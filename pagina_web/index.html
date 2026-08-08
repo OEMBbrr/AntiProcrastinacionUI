@@ -188,11 +188,11 @@
         <div class="challenge-sandbox">
             <div class="phrase-box">
                 <span class="badge-phrase">Texto de Desafío Requerido:</span>
-                <p id="sample-phrase">Al tomar la firme decisión de dar por concluida mi actividad antes de tiempo, reconozco plenamente que la verdadera autodisciplina no consiste en buscar atajos hacia la comodidad, sino en honrar cada promesa que me hago a mí mismo. Reconozco que mi mente intentará justificar la pausa y buscará refugio en la gratificación inmediata de una pantalla, pero mi compromiso con el éxito real y con mi propio crecimiento personal se encuentra por encima de cualquier impulso efímero.</p>
+                <p id="sample-phrase" oncopy="return false;" oncontextmenu="return false;">Al tomar la firme decisión de dar por concluida mi actividad antes de tiempo, reconozco plenamente que la verdadera autodisciplina no consiste en buscar atajos hacia la comodidad, sino en honrar cada promesa que me hago a mí mismo. Reconozco que mi mente intentará justificar la pausa y buscará refugio en la gratificación inmediata de una pantalla, pero mi compromiso con el éxito real y con mi propio crecimiento personal se encuentra por encima de cualquier impulso efímero.</p>
             </div>
 
             <div class="typing-area">
-                <textarea id="typing-input" placeholder="Comienza a escribir el texto aquí exactamente para probar la verificación..."></textarea>
+                <textarea id="typing-input" placeholder="Comienza a escribir el texto aquí exactamente (Pegado desactivado por seguridad)..." onpaste="return false;" oncopy="return false;" oncontextmenu="return false;"></textarea>
                 <div class="progress-bar-container">
                     <div class="progress-fill" id="typing-progress"></div>
                 </div>
@@ -272,8 +272,8 @@
         <div class="modal-card">
             <h4 id="modal-title">Desafío de Verificación</h4>
             <p id="modal-desc">Escribe el texto requerido para desbloquear la aplicación:</p>
-            <div class="modal-text-box" id="modal-text-box"></div>
-            <textarea id="modal-input" placeholder="Escribe aquí..."></textarea>
+            <div class="modal-text-box" id="modal-text-box" oncopy="return false;" oncontextmenu="return false;"></div>
+            <textarea id="modal-input" placeholder="Escribe aquí (Pegado desactivado por seguridad)..." onpaste="return false;" oncopy="return false;" oncontextmenu="return false;"></textarea>
             <div class="modal-actions">
                 <button class="btn-cancel" id="btn-close-modal">Cancelar</button>
                 <button class="btn-confirm" id="btn-verify-modal">Verificar</button>

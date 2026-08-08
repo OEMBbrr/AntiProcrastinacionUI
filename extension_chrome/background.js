@@ -1,8 +1,9 @@
 let isLocked = false;
 let remainingSeconds = 0;
 let lockInterval = null;
+let parentalEnabled = false;
 
-const blockedDomains = [
+let defaultDomains = [
     "facebook.com",
     "instagram.com",
     "tiktok.com",
@@ -12,29 +13,67 @@ const blockedDomains = [
     "reddit.com"
 ];
 
-function updateNetRules() {
-    if (isLocked) {
-        const rules = blockedDomains.map((domain, index) => ({
-            id: index + 1,
-            priority: 1,
-            action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
-            condition: { urlFilter: `*://${domain}/*`, resourceTypes: ['main_frame'] }
-        }));
+const adultDomains = [
+    "pornhub.com",
+    "xvideos.com",
+    "xnxx.com",
+    "xhamster.com",
+    "onlyfans.com",
+    "redtube.com",
+    "youporn.com",
+    "chaturbate.com",
+    "stripchat.com"
+];
 
-        chrome.declarativeNetRequest.updateDynamicRules({
-            removeRuleIds: blockedDomains.map((_, i) => i + 1),
-            addRules: rules
-        });
-    } else {
-        chrome.declarativeNetRequest.updateDynamicRules({
-            removeRuleIds: blockedDomains.map((_, i) => i + 1)
-        });
+let customDomains = [...defaultDomains];
+
+// Cargar configuración guardada
+chrome.storage.local.get(['customDomains', 'parentalEnabled'], (res) => {
+    if (res.customDomains && Array.isArray(res.customDomains)) {
+        customDomains = res.customDomains;
     }
+    if (res.parentalEnabled !== undefined) {
+        parentalEnabled = res.parentalEnabled;
+    }
+    updateNetRules();
+});
+
+function getActiveRulesList() {
+    let active = [...customDomains];
+    if (parentalEnabled) {
+        active = [...new Set([...active, ...adultDomains])];
+    }
+    return active;
+}
+
+function updateNetRules() {
+    chrome.declarativeNetRequest.getDynamicRules((existingRules) => {
+        const removeIds = existingRules.map(r => r.id);
+        const activeList = getActiveRulesList();
+
+        if (isLocked || parentalEnabled) {
+            const rules = activeList.map((domain, index) => ({
+                id: index + 1,
+                priority: 1,
+                action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
+                condition: { urlFilter: `*://${domain}/*`, resourceTypes: ['main_frame'] }
+            }));
+
+            chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: removeIds,
+                addRules: rules
+            });
+        } else {
+            chrome.declarativeNetRequest.updateDynamicRules({
+                removeRuleIds: removeIds
+            });
+        }
+    });
 }
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getState') {
-        sendResponse({ isLocked, remainingSeconds });
+        sendResponse({ isLocked, remainingSeconds, customDomains, parentalEnabled });
     } else if (request.action === 'startTimer') {
         isLocked = true;
         remainingSeconds = request.minutes * 60;
@@ -50,6 +89,24 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     } else if (request.action === 'grantTregua') {
         remainingSeconds = request.minutes * 60;
         sendResponse({ success: true });
+    } else if (request.action === 'addDomain') {
+        const cleanDomain = request.domain.trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '');
+        if (cleanDomain && !customDomains.includes(cleanDomain)) {
+            customDomains.push(cleanDomain);
+            chrome.storage.local.set({ customDomains });
+            updateNetRules();
+        }
+        sendResponse({ success: true, customDomains });
+    } else if (request.action === 'removeDomain') {
+        customDomains = customDomains.filter(d => d !== request.domain);
+        chrome.storage.local.set({ customDomains });
+        updateNetRules();
+        sendResponse({ success: true, customDomains });
+    } else if (request.action === 'toggleParental') {
+        parentalEnabled = request.enabled;
+        chrome.storage.local.set({ parentalEnabled });
+        updateNetRules();
+        sendResponse({ success: true, parentalEnabled });
     }
     return true;
 });

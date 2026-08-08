@@ -1,0 +1,103 @@
+================================================================================
+    DOCUMENTO DE CONTEXTO TÉCNICO Y ARQUITECTURA: PROYECTO ANTIPROCRASTINACIÓN
+================================================================================
+
+ESTIMADA IA:
+Este documento contiene la especificación completa, arquitectura, decisiones de diseño,
+flujos de código y estado actual del ecosistema "AntiProcrastinación". Léelo atentamente
+para comprender exactamente de qué trata la aplicación y cómo está construida.
+
+--------------------------------------------------------------------------------
+1. CONCEPTO Y FILOSOFÍA DE LA APLICACIÓN
+--------------------------------------------------------------------------------
+"AntiProcrastinación" es un ecosistema multiplataforma (Android, iOS, Web y Extensión
+de Google Chrome) diseñado para imponer autodisciplina real y eliminar la tentación
+del desbloqueo impulsivo de dispositivos móviles y navegadores web.
+
+A diferencia de otras apps que permiten saltar el bloqueo presionando un simple botón,
+AntiProcrastinación utiliza un enfoque psicopedagógico de resistencia cognitiva:
+- RETOS ANTI-PEGADO DE SEGURIDAD (ANTI-PASTE SECURITY):
+  Se desactivó totalmente la función de copiar y pegar (onpaste/oncopy return false + detección de velocidad de tecleo).
+  El usuario está OBLIGADO a teclear letra por letra el texto reflexivo de 150-200 palabras con ortografía,
+  mayúsculas, acentos y signos de puntuación exactos.
+- GESTOR DE ENLACES PERSONALIZADOS:
+  Permite agregar, editar y eliminar dominios/sitios bloqueados personalizados (ej. tiktok.com, instagram.com).
+- MODO CONTROL PARENTAL (+18):
+  Interruptor especial que bloquea automáticamente una lista integrada de sitios de contenido adulto e inapropiado
+  (pornhub.com, xvideos.com, xnxx.com, xhamster.com, onlyfans.com, redtube.com, youporn.com, etc.).
+- Si el usuario necesita un acceso temporal de emergencia ("Tregua temporal de 5 min"), debe
+  resolver problemas matemáticos aleatorios (multiplicaciones o restas compuestas) o escribir
+  1 de las 100 frases de enfoque preparadas.
+- Los botones de Emergencia para llamadas de voz (📞 Teléfono) y mensajes de texto (💬 SMS)
+  permanecen siempre accesibles en todo momento por seguridad.
+- Estética Zen: Diseñada con una paleta de colores relajantes Verde Pizarra Pardo (#5A6E61),
+  Gris Verdoso (#8C9B90), Carbón Oscuro (#2C302E) y Blanco Roto Crema (#F9F8F6).
+
+--------------------------------------------------------------------------------
+2. COMPONENTE 1: APLICACIÓN NATIVA ANDROID (KOTLIN & JETPACK COMPOSE)
+--------------------------------------------------------------------------------
+Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\app\
+
+- Paquete: com.antiprocrastinacion.lock (Versión 12 / versionCode = 12).
+- Monitoreo Hyper-Responsivo (LockMonitoringService.kt):
+  Servicio en primer plano (Foreground Service) que ejecuta un bucle de verificación cada
+  80 milisegundos. Detecta si el usuario está en un lanzador del sistema o app no autorizada
+  y superpone la pantalla ZenScreen sin animación (FLAG_ACTIVITY_NO_ANIMATION).
+- Prevención de Pegado en Compose (ZenScreen.kt):
+  Detecta variaciones brutas en el campo de texto (si se insertan más de 25 caracteres simultáneamente),
+  bloqueando la acción de pegado del portapapeles e informando mediante Toast.
+- Gestor de Enlaces y Control Parental (LockManager.kt & ConfigScreen.kt):
+  Almacena y gestiona en SharedPreferences la lista de enlaces bloqueados personalizados y el estado del Modo Parental (+18).
+
+--------------------------------------------------------------------------------
+3. COMPONENTE 2: APLICACIÓN MULTIPLATAFORMA IPHONE (iOS / FLUTTER / SWIFT)
+--------------------------------------------------------------------------------
+Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\lib\ & ios\
+
+- Estructura: Creada con Flutter (lib/main.dart) preservando el código nativo de Android en app/ 100% intacto.
+- Compilación en la Nube Automatizada (GitHub Actions):
+  Archivo .github/workflows/build_apps.yml configurado para ejecutarse en servidores Mac de GitHub (macos-14).
+- Al hacer git push a GitHub, el servidor Mac ejecuta "flutter create . --project-name antiprocrastinacion --platforms=ios"
+  y compila el paquete ejecutable para iPhone (AntiProcrastinacion_iOS.ipa / Runner.app).
+- Instalación en iPhone: Se puede instalar sin PC mediante usescarlet.com desde Safari o mediante Sideloadly.io desde PC.
+
+--------------------------------------------------------------------------------
+4. COMPONENTE 3: SITIO WEB LANDING PAGE INTERACTIVO
+--------------------------------------------------------------------------------
+Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\pagina_web\
+
+- Archivos: index.html, styles.css, app.js, images/app_logo.jpg, images/promo_zen.jpg, downloads/
+- Bloqueo Anti-Pegado: Atributos onpaste="return false;", oncopy="return false;" y comprobación de tiempo transcurrido en app.js.
+- Maqueta Interactiva de Smartphone: Permite probar el temporizador, modales y botones en vivo.
+- Sandbox de Escritura: Permite escribir el texto de 150 palabras y muestra el progreso de coincidencia en tiempo real.
+- Motor de Audio Zen (Web Audio API):
+  * Frecuencia Om 136.1 Hz profunda y grave con filtro pasa-bajos a 300Hz.
+  * Sonido ambiental de brisa de viento Zen grave (playZenWind) con seguro anti-superposición (cooldownMs = 2400).
+  * Inicialización automática al primer gesto del usuario (click, scroll, mousemove, touchstart).
+- Alternador de Modo Claro / Modo Oscuro con persistencia en localStorage y sombras de volumen suaves en modo claro.
+- Animaciones al bajar por la página (Intersection Observer Scroll Reveal).
+- Botón de descarga directa de Android (AntiProcrastinacion.apk / v12) y modal interactivo de guía de instalación para iPhone (.IPA).
+
+--------------------------------------------------------------------------------
+5. COMPONENTE 4: EXTENSIÓN OFICIAL PARA GOOGLE CHROME (MANIFEST V3)
+--------------------------------------------------------------------------------
+Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\extension_chrome\
+
+- Especificación Manifest V3: manifest.json, background.js, popup.html, popup.js, blocked.html, styles.css.
+- Bloqueo Dinámico de Red (declarativeNetRequest):
+  Soporta agregar y eliminar dominios personalizados en vivo (ej. tiktok.com, instagram.com) + el interruptor de Modo Control Parental (+18).
+- Bloqueo de Pegado: Atributos onpaste="return false;" en textareas y verificación de velocidad de tecleo (< 10 segundos para 150 palabras rechaza el intento).
+
+--------------------------------------------------------------------------------
+6. REPOSITORIO DE CÓDIGO Y CONTROL DE VERSIONES
+--------------------------------------------------------------------------------
+- Repositorio Oficial de GitHub: https://github.com/OEMBbrr/AntiProcastinacion.git
+- Usuario de GitHub: OEMBbrr
+- Rama Principal: main
+
+================================================================================
+SI ERES UNA IA CONTINUANDO ESTE PROYECTO:
+Mantén siempre la estética Zen, la rigurosidad en los retos de escritura de 150 palabras,
+la paleta de colores slate-green (#5A6E61 / #8C9B90), la arquitectura sin atajos y la integridad
+de todos los archivos Android, iOS, Web y Chrome Extension creados.
+================================================================================

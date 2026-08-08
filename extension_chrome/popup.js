@@ -2,6 +2,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let targetMinutes = 10;
     let longPhrase = "Al tomar la firme decisión de dar por concluida mi actividad antes de tiempo, reconozco plenamente que la verdadera autodisciplina no consiste en buscar atajos hacia la comodidad, sino en honrar cada promesa que me hago a mí mismo.";
     let expectedMath = 0;
+    let phraseStartTime = 0;
 
     const timerText = document.getElementById('timer-text');
     const targetLabel = document.getElementById('target-label');
@@ -15,6 +16,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnFinishEarly = document.getElementById('btn-finish-early');
     const btnTregua = document.getElementById('btn-tregua');
 
+    const siteTagsContainer = document.getElementById('site-tags-container');
+    const newSiteInput = document.getElementById('new-site-input');
+    const btnAddSite = document.getElementById('btn-add-site');
+    const parentalSwitch = document.getElementById('parental-switch');
+
     const phraseModal = document.getElementById('phrase-modal');
     const phraseTargetText = document.getElementById('phrase-target-text');
     const phraseInput = document.getElementById('phrase-input');
@@ -27,16 +33,42 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseMath = document.getElementById('btn-close-math');
     const btnVerifyMath = document.getElementById('btn-verify-math');
 
+    // Desactivar pegar por código JS y eventos
+    phraseInput.addEventListener('paste', (e) => e.preventDefault());
+    phraseInput.addEventListener('copy', (e) => e.preventDefault());
+    phraseInput.addEventListener('contextmenu', (e) => e.preventDefault());
+
     function formatTime(totalSecs) {
         const mins = Math.floor(totalSecs / 60);
         const secs = totalSecs % 60;
         return `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
     }
 
+    function renderSiteTags(customDomains) {
+        if (!siteTagsContainer) return;
+        siteTagsContainer.innerHTML = '';
+        customDomains.forEach(domain => {
+            const tag = document.createElement('span');
+            tag.className = 'tag';
+            tag.innerHTML = `${domain} <span class="del-tag" data-domain="${domain}">×</span>`;
+            siteTagsContainer.appendChild(tag);
+        });
+
+        document.querySelectorAll('.del-tag').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const dom = e.target.getAttribute('data-domain');
+                chrome.runtime.sendMessage({ action: 'removeDomain', domain: dom }, () => updateUI());
+            });
+        });
+    }
+
     function updateUI() {
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
-            const { isLocked, remainingSeconds } = response;
+            const { isLocked, remainingSeconds, customDomains, parentalEnabled } = response;
+
+            if (parentalSwitch) parentalSwitch.checked = !!parentalEnabled;
+            if (customDomains) renderSiteTags(customDomains);
 
             if (isLocked) {
                 statusPill.textContent = "MODO ENFOQUE ACTIVO";
@@ -54,6 +86,22 @@ document.addEventListener('DOMContentLoaded', () => {
                 targetLabel.textContent = `${targetMinutes} min`;
                 timerText.textContent = `${targetMinutes < 10 ? '0' + targetMinutes : targetMinutes}:00`;
             }
+        });
+    }
+
+    btnAddSite.addEventListener('click', () => {
+        const val = newSiteInput.value.trim();
+        if (val) {
+            chrome.runtime.sendMessage({ action: 'addDomain', domain: val }, () => {
+                newSiteInput.value = '';
+                updateUI();
+            });
+        }
+    });
+
+    if (parentalSwitch) {
+        parentalSwitch.addEventListener('change', () => {
+            chrome.runtime.sendMessage({ action: 'toggleParental', enabled: parentalSwitch.checked }, () => updateUI());
         });
     }
 
@@ -78,6 +126,7 @@ document.addEventListener('DOMContentLoaded', () => {
     btnFinishEarly.addEventListener('click', () => {
         phraseTargetText.textContent = longPhrase;
         phraseInput.value = "";
+        phraseStartTime = Date.now();
         phraseModal.classList.remove('hidden');
     });
 
@@ -86,13 +135,22 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnVerifyPhrase.addEventListener('click', () => {
+        const timeTakenSeconds = (Date.now() - phraseStartTime) / 1000;
+        
+        // Verificación Anti-Pegado (Nadie escribe 150 palabras en menos de 10 segundos)
+        if (timeTakenSeconds < 10) {
+            alert("⚠️ Intento de pegado detectado. Debes escribir el texto manualmente letra por letra para demostrar autodisciplina.");
+            phraseInput.value = "";
+            return;
+        }
+
         if (phraseInput.value.trim() === longPhrase.trim()) {
             chrome.runtime.sendMessage({ action: 'stopTimer' }, () => {
                 phraseModal.classList.add('hidden');
                 updateUI();
             });
         } else {
-            alert("El texto no coincide exactamente. Verifica mayúsculas y acentos.");
+            alert("El texto no coincide exactamente. Verifica acentos y signos de puntuación.");
         }
     });
 

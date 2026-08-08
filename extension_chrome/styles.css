@@ -151,18 +151,45 @@ body {
     cursor: pointer;
 }
 
-.sites-box {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    margin-bottom: 14px;
+.box-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
 }
 
-.sites-box h4 {
-    font-size: 0.8rem;
-    color: var(--text-muted);
-    margin-bottom: 8px;
+.parental-toggle {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.72rem;
+    color: var(--zen-coral);
+    font-weight: 600;
+}
+
+.add-site-form {
+    display: flex;
+    gap: 6px;
+    margin-bottom: 10px;
+}
+
+.add-site-form input {
+    flex: 1;
+    padding: 5px 8px;
+    border: 1px solid #CBD5E1;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    outline: none;
+}
+
+.add-site-form button {
+    padding: 5px 10px;
+    background: var(--zen-olive);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    cursor: pointer;
 }
 
 .site-tags {
@@ -178,6 +205,16 @@ body {
     font-size: 0.72rem;
     padding: 3px 8px;
     border-radius: 6px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.tag .del-tag {
+    cursor: pointer;
+    color: var(--zen-coral);
+    font-weight: 700;
+}
 }
 
 .modal-overlay {

@@ -32,23 +32,27 @@
     </div>
 
     <div class="sites-box">
-        <h4>SITIOS WEB BLOQUEADOS:</h4>
-        <div class="site-tags">
-            <span class="tag">facebook.com</span>
-            <span class="tag">instagram.com</span>
-            <span class="tag">tiktok.com</span>
-            <span class="tag">youtube.com</span>
-            <span class="tag">x.com</span>
+        <div class="box-header">
+            <h4>SITIOS WEB BLOQUEADOS:</h4>
+            <div class="parental-toggle">
+                <label for="parental-switch">🔞 Control Parental (+18):</label>
+                <input type="checkbox" id="parental-switch">
+            </div>
         </div>
+        <div class="add-site-form">
+            <input type="text" id="new-site-input" placeholder="ej. tiktok.com o instagram.com">
+            <button id="btn-add-site">+ Agregar</button>
+        </div>
+        <div class="site-tags" id="site-tags-container"></div>
     </div>
 
-    <!-- Modal Reto de Escritura -->
+    <!-- Modal Reto de Escritura (Con bloqueo anti copiar y pegar) -->
     <div class="modal-overlay hidden" id="phrase-modal">
         <div class="modal-card">
             <h4>Verificación de Finalización (150 palabras)</h4>
-            <p>Escribe el texto exacto para finalizar el enfoque antes de tiempo:</p>
-            <div class="modal-text" id="phrase-target-text"></div>
-            <textarea id="phrase-input" placeholder="Comienza a escribir aquí..."></textarea>
+            <p>Escribe el texto exacto para finalizar el enfoque antes de tiempo (<strong>Pegado desactivado por seguridad</strong>):</p>
+            <div class="modal-text" id="phrase-target-text" oncopy="return false;" oncontextmenu="return false;"></div>
+            <textarea id="phrase-input" placeholder="Comienza a escribir aquí..." onpaste="return false;" oncopy="return false;" oncontextmenu="return false;"></textarea>
             <div class="modal-actions">
                 <button class="btn-sm btn-cancel" id="btn-close-phrase">Cancelar</button>
                 <button class="btn-sm btn-confirm" id="btn-verify-phrase">Desbloquear</button>

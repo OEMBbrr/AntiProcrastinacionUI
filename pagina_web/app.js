@@ -217,14 +217,23 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const longChallengePhrase = "Al tomar la firme decisión de dar por concluida mi actividad antes de tiempo, reconozco plenamente que la verdadera autodisciplina no consiste en buscar atajos hacia la comodidad, sino en honrar cada promesa que me hago a mí mismo.";
 
+    let modalStartTime = 0;
+
     if (btnFinishEarly) {
         btnFinishEarly.addEventListener('click', () => {
             modalTitle.textContent = "Verificación de Finalización (150-200 Palabras)";
-            modalDesc.textContent = "Escribe el texto exacto para finalizar el temporizador antes de tiempo:";
+            modalDesc.textContent = "Escribe el texto exacto para finalizar el temporizador antes de tiempo (Pegado desactivado por seguridad):";
             modalTextBox.textContent = longChallengePhrase;
             modalInput.value = "";
+            modalStartTime = Date.now();
             demoModal.classList.remove('hidden');
         });
+    }
+
+    if (modalInput) {
+        modalInput.addEventListener('paste', (e) => e.preventDefault());
+        modalInput.addEventListener('copy', (e) => e.preventDefault());
+        modalInput.addEventListener('contextmenu', (e) => e.preventDefault());
     }
 
     if (btnTregua) {
@@ -250,6 +259,15 @@ document.addEventListener('DOMContentLoaded', () => {
         btnVerifyModal.addEventListener('click', () => {
             const typed = modalInput.value.trim();
             const expectedMath = modalInput.dataset.expectedMath;
+
+            if (!expectedMath) {
+                const elapsedSecs = (Date.now() - modalStartTime) / 1000;
+                if (elapsedSecs < 8) {
+                    alert("⚠️ Intento de pegado detectado. Debes escribir el texto manualmente letra por letra para demostrar autodisciplina.");
+                    modalInput.value = "";
+                    return;
+                }
+            }
 
             if (expectedMath && typed === expectedMath) {
                 alert("¡Desafío matemático correcto! Se ha activado la tregua de 5 minutos.");
