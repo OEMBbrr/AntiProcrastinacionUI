@@ -1,0 +1,24 @@
+{
+  "manifest_version": 3,
+  "name": "AntiProcrastinación - Enfoque & Autodisciplina",
+  "version": "1.0.0",
+  "description": "Bloquea sitios web de distracción con temporizador Zen, retos de escritura consciente de 150 palabras y treguas matemáticas.",
+  "permissions": [
+    "declarativeNetRequest",
+    "declarativeNetRequestWithHostAccess",
+    "storage",
+    "tabs",
+    "alarms"
+  ],
+  "host_permissions": [
+    "<all_urls>"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "AntiProcrastinación"
+  },
+  "options_page": "popup.html"
+}

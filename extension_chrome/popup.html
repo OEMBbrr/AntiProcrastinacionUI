@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>AntiProcrastinación</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+    <div class="header">
+        <img src="app_logo.jpg" alt="Logo" class="logo-img">
+        <h2>antiprocrastinación</h2>
+        <span class="status-pill" id="status-pill">MODO LIBRE</span>
+    </div>
+
+    <div class="timer-box">
+        <span class="timer-digits" id="timer-text">10:00</span>
+        <span class="timer-label">Tiempo de Enfoque Restante</span>
+
+        <div class="adjuster" id="setup-controls">
+            <button class="btn-adj" id="btn-minus">-</button>
+            <span id="target-label">10 min</span>
+            <button class="btn-adj" id="btn-plus">+</button>
+        </div>
+
+        <button class="btn-main" id="btn-start">Iniciar Enfoque</button>
+
+        <div class="hidden" id="locked-controls">
+            <button class="btn-outline" id="btn-finish-early">Ya terminé mi actividad</button>
+            <button class="btn-coral" id="btn-tregua">Tregua temporal (5 min)</button>
+        </div>
+    </div>
+
+    <div class="sites-box">
+        <h4>SITIOS WEB BLOQUEADOS:</h4>
+        <div class="site-tags">
+            <span class="tag">facebook.com</span>
+            <span class="tag">instagram.com</span>
+            <span class="tag">tiktok.com</span>
+            <span class="tag">youtube.com</span>
+            <span class="tag">x.com</span>
+        </div>
+    </div>
+
+    <!-- Modal Reto de Escritura -->
+    <div class="modal-overlay hidden" id="phrase-modal">
+        <div class="modal-card">
+            <h4>Verificación de Finalización (150 palabras)</h4>
+            <p>Escribe el texto exacto para finalizar el enfoque antes de tiempo:</p>
+            <div class="modal-text" id="phrase-target-text"></div>
+            <textarea id="phrase-input" placeholder="Comienza a escribir aquí..."></textarea>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" id="btn-close-phrase">Cancelar</button>
+                <button class="btn-sm btn-confirm" id="btn-verify-phrase">Desbloquear</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Tregua Matemática -->
+    <div class="modal-overlay hidden" id="math-modal">
+        <div class="modal-card">
+            <h4>Desafío de Tregua (5 Minutos)</h4>
+            <p>Resuelve la siguiente operación matemática para obtener 5 minutos de acceso:</p>
+            <div class="modal-text" id="math-problem-text"></div>
+            <textarea id="math-input" placeholder="Respuesta numérica..."></textarea>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" id="btn-close-math">Cancelar</button>
+                <button class="btn-sm btn-confirm" id="btn-verify-math">Activar Tregua</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="popup.js"></script>
+</body>
+</html>
