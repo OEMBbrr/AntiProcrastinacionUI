@@ -49,20 +49,20 @@
                     Una aplicación diseñada para la autodisciplina real. Sin atajos sencillos: incluye retos de escritura consciente de 150-200 palabras, desafíos matemáticos de tregua y protección continua para Android e iPhone.
                 </p>
                 <div class="hero-ctas">
-                    <a href="../AntiProcrastinacion_v11.apk" class="btn btn-primary" download id="download-android-btn">
+                    <a href="downloads/AntiProcrastinacion.apk" class="btn btn-primary" download="AntiProcrastinacion.apk" id="download-android-btn">
                         <i class="fa-brands fa-android"></i>
                         <div>
                             <span class="btn-small">Descargar para</span>
-                            <span class="btn-large">Android (APK v11)</span>
+                            <span class="btn-large">Android (APK)</span>
                         </div>
                     </a>
-                    <a href="../descargas_ios/AntiProcrastinacion_iOS_v1/AntiProcrastinacion_iOS.ipa" class="btn btn-secondary" download id="download-ios-btn">
+                    <button class="btn btn-secondary" id="btn-open-ios-modal">
                         <i class="fa-brands fa-apple"></i>
                         <div>
                             <span class="btn-small">Descargar para</span>
-                            <span class="btn-large">iPhone (.IPA)</span>
+                            <span class="btn-large">iPhone (Guía .IPA)</span>
                         </div>
-                    </a>
+                    </button>
                 </div>
                 <div class="platform-support">
                     <span><i class="fa-solid fa-check-circle"></i> TECNO, Samsung, Xiaomi, Motorola</span>
@@ -207,12 +207,12 @@
             <h2>Empieza a Proteger Tu Tiempo Hoy Mismo</h2>
             <p>Descarga la app oficial para tu teléfono Android o iPhone de forma 100% gratuita.</p>
             <div class="cta-buttons">
-                <a href="../AntiProcrastinacion_v11.apk" class="btn btn-primary" download>
-                    <i class="fa-brands fa-android"></i> Descargar Android APK (v11)
+                <a href="downloads/AntiProcrastinacion.apk" class="btn btn-primary" download="AntiProcrastinacion.apk">
+                    <i class="fa-brands fa-android"></i> Descargar Android (APK)
                 </a>
-                <a href="../descargas_ios/AntiProcrastinacion_iOS_v1/AntiProcrastinacion_iOS.ipa" class="btn btn-secondary" download>
-                    <i class="fa-brands fa-apple"></i> Descargar iPhone (.IPA)
-                </a>
+                <button class="btn btn-secondary" id="btn-open-ios-modal-2">
+                    <i class="fa-brands fa-apple"></i> Instalación para iPhone (.IPA)
+                </button>
             </div>
         </div>
     </section>
@@ -223,6 +223,46 @@
             <p>© 2026 AntiProcrastinación. Todos los derechos reservados. Diseñado para la máxima autodisciplina.</p>
         </div>
     </footer>
+
+    <!-- Modal Guía de Instalación para iPhone -->
+    <div class="modal-overlay hidden" id="ios-guide-modal">
+        <div class="modal-card ios-modal-card">
+            <div class="ios-modal-header">
+                <i class="fa-brands fa-apple"></i>
+                <div>
+                    <h4>Instalación en iPhone (iOS)</h4>
+                    <span class="sub-badge">Guía Rápida</span>
+                </div>
+            </div>
+            <p class="ios-modal-intro">En iOS los archivos <code>.IPA</code> requieren instalación guiada. Tienes 2 opciones sencillas:</p>
+            
+            <div class="ios-method-box">
+                <div class="method-title">
+                    <span class="method-num">1</span>
+                    <strong>Sin Computadora (Directo desde Safari):</strong>
+                </div>
+                <p>Entra desde Safari en tu iPhone a <a href="https://usescarlet.com" target="_blank" rel="noopener">usescarlet.com</a>, instala Scarlet, y abre el archivo <code>.IPA</code> descargado desde la app.</p>
+            </div>
+
+            <div class="ios-method-box">
+                <div class="method-title">
+                    <span class="method-num">2</span>
+                    <strong>Desde tu PC con Sideloadly:</strong>
+                </div>
+                <p>Descarga <a href="https://sideloadly.io" target="_blank" rel="noopener">Sideloadly.io</a> en tu PC, conecta tu iPhone por USB, arrastra el archivo <code>.IPA</code> e ingresa tu Apple ID.</p>
+            </div>
+
+            <div class="ios-modal-download-area">
+                <a href="downloads/AntiProcrastinacion.ipa" class="btn btn-primary btn-full-width" download="AntiProcrastinacion.ipa">
+                    <i class="fa-solid fa-download"></i> Descargar Archivo AntiProcrastinacion.ipa
+                </a>
+            </div>
+
+            <div class="modal-actions">
+                <button class="btn-cancel" id="btn-close-ios-modal">Cerrar Ventana</button>
+            </div>
+        </div>
+    </div>
 
     <!-- Interactive Challenge Modal for Demo Phone -->
     <div class="modal-overlay hidden" id="demo-modal">

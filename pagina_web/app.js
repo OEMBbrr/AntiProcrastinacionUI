@@ -177,4 +177,22 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    // 4. iOS Guide Modal Handlers
+    const iosGuideModal = document.getElementById('ios-guide-modal');
+    const btnOpenIosModal1 = document.getElementById('btn-open-ios-modal');
+    const btnOpenIosModal2 = document.getElementById('btn-open-ios-modal-2');
+    const btnCloseIosModal = document.getElementById('btn-close-ios-modal');
+
+    function openIosModal() {
+        if (iosGuideModal) iosGuideModal.classList.remove('hidden');
+    }
+
+    function closeIosModal() {
+        if (iosGuideModal) iosGuideModal.classList.add('hidden');
+    }
+
+    if (btnOpenIosModal1) btnOpenIosModal1.addEventListener('click', openIosModal);
+    if (btnOpenIosModal2) btnOpenIosModal2.addEventListener('click', openIosModal);
+    if (btnCloseIosModal) btnCloseIosModal.addEventListener('click', closeIosModal);
 });
