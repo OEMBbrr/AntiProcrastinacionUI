@@ -438,41 +438,94 @@ fun ConfigScreen(
                     }
                 }
 
-                // Sincronización de Cuenta con Extensión de Chrome
+                // Sincronización de Cuenta con Extensión de Chrome (Estilo Web Pro)
                 var syncKeyText by remember { mutableStateOf(lockManager.userSyncKey) }
                 
                 Column {
-                    Text(
-                        text = "VINCULACIÓN DE CUENTA CON CHROME EXTENSION",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = ZenSage,
-                        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        modifier = Modifier.fillMaxWidth().padding(start = 4.dp, bottom = 6.dp)
+                    ) {
+                        Text(
+                            text = "VINCULACIÓN DE CUENTA CON CHROME",
+                            style = MaterialTheme.typography.labelLarge,
+                            color = ZenSage,
+                            fontWeight = FontWeight.Bold
+                        )
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = ZenOlive.copy(alpha = 0.12f),
+                            border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f))
+                        ) {
+                            Text(
+                                text = if (syncKeyText.isNotEmpty()) "🟢 Vinculado" else "Desconectado",
+                                fontSize = 10.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ZenOlive,
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
+                            )
+                        }
+                    }
 
                     Card(
                         modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
+                        shape = RoundedCornerShape(20.dp),
                         colors = CardDefaults.cardColors(containerColor = ZenWhite),
-                        border = BorderStroke(1.dp, ZenSage.copy(alpha = 0.2f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.25f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 3.dp)
                     ) {
-                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(
-                                text = "Ingresa tu email o código PIN de vinculación para sincronizar este teléfono con la Extensión de Chrome de tu PC:",
-                                fontSize = 11.sp,
-                                color = ZenCharcoal
-                            )
+                        Column(modifier = Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                        .background(ZenOlive.copy(alpha = 0.12f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Default.Lock,
+                                        contentDescription = null,
+                                        tint = ZenOlive,
+                                        modifier = Modifier.size(20.dp)
+                                    )
+                                }
+                                Column {
+                                    Text(
+                                        text = "Sincronización en Tiempo Real",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ZenCharcoal
+                                    )
+                                    Text(
+                                        text = "Ingresa tu email o código PIN para conectar este teléfono con tu PC:",
+                                        fontSize = 11.sp,
+                                        color = ZenSage
+                                    )
+                                }
+                            }
+
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp),
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 OutlinedTextField(
                                     value = syncKeyText,
                                     onValueChange = { syncKeyText = it },
-                                    placeholder = { Text("ej. usuario@email.com", fontSize = 11.sp) },
-                                    modifier = Modifier.weight(1f).height(48.dp),
-                                    shape = RoundedCornerShape(8.dp)
+                                    placeholder = { Text("ej. usuario@email.com", fontSize = 12.sp, color = ZenSage.copy(alpha = 0.6f)) },
+                                    modifier = Modifier.weight(1f).height(52.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = CreamBackground,
+                                        unfocusedContainerColor = CreamBackground,
+                                        focusedBorderColor = ZenOlive,
+                                        unfocusedBorderColor = ZenSage.copy(alpha = 0.3f)
+                                    )
                                 )
                                 Button(
                                     onClick = {
@@ -483,9 +536,11 @@ fun ConfigScreen(
                                         }
                                     },
                                     colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
-                                    shape = RoundedCornerShape(8.dp)
+                                    shape = RoundedCornerShape(12.dp),
+                                    modifier = Modifier.height(52.dp),
+                                    elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
                                 ) {
-                                    Text("Guardar", fontSize = 11.sp)
+                                    Text("Guardar", fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }
