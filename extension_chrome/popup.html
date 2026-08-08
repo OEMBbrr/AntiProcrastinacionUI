@@ -26,13 +26,28 @@
     </div>
 
     <div class="timer-box">
-        <span class="timer-digits" id="timer-text">10:00</span>
+        <span class="timer-digits" id="timer-text">00:10:00</span>
         <span class="timer-label">Tiempo de Enfoque Restante</span>
 
-        <div class="adjuster" id="setup-controls">
-            <button class="btn-adj" id="btn-minus">-</button>
-            <span id="target-label">10 min</span>
-            <button class="btn-adj" id="btn-plus">+</button>
+        <!-- Stepper de Horas y Minutos idéntico a Android -->
+        <div class="time-picker-zen" id="setup-controls">
+            <div class="picker-col">
+                <span class="picker-title">HORAS</span>
+                <div class="stepper-row">
+                    <button class="btn-step" id="btn-hours-minus">-</button>
+                    <span class="step-num" id="hours-text">00</span>
+                    <button class="btn-step" id="btn-hours-plus">+</button>
+                </div>
+            </div>
+            <span class="colon-sep">:</span>
+            <div class="picker-col">
+                <span class="picker-title">MINUTOS</span>
+                <div class="stepper-row">
+                    <button class="btn-step" id="btn-mins-minus">-</button>
+                    <span class="step-num" id="mins-text">10</span>
+                    <button class="btn-step" id="btn-mins-plus">+</button>
+                </div>
+            </div>
         </div>
 
         <button class="btn-main" id="btn-start">Iniciar Enfoque</button>

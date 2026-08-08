@@ -143,24 +143,72 @@ body {
     text-transform: uppercase;
 }
 
-.adjuster {
+.time-picker-zen {
     display: flex;
     align-items: center;
     justify-content: center;
-    gap: 14px;
+    gap: 12px;
     margin: 12px 0 16px;
+    background: #F1F5F3;
+    padding: 10px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(90, 110, 97, 0.2);
 }
 
-.btn-adj {
-    width: 32px;
-    height: 32px;
+.picker-col {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2px;
+}
+
+.picker-title {
+    font-size: 0.62rem;
+    font-weight: 800;
+    color: var(--zen-olive);
+    letter-spacing: 0.5px;
+}
+
+.stepper-row {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-step {
+    width: 28px;
+    height: 28px;
     border-radius: 50%;
-    border: 1px solid #CBD5E1;
+    border: 1px solid rgba(90, 110, 97, 0.3);
     background: #fff;
     cursor: pointer;
-    font-size: 1.1rem;
+    font-size: 1rem;
     font-weight: 700;
     color: var(--text-main);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: 0.15s ease;
+}
+
+.btn-step:hover {
+    background: var(--zen-olive);
+    color: #fff;
+}
+
+.step-num {
+    font-size: 1.4rem;
+    font-weight: 300;
+    color: var(--text-main);
+    min-width: 32px;
+    text-align: center;
+}
+
+.colon-sep {
+    font-size: 1.6rem;
+    font-weight: 300;
+    color: var(--zen-olive);
+    margin-top: 10px;
 }
 
 .btn-main {

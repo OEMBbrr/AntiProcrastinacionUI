@@ -6,6 +6,10 @@ import android.content.SharedPreferences
 class LockManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("anti_procrastinacion_prefs", Context.MODE_PRIVATE)
 
+    init {
+        pushDeviceHeartbeatToFirebase()
+    }
+
     companion object {
         private const val KEY_IS_LOCKED = "is_locked"
         private const val KEY_LOCK_END_TIME = "lock_end_time"

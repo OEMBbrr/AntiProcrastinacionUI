@@ -1,17 +1,22 @@
 document.addEventListener('DOMContentLoaded', () => {
+    let targetHours = 0;
     let targetMinutes = 10;
     let longPhrase = "Al tomar la firme decisión de dar por concluida mi actividad antes de tiempo, reconozco plenamente que la verdadera autodisciplina no consiste en buscar atajos hacia la comodidad, sino en honrar cada promesa que me hago a mí mismo.";
     let expectedMath = 0;
     let phraseStartTime = 0;
 
     const timerText = document.getElementById('timer-text');
-    const targetLabel = document.getElementById('target-label');
     const statusPill = document.getElementById('status-pill');
     const setupControls = document.getElementById('setup-controls');
     const lockedControls = document.getElementById('locked-controls');
 
-    const btnPlus = document.getElementById('btn-plus');
-    const btnMinus = document.getElementById('btn-minus');
+    const btnHoursPlus = document.getElementById('btn-hours-plus');
+    const btnHoursMinus = document.getElementById('btn-hours-minus');
+    const btnMinsPlus = document.getElementById('btn-mins-plus');
+    const btnMinsMinus = document.getElementById('btn-mins-minus');
+    const hoursText = document.getElementById('hours-text');
+    const minsText = document.getElementById('mins-text');
+
     const btnStart = document.getElementById('btn-start');
     const btnFinishEarly = document.getElementById('btn-finish-early');
     const btnTregua = document.getElementById('btn-tregua');
@@ -34,14 +39,63 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnVerifyMath = document.getElementById('btn-verify-math');
 
     // Desactivar pegar por código JS y eventos
-    phraseInput.addEventListener('paste', (e) => e.preventDefault());
-    phraseInput.addEventListener('copy', (e) => e.preventDefault());
-    phraseInput.addEventListener('contextmenu', (e) => e.preventDefault());
+    if (phraseInput) {
+        phraseInput.addEventListener('paste', (e) => e.preventDefault());
+        phraseInput.addEventListener('copy', (e) => e.preventDefault());
+        phraseInput.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
 
     function formatTime(totalSecs) {
-        const mins = Math.floor(totalSecs / 60);
+        const hrs = Math.floor(totalSecs / 3600);
+        const mins = Math.floor((totalSecs % 3600) / 60);
         const secs = totalSecs % 60;
+        if (hrs > 0) {
+            return `${hrs < 10 ? '0' + hrs : hrs}:${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
+        }
         return `${mins < 10 ? '0' + mins : mins}:${secs < 10 ? '0' + secs : secs}`;
+    }
+
+    function updateTimeDisplay() {
+        if (hoursText) hoursText.textContent = targetHours < 10 ? '0' + targetHours : targetHours;
+        if (minsText) minsText.textContent = targetMinutes < 10 ? '0' + targetMinutes : targetMinutes;
+
+        const totalSecs = (targetHours * 3600) + (targetMinutes * 60);
+        if (timerText) timerText.textContent = formatTime(totalSecs);
+    }
+
+    if (btnHoursPlus) {
+        btnHoursPlus.addEventListener('click', () => {
+            if (targetHours < 23) targetHours++;
+            updateTimeDisplay();
+        });
+    }
+    if (btnHoursMinus) {
+        btnHoursMinus.addEventListener('click', () => {
+            if (targetHours > 0) targetHours--;
+            updateTimeDisplay();
+        });
+    }
+    if (btnMinsPlus) {
+        btnMinsPlus.addEventListener('click', () => {
+            if (targetMinutes < 55) {
+                targetMinutes += 5;
+            } else if (targetHours < 23) {
+                targetMinutes = 0;
+                targetHours++;
+            }
+            updateTimeDisplay();
+        });
+    }
+    if (btnMinsMinus) {
+        btnMinsMinus.addEventListener('click', () => {
+            if (targetMinutes >= 5) {
+                targetMinutes -= 5;
+            } else if (targetHours > 0) {
+                targetMinutes = 55;
+                targetHours--;
+            }
+            updateTimeDisplay();
+        });
     }
 
     function renderSiteTags(customDomains) {
@@ -122,8 +176,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 setupControls.classList.remove("hidden");
                 btnStart.classList.remove("hidden");
                 lockedControls.classList.add("hidden");
-                targetLabel.textContent = `${targetMinutes} min`;
-                timerText.textContent = `${targetMinutes < 10 ? '0' + targetMinutes : targetMinutes}:00`;
+                updateTimeDisplay();
             }
         });
     }
@@ -144,20 +197,10 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    btnPlus.addEventListener('click', () => {
-        targetMinutes += 5;
-        updateUI();
-    });
-
-    btnMinus.addEventListener('click', () => {
-        if (targetMinutes > 5) {
-            targetMinutes -= 5;
-            updateUI();
-        }
-    });
-
     btnStart.addEventListener('click', () => {
-        chrome.runtime.sendMessage({ action: 'startTimer', minutes: targetMinutes }, () => {
+        const totalMinutes = (targetHours * 60) + targetMinutes;
+        if (totalMinutes <= 0) return;
+        chrome.runtime.sendMessage({ action: 'startTimer', minutes: totalMinutes }, () => {
             updateUI();
         });
     });
