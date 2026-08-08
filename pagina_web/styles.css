@@ -178,6 +178,15 @@ body {
     color: #fff;
     box-shadow: 0 8px 24px rgba(101, 131, 50, 0.35);
 }
+.btn-chrome-dl {
+    background: linear-gradient(135deg, #0F766E, #0D9488);
+    color: #fff;
+    box-shadow: 0 8px 24px rgba(13, 148, 136, 0.35);
+}
+.btn-chrome-dl:hover {
+    transform: translateY(-2.5px);
+    box-shadow: 0 12px 30px rgba(13, 148, 136, 0.5);
+}
 .btn-primary:hover {
     transform: translateY(-2px);
     box-shadow: 0 12px 30px rgba(101, 131, 50, 0.5);
