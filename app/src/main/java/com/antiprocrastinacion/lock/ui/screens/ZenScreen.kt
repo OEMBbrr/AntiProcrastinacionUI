@@ -2,7 +2,6 @@ package com.antiprocrastinacion.lock.ui.screens
 
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.widget.Toast
 import androidx.compose.animation.*
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -563,14 +562,7 @@ fun ZenScreen(
 
                     OutlinedTextField(
                         value = longUserInput,
-                        onValueChange = { input ->
-                            // Prevención de Pegado / Clipboard Paste
-                            if (input.length - longUserInput.length > 25) {
-                                Toast.makeText(context, "⚠️ Intento de pegado bloqueado por seguridad. Escribe letra por letra.", Toast.LENGTH_SHORT).show()
-                            } else {
-                                longUserInput = input
-                            }
-                        },
+                        onValueChange = { longUserInput = it },
                         placeholder = { Text("Empieza a escribir el texto aquí...", fontSize = 12.sp) },
                         modifier = Modifier.fillMaxWidth().height(140.dp),
                         shape = RoundedCornerShape(10.dp)

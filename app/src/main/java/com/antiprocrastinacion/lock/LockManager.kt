@@ -16,8 +16,6 @@ class LockManager(context: Context) {
         private const val KEY_TEMP_UNLOCK_END_TIME = "temp_unlock_end_time"
         private const val KEY_COOLDOWN_END_TIME = "cooldown_end_time"
         private const val KEY_ALLOWED_PACKAGES = "allowed_packages"
-        private const val KEY_CUSTOM_BLOCKED_LINKS = "custom_blocked_links"
-        private const val KEY_PARENTAL_CONTROL_ENABLED = "parental_control_enabled"
         
         // 1. Frases MUY LARGAS (150 a 200 palabras) para "Ya terminé mi actividad"
         val LONG_FINISH_EARLY_PHRASES = listOf(
@@ -183,14 +181,6 @@ class LockManager(context: Context) {
     var allowedPackages: Set<String>
         get() = prefs.getStringSet(KEY_ALLOWED_PACKAGES, emptySet()) ?: emptySet()
         set(value) = prefs.edit().putStringSet(KEY_ALLOWED_PACKAGES, value).apply()
-
-    var customBlockedLinks: Set<String>
-        get() = prefs.getStringSet(KEY_CUSTOM_BLOCKED_LINKS, setOf("facebook.com", "instagram.com", "tiktok.com", "youtube.com", "x.com")) ?: setOf("facebook.com", "instagram.com", "tiktok.com", "youtube.com", "x.com")
-        set(value) = prefs.edit().putStringSet(KEY_CUSTOM_BLOCKED_LINKS, value).apply()
-
-    var isParentalControlEnabled: Boolean
-        get() = prefs.getBoolean(KEY_PARENTAL_CONTROL_ENABLED, false)
-        set(value) = prefs.edit().putBoolean(KEY_PARENTAL_CONTROL_ENABLED, value).apply()
 
     val isTempUnlocked: Boolean
         get() = System.currentTimeMillis() < tempUnlockEndTime

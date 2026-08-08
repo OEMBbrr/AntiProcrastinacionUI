@@ -170,26 +170,40 @@ body {
 .add-site-form {
     display: flex;
     gap: 6px;
-    margin-bottom: 10px;
+    margin-bottom: 12px;
 }
 
 .add-site-form input {
     flex: 1;
-    padding: 5px 8px;
-    border: 1px solid #CBD5E1;
-    border-radius: 6px;
-    font-size: 0.72rem;
+    padding: 7px 10px;
+    border: 1px solid rgba(90, 110, 97, 0.25);
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
     outline: none;
+    background: #F1F5F3;
+    color: var(--text-main);
+    transition: border-color 0.2s ease;
+}
+
+.add-site-form input:focus {
+    border-color: var(--zen-olive);
 }
 
 .add-site-form button {
-    padding: 5px 10px;
+    padding: 7px 12px;
     background: var(--zen-olive);
     color: #fff;
     border: none;
-    border-radius: 6px;
-    font-size: 0.72rem;
+    border-radius: var(--radius-sm);
+    font-size: 0.78rem;
+    font-weight: 600;
     cursor: pointer;
+    transition: transform 0.15s ease, background 0.2s ease;
+}
+
+.add-site-form button:hover {
+    transform: scale(1.03);
+    background: #4E6054;
 }
 
 .site-tags {
@@ -200,20 +214,23 @@ body {
 
 .tag {
     background: #F1F5F3;
-    border: 1px solid rgba(90, 110, 97, 0.2);
+    border: 1px solid rgba(90, 110, 97, 0.25);
     color: var(--text-main);
     font-size: 0.72rem;
-    padding: 3px 8px;
-    border-radius: 6px;
-    display: flex;
+    padding: 4px 10px;
+    border-radius: 12px;
+    display: inline-flex;
     align-items: center;
     gap: 6px;
+    font-weight: 500;
 }
 
 .tag .del-tag {
     cursor: pointer;
     color: var(--zen-coral);
     font-weight: 700;
+    font-size: 0.85rem;
+    margin-left: 2px;
 }
 }
 
