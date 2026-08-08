@@ -103,13 +103,33 @@ function updateNetRules() {
     });
 }
 
+// Interceptor Temprano de Navegación de Enlaces Directos de Video (webNavigation)
+chrome.webNavigation.onBeforeNavigate.addListener((details) => {
+    if (details.frameId !== 0) return; // Solo marco principal
+    const url = details.url;
+    if (!url || url.includes('/blocked.html') || url.startsWith('chrome://')) return;
+
+    const activeList = getActiveRulesList();
+    const isMatch = activeList.some(domain => {
+        const cleanKeyword = domain.replace('.com', '').replace('.net', '').replace('.org', '').replace('.es', '');
+        return url.toLowerCase().includes(domain.toLowerCase()) || (cleanKeyword.length > 3 && url.toLowerCase().includes(cleanKeyword.toLowerCase()));
+    });
+
+    if (isMatch && (isLocked || parentalEnabled)) {
+        chrome.tabs.update(details.tabId, { url: chrome.runtime.getURL('/blocked.html') });
+    }
+});
+
 // Fail-safe Tab Interceptor (Redirección instantánea basada en pestañas activas)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const url = changeInfo.url || (tab && tab.url);
     if (!url || url.includes('/blocked.html') || url.startsWith('chrome://')) return;
 
     const activeList = getActiveRulesList();
-    const isMatch = activeList.some(domain => url.toLowerCase().includes(domain.toLowerCase()));
+    const isMatch = activeList.some(domain => {
+        const cleanKeyword = domain.replace('.com', '').replace('.net', '').replace('.org', '').replace('.es', '');
+        return url.toLowerCase().includes(domain.toLowerCase()) || (cleanKeyword.length > 3 && url.toLowerCase().includes(cleanKeyword.toLowerCase()));
+    });
 
     if (isMatch && (isLocked || parentalEnabled)) {
         chrome.tabs.update(tabId, { url: chrome.runtime.getURL('/blocked.html') });
