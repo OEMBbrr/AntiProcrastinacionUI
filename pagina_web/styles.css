@@ -83,17 +83,13 @@ body {
     font-size: 1.25rem;
     font-weight: 700;
 }
-.logo-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, var(--zen-olive), var(--zen-olive-bright));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #fff;
-    font-size: 1.1rem;
-    box-shadow: 0 4px 14px rgba(101, 131, 50, 0.4);
+.logo-img {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    border: 1px solid var(--zen-olive);
+    object-fit: cover;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 .nav-links {
     display: flex;
@@ -259,18 +255,15 @@ body {
     text-align: center;
     margin-bottom: 20px;
 }
-.app-icon-circle {
-    width: 50px;
-    height: 50px;
+.phone-app-logo {
+    width: 64px;
+    height: 64px;
     border-radius: 50%;
-    background: rgba(101, 131, 50, 0.12);
-    border: 1px solid var(--zen-olive);
-    display: flex;
-    align-items: center;
-    justify-content: center;
+    border: 1px solid rgba(90, 110, 97, 0.4);
+    object-fit: cover;
     margin: 0 auto 8px;
-    color: var(--zen-olive);
-    font-size: 1.4rem;
+    display: block;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
 }
 .app-header h3 {
     font-size: 1.1rem;
