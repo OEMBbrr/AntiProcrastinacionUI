@@ -18,6 +18,10 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Close
+import androidx.compose.ui.window.Dialog
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -88,36 +92,202 @@ fun ConfigScreen(
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
-            // Cabecera Minimalista
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 8.dp)
-            ) {
-                Image(
-                    painter = painterResource(id = com.antiprocrastinacion.lock.R.drawable.app_logo),
-                    contentDescription = "Logo",
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .border(BorderStroke(1.dp, ZenSage.copy(alpha = 0.4f)), CircleShape)
-                )
-                Spacer(modifier = Modifier.height(10.dp))
+            var showSyncModal by remember { mutableStateOf(false) }
 
-                Text(
-                    text = "antiprocrastinación",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontSize = 28.sp,
-                        fontWeight = FontWeight.ExtraLight,
-                        color = ZenCharcoal,
-                        letterSpacing = 1.sp
+            // Dialogo Modal de Sincronización de Cuenta Estilo Web Pro
+            if (showSyncModal) {
+                Dialog(onDismissRequest = { showSyncModal = false }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(12.dp),
+                        shape = RoundedCornerShape(24.dp),
+                        colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                        border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(20.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.spacedBy(14.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(36.dp)
+                                            .clip(CircleShape)
+                                            .background(ZenOlive.copy(alpha = 0.12f)),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Person,
+                                            contentDescription = null,
+                                            tint = ZenOlive,
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                    Text(
+                                        text = "Cuenta & Sincronización",
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = ZenCharcoal
+                                    )
+                                }
+                                IconButton(onClick = { showSyncModal = false }) {
+                                    Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar", tint = ZenSage)
+                                }
+                            }
+
+                            Divider(color = ZenSage.copy(alpha = 0.15f))
+
+                            // CÓDIGO ÚNICO DEL TELÉFONO
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(6.dp),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .background(CreamBackground, RoundedCornerShape(16.dp))
+                                    .border(1.dp, ZenOlive.copy(alpha = 0.2f), RoundedCornerShape(16.dp))
+                                    .padding(14.dp)
+                            ) {
+                                Text(
+                                    text = "🔑 CÓDIGO ÚNICO DE ESTE TELÉFONO:",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ZenSage,
+                                    letterSpacing = 0.5.sp
+                                )
+                                SelectionContainer {
+                                    Text(
+                                        text = lockManager.devicePin,
+                                        fontSize = 24.sp,
+                                        fontWeight = FontWeight.ExtraBold,
+                                        color = ZenOlive,
+                                        letterSpacing = 2.sp
+                                    )
+                                }
+                                Text(
+                                    text = "Ingresa este código en tu Extensión de Chrome para conectar este teléfono al instante.",
+                                    fontSize = 11.sp,
+                                    color = ZenCharcoal,
+                                    textAlign = TextAlign.Center
+                                )
+                            }
+
+                            // VINCULACIÓN POR CORREO O PIN PERSONALIZADO
+                            var syncKeyInput by remember { mutableStateOf(lockManager.userSyncKey) }
+                            Column(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Text(
+                                    text = "📧 O VINCULA CON TU CORREO ELECTRONICO:",
+                                    fontSize = 10.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ZenSage
+                                )
+                                OutlinedTextField(
+                                    value = syncKeyInput,
+                                    onValueChange = { syncKeyInput = it },
+                                    placeholder = { Text("ej. usuario@email.com", fontSize = 12.sp, color = ZenSage.copy(alpha = 0.6f)) },
+                                    modifier = Modifier.fillMaxWidth().height(52.dp),
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = OutlinedTextFieldDefaults.colors(
+                                        focusedContainerColor = CreamBackground,
+                                        unfocusedContainerColor = CreamBackground,
+                                        focusedBorderColor = ZenOlive,
+                                        unfocusedBorderColor = ZenSage.copy(alpha = 0.3f)
+                                    )
+                                )
+                            }
+
+                            Button(
+                                onClick = {
+                                    val clean = syncKeyInput.trim().lowercase().replace(" ", "_")
+                                    if (clean.isNotEmpty()) {
+                                        lockManager.userSyncKey = clean
+                                        syncKeyInput = clean
+                                    }
+                                    showSyncModal = false
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(48.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                            ) {
+                                Text("Guardar Vinculación", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                }
+            }
+
+            // Cabecera Minimalista
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp)
+            ) {
+                // Icono de Cuenta en la esquina superior derecha
+                Box(
+                    modifier = Modifier.align(Alignment.TopEnd)
+                ) {
+                    Surface(
+                        onClick = { showSyncModal = true },
+                        shape = CircleShape,
+                        color = ZenOlive.copy(alpha = 0.12f),
+                        border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f)),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Icon(
+                                imageVector = Icons.Default.Person,
+                                contentDescription = "Vinculación",
+                                tint = ZenOlive,
+                                modifier = Modifier.size(22.dp)
+                            )
+                        }
+                    }
+                }
+
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Image(
+                        painter = painterResource(id = com.antiprocrastinacion.lock.R.drawable.app_logo),
+                        contentDescription = "Logo",
+                        modifier = Modifier
+                            .size(80.dp)
+                            .clip(CircleShape)
+                            .border(BorderStroke(1.dp, ZenSage.copy(alpha = 0.4f)), CircleShape)
                     )
-                )
-                Spacer(modifier = Modifier.height(4.dp))
-                Text(
-                    text = "Enfoque profundo y autodisciplina",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = ZenSage
-                )
+                    Spacer(modifier = Modifier.height(10.dp))
+
+                    Text(
+                        text = "antiprocrastinación",
+                        style = MaterialTheme.typography.displayLarge.copy(
+                            fontSize = 28.sp,
+                            fontWeight = FontWeight.ExtraLight,
+                            color = ZenCharcoal,
+                            letterSpacing = 1.sp
+                        )
+                    )
+                    Spacer(modifier = Modifier.height(4.dp))
+                    Text(
+                        text = "Enfoque profundo y autodisciplina",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = ZenSage
+                    )
+                }
             }
 
             // Contenedor Central Con Scroll

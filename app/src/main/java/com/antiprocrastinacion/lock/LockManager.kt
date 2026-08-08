@@ -221,8 +221,22 @@ class LockManager(context: Context) {
         cooldownEndTime = now + (15 * 60 * 1000)
     }
 
+    val devicePin: String
+        get() {
+            var pin = prefs.getString("device_unique_pin", "") ?: ""
+            if (pin.isEmpty()) {
+                val randomNum = 1000 + java.util.Random().nextInt(9000)
+                pin = "ZEN-$randomNum"
+                prefs.edit().putString("device_unique_pin", pin).apply()
+            }
+            return pin
+        }
+
     var userSyncKey: String
-        get() = prefs.getString("user_sync_key", "USER_DEFAULT_12345") ?: "USER_DEFAULT_12345"
+        get() {
+            val key = prefs.getString("user_sync_key", "") ?: ""
+            return if (key.isNotEmpty()) key else devicePin
+        }
         set(value) = prefs.edit().putString("user_sync_key", value).apply()
 
     private fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
