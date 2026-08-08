@@ -32,7 +32,7 @@ jobs:
         run: flutter pub get
 
       - name: Generar estructura oficial Xcode para iOS
-        run: flutter create . --platforms=ios --org com.antiprocrastinacion
+        run: flutter create . --project-name antiprocrastinacion --platforms=ios --org com.antiprocrastinacion
 
       - name: Compilar ejecutable para iPhone
         run: |
