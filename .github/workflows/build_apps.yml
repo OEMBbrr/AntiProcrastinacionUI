@@ -1,0 +1,86 @@
+name: Build AntiProcrastinación (Android APK & iOS IPA)
+
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  # 1. Compilación de Android APK (Ejecuta en Linux de GitHub Gratis)
+  build-android:
+    name: Build Android APK
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'microsoft'
+          java-version: '21'
+
+      - name: Otorgar permisos de ejecución a Gradlew
+        run: chmod +x gradlew || true
+
+      - name: Compilar APK Debug/Release de Android
+        run: ./gradlew assembleDebug
+
+      - name: Renombrar y guardar APK
+        run: |
+          mkdir -p output_apk
+          cp app/build/outputs/apk/debug/app-debug.apk output_apk/AntiProcrastinacion_v11.apk
+
+      - name: Subir APK como artefacto de descarga
+        uses: actions/upload-artifact@v4
+        with:
+          name: AntiProcrastinacion_Android_v11
+          path: output_apk/AntiProcrastinacion_v11.apk
+
+  # 2. Compilación de iOS IPA en servidores MAC oficiales de GitHub
+  build-ios:
+    name: Build iOS App (Servidores Mac de GitHub)
+    runs-on: macos-14
+    steps:
+      - name: Checkout repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Configurar Flutter SDK
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: '3.22.x'
+          channel: 'stable'
+          cache: true
+
+      - name: Obtener dependencias de Flutter
+        run: |
+          if [ -f "pubspec.yaml" ]; then
+            flutter pub get
+          fi
+
+      - name: Compilar paquete de iOS para iPhone
+        run: |
+          if [ -f "pubspec.yaml" ]; then
+            flutter build ios --release --no-codesign
+            mkdir -p build/ios/iphoneos/Payload
+            cp -r build/ios/iphoneos/Runner.app build/ios/iphoneos/Payload/ 2>/dev/null || true
+            cd build/ios/iphoneos && zip -r AntiProcrastinacion_iOS.ipa Payload
+          else
+            echo "Proyecto listo para migración a Flutter cross-platform."
+          fi
+
+      - name: Subir ejecutable para iPhone (.ipa / Runner.app)
+        uses: actions/upload-artifact@v4
+        with:
+          name: AntiProcrastinacion_iOS_v1
+          path: |
+            build/ios/iphoneos/*.ipa
+            build/ios/iphoneos/Runner.app

@@ -1,0 +1,14 @@
+[
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-47:/xml_wallpaper.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-49:/xml/wallpaper.xml"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-47:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-49:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-47:/drawable_app_logo.jpg.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-49:/drawable/app_logo.jpg"
+    }
+]
