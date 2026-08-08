@@ -127,8 +127,8 @@ class _MainLockScreenState extends State<MainLockScreen> {
                   Text(
                     isLocked ? 'MODO ENFOQUE (iOS)' : 'antiprocrastinación',
                     style: const TextStyle(
-                      fontSize = 24,
-                      fontWeight = FontWeight.w300,
+                      fontSize: 24,
+                      fontWeight: FontWeight.w300,
                       letterSpacing: 1.2,
                       color: Color(0xFF2C3539),
                     ),
