@@ -161,10 +161,65 @@ body {
 .parental-toggle {
     display: flex;
     align-items: center;
-    gap: 4px;
-    font-size: 0.72rem;
+    justify-content: space-between;
+    gap: 8px;
+    background: rgba(217, 125, 117, 0.08);
+    border: 1px solid rgba(217, 125, 117, 0.25);
+    padding: 6px 12px;
+    border-radius: 10px;
+    margin-bottom: 10px;
+}
+
+.parental-label {
+    font-size: 0.75rem;
     color: var(--zen-coral);
-    font-weight: 600;
+    font-weight: 700;
+}
+
+.zen-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+}
+
+.zen-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.zen-slider {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #CBD5E1;
+    transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 20px;
+}
+
+.zen-slider:before {
+    position: absolute;
+    content: "";
+    height: 14px;
+    width: 14px;
+    left: 3px;
+    bottom: 3px;
+    background-color: white;
+    transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+    border-radius: 50%;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+}
+
+.zen-switch input:checked + .zen-slider {
+    background-color: var(--zen-coral);
+}
+
+.zen-switch input:checked + .zen-slider:before {
+    transform: translateX(16px);
 }
 
 .add-site-form {
