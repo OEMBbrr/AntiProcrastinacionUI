@@ -3,7 +3,7 @@ class DeepZenSoundEngine {
     constructor() {
         this.ctx = null;
         this.lastPlayTime = 0;
-        this.cooldownMs = 2000; // Cooldown de 2.0 segundos para evitar sonidos bugueados al pasar el ratón rápido
+        this.cooldownMs = 2200; // Cooldown de 2.2s para evitar superposición
     }
 
     initCtx() {
@@ -16,10 +16,10 @@ class DeepZenSoundEngine {
         }
     }
 
-    // Sonido Profundo y Largo de Cuenco Tibetano Zen (432 Hz y 528 Hz con caída natural de 3.5 segundos)
+    // Tono grave, profundo, cálido y aterciopelado (Frecuencia Om 136.1 Hz con filtro pasa-bajos)
     playDeepBowl() {
         const nowMs = Date.now();
-        if (nowMs - this.lastPlayTime < this.cooldownMs) return; // Evita superposición o sonido bugueado
+        if (nowMs - this.lastPlayTime < this.cooldownMs) return;
         this.lastPlayTime = nowMs;
 
         try {
@@ -27,26 +27,29 @@ class DeepZenSoundEngine {
             if (!this.ctx) return;
             const t = this.ctx.currentTime;
 
-            // Frecuencias Zen fundamentales (432 Hz armónico y 528 Hz frecuencia de transformación)
-            const frequencies = [432, 528];
-            frequencies.forEach((freq, idx) => {
-                const osc = this.ctx.createOscillator();
-                const gain = this.ctx.createGain();
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+            const lowpass = this.ctx.createBiquadFilter();
 
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(freq, t);
+            // Frecuencia grave profunda (136.1 Hz Frecuencia Om)
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(136.1, t);
 
-                const volume = idx === 0 ? 0.16 : 0.07;
-                gain.gain.setValueAtTime(0.001, t);
-                gain.gain.linearRampToValueAtTime(volume, t + 0.18);
-                gain.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
+            // Filtro pasa-bajos a 300 Hz para eliminar cualquier agudo molesto
+            lowpass.type = 'lowpass';
+            lowpass.frequency.setValueAtTime(300, t);
 
-                osc.connect(gain);
-                gain.connect(this.ctx.destination);
+            // Volumen muy suave y envolvente (0.04 max) con ataque gradual de 0.3s
+            gain.gain.setValueAtTime(0.0001, t);
+            gain.gain.linearRampToValueAtTime(0.04, t + 0.3);
+            gain.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
 
-                osc.start(t);
-                osc.stop(t + 3.6);
-            });
+            osc.connect(lowpass);
+            lowpass.connect(gain);
+            gain.connect(this.ctx.destination);
+
+            osc.start(t);
+            osc.stop(t + 3.8);
         } catch (e) {}
     }
 }
