@@ -31,6 +31,9 @@ jobs:
       - name: Obtener dependencias de Flutter
         run: flutter pub get
 
+      - name: Generar estructura oficial Xcode para iOS
+        run: flutter create . --platforms=ios --org com.antiprocrastinacion
+
       - name: Compilar ejecutable para iPhone
         run: |
           flutter build ios --release --no-codesign
