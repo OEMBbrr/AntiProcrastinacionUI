@@ -1,4 +1,111 @@
+// Web Audio API Synthesized Zen Sound Engine
+class ZenSoundEngine {
+    constructor() {
+        this.ctx = null;
+    }
+
+    initCtx() {
+        if (!this.ctx) {
+            const AudioContext = window.AudioContext || window.webkitAudioContext;
+            if (AudioContext) this.ctx = new AudioContext();
+        }
+        if (this.ctx && this.ctx.state === 'suspended') {
+            this.ctx.resume();
+        }
+    }
+
+    // 1. Zen Tibetan Bell / Singing Bowl (432 Hz Healing Tone)
+    playChime() {
+        try {
+            this.initCtx();
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(432, now);
+
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.exponentialRampToValueAtTime(0.25, now + 0.04);
+            gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 2.2);
+        } catch (e) {}
+    }
+
+    // 2. Soft Zen Air Whoosh (Hover and modal open sound)
+    playWhoosh() {
+        try {
+            this.initCtx();
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+
+            const bufferSize = this.ctx.sampleRate * 0.25;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const output = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                output[i] = Math.random() * 2 - 1;
+            }
+
+            const whiteNoise = this.ctx.createBufferSource();
+            whiteNoise.buffer = buffer;
+
+            const filter = this.ctx.createBiquadFilter();
+            filter.type = 'bandpass';
+            filter.frequency.setValueAtTime(300, now);
+            filter.frequency.exponentialRampToValueAtTime(1100, now + 0.12);
+            filter.frequency.exponentialRampToValueAtTime(200, now + 0.25);
+            filter.Q.value = 2.5;
+
+            const gain = this.ctx.createGain();
+            gain.gain.setValueAtTime(0.001, now);
+            gain.gain.linearRampToValueAtTime(0.12, now + 0.12);
+            gain.gain.linearRampToValueAtTime(0.001, now + 0.25);
+
+            whiteNoise.connect(filter);
+            filter.connect(gain);
+            gain.connect(this.ctx.destination);
+            whiteNoise.start(now);
+            whiteNoise.stop(now + 0.25);
+        } catch (e) {}
+    }
+
+    // 3. Bamboo Woodblock Tap (Typing and button click sound)
+    playTap() {
+        try {
+            this.initCtx();
+            if (!this.ctx) return;
+            const now = this.ctx.currentTime;
+            const osc = this.ctx.createOscillator();
+            const gain = this.ctx.createGain();
+
+            osc.type = 'triangle';
+            osc.frequency.setValueAtTime(750, now);
+            osc.frequency.exponentialRampToValueAtTime(280, now + 0.04);
+
+            gain.gain.setValueAtTime(0.15, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+
+            osc.connect(gain);
+            gain.connect(this.ctx.destination);
+            osc.start(now);
+            osc.stop(now + 0.04);
+        } catch (e) {}
+    }
+}
+
+const zenSound = new ZenSoundEngine();
+
 document.addEventListener('DOMContentLoaded', () => {
+    // Attach Whoosh sound on hover to interactive buttons and cards
+    document.querySelectorAll('.btn, .feature-card, .btn-adjust, .btn-app-main, .btn-app-outline, .btn-app-tregua, .btn-emergency').forEach(el => {
+        el.addEventListener('mouseenter', () => zenSound.playWhoosh());
+    });
+
     // 1. Phone Demo State Controls
     let targetMinutes = 10;
     let remainingSeconds = 0;
@@ -43,6 +150,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startDemoFocus() {
+        zenSound.playChime();
         isLocked = true;
         remainingSeconds = targetMinutes * 60;
         demoStatus.textContent = "MODO ENFOQUE ACTIVO";
@@ -185,6 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseIosModal = document.getElementById('btn-close-ios-modal');
 
     function openIosModal() {
+        zenSound.playWhoosh();
         if (iosGuideModal) iosGuideModal.classList.remove('hidden');
     }
 

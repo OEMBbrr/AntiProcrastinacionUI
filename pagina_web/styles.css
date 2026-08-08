@@ -133,9 +133,9 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 8px;
-    background: rgba(101, 131, 50, 0.2);
-    border: 1px solid rgba(101, 131, 50, 0.4);
-    color: #A3E635;
+    background: rgba(90, 110, 97, 0.2);
+    border: 1px solid rgba(90, 110, 97, 0.4);
+    color: #8C9B90;
     padding: 6px 14px;
     border-radius: 20px;
     font-size: 0.85rem;
@@ -213,7 +213,7 @@ body {
     color: var(--text-muted);
 }
 .platform-support i {
-    color: #A3E635;
+    color: #8C9B90;
 }
 
 /* Smartphone Mockup Frame */
@@ -440,7 +440,7 @@ body {
 .icon-bolt { background: rgba(56, 189, 248, 0.15); color: var(--accent-blue); }
 .icon-pen { background: rgba(129, 140, 248, 0.15); color: var(--accent-purple); }
 .icon-math { background: rgba(229, 115, 115, 0.15); color: var(--zen-coral); }
-.icon-shield { background: rgba(101, 131, 50, 0.15); color: #A3E635; }
+.icon-shield { background: rgba(90, 110, 97, 0.2); color: #8C9B90; }
 
 .feature-card h3 {
     font-size: 1.2rem;
@@ -483,9 +483,9 @@ body {
     display: inline-flex;
     align-items: center;
     gap: 6px;
-    background: rgba(101, 131, 50, 0.2);
-    border: 1px solid rgba(101, 131, 50, 0.4);
-    color: #A3E635;
+    background: rgba(90, 110, 97, 0.2);
+    border: 1px solid rgba(90, 110, 97, 0.4);
+    color: #8C9B90;
     padding: 6px 14px;
     border-radius: 20px;
     font-size: 0.8rem;
@@ -526,7 +526,7 @@ body {
 .badge-phrase {
     font-size: 0.75rem;
     text-transform: uppercase;
-    color: #A3E635;
+    color: #8C9B90;
     font-weight: 700;
     display: block;
     margin-bottom: 8px;
