@@ -14,13 +14,40 @@ let defaultDomains = [
 ];
 
 const adultDomains = [
+    // Pornhub dominios principales y TLDs internacionales
     "pornhub.com",
+    "pornhub.net",
+    "pornhub.org",
+    "pornhub.club",
+    "pornhubselect.com",
+    "pornhubpremium.com",
+    "pornhublive.com",
+    "pornhubvids.com",
+    "pornhubcasino.com",
+    "pornhub.es",
+    "pornhub.fr",
+    "pornhub.de",
+    "pornhub.it",
+    "pornhub.cz",
+    "pornhub.com.br",
+    "phncdn.com",
+    "phprcdn.com",
+    "phncdn.net",
+    
+    // Red oficial de sitios hermanos de Pornhub (MindGeek / Aylo Network)
+    "thumbzilla.com",
+    "youporn.com",
+    "redtube.com",
+    "tube8.com",
+    "spankwire.com",
+    "gaytube.com",
+    "extremetube.com",
+
+    // Otros portales adultos principales
     "xvideos.com",
     "xnxx.com",
     "xhamster.com",
     "onlyfans.com",
-    "redtube.com",
-    "youporn.com",
     "chaturbate.com",
     "stripchat.com"
 ];
