@@ -1,9 +1,10 @@
-// Web Audio API Deep Resonant Zen Singing Bowl Engine with Strict Anti-Overlap Cooldown
-class DeepZenSoundEngine {
+// Web Audio API Deep Grave Zen Wind Engine (Viento Grave Zen Envolvente)
+class DeepGraveWindEngine {
     constructor() {
         this.ctx = null;
         this.lastPlayTime = 0;
-        this.cooldownMs = 2200; // Cooldown de 2.2s para evitar superposición
+        this.cooldownMs = 2400; // Cooldown de 2.4s anti-superposición
+        this.setupAutoUnlock();
     }
 
     initCtx() {
@@ -16,8 +17,23 @@ class DeepZenSoundEngine {
         }
     }
 
-    // Tono grave, profundo, cálido y aterciopelado (Frecuencia Om 136.1 Hz con filtro pasa-bajos)
-    playDeepBowl() {
+    // Desbloqueo automático del canal de audio al primer gesto del usuario (scroll, movimiento, toque o clic)
+    setupAutoUnlock() {
+        const unlock = () => {
+            this.initCtx();
+            if (this.ctx && this.ctx.state === 'running') {
+                ['click', 'mousemove', 'scroll', 'touchstart', 'keydown'].forEach(evt => {
+                    window.removeEventListener(evt, unlock);
+                });
+            }
+        };
+        ['click', 'mousemove', 'scroll', 'touchstart', 'keydown'].forEach(evt => {
+            window.addEventListener(evt, unlock, { passive: true, once: false });
+        });
+    }
+
+    // Sonido ambiental de Viento Grave Zen (Ruido filtrado a 160Hz + sub-bajo sutil de 75Hz)
+    playZenWind() {
         const nowMs = Date.now();
         if (nowMs - this.lastPlayTime < this.cooldownMs) return;
         this.lastPlayTime = nowMs;
@@ -27,39 +43,67 @@ class DeepZenSoundEngine {
             if (!this.ctx) return;
             const t = this.ctx.currentTime;
 
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
+            // 1. Buffer de Viento Amortiguado (Pink Noise)
+            const bufferSize = this.ctx.sampleRate * 2.2;
+            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+            const data = buffer.getChannelData(0);
+            let b0 = 0, b1 = 0, b2 = 0;
+            for (let i = 0; i < bufferSize; i++) {
+                const white = Math.random() * 2 - 1;
+                b0 = 0.99886 * b0 + white * 0.0555179;
+                b1 = 0.99332 * b1 + white * 0.0750759;
+                b2 = 0.96900 * b2 + white * 0.1538520;
+                data[i] = (b0 + b1 + b2) * 0.08;
+            }
+
+            const windSource = this.ctx.createBufferSource();
+            windSource.buffer = buffer;
+
+            // Filtro Pasa-Bajos ultra-grave a 160 Hz (Sensación de brisa suave de templo)
             const lowpass = this.ctx.createBiquadFilter();
-
-            // Frecuencia grave profunda (136.1 Hz Frecuencia Om)
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(136.1, t);
-
-            // Filtro pasa-bajos a 300 Hz para eliminar cualquier agudo molesto
             lowpass.type = 'lowpass';
-            lowpass.frequency.setValueAtTime(300, t);
+            lowpass.frequency.setValueAtTime(120, t);
+            lowpass.frequency.exponentialRampToValueAtTime(260, t + 0.9);
+            lowpass.frequency.exponentialRampToValueAtTime(110, t + 2.2);
 
-            // Volumen muy suave y envolvente (0.04 max) con ataque gradual de 0.3s
-            gain.gain.setValueAtTime(0.0001, t);
-            gain.gain.linearRampToValueAtTime(0.04, t + 0.3);
-            gain.gain.exponentialRampToValueAtTime(0.0001, t + 3.8);
+            const windGain = this.ctx.createGain();
+            windGain.gain.setValueAtTime(0.0001, t);
+            windGain.gain.linearRampToValueAtTime(0.08, t + 0.6);
+            windGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
 
-            osc.connect(lowpass);
-            lowpass.connect(gain);
-            gain.connect(this.ctx.destination);
+            windSource.connect(lowpass);
+            lowpass.connect(windGain);
+            windGain.connect(this.ctx.destination);
 
-            osc.start(t);
-            osc.stop(t + 3.8);
+            windSource.start(t);
+            windSource.stop(t + 2.2);
+
+            // 2. Sub-bajo sutil de 75 Hz (Base profunda)
+            const subOsc = this.ctx.createOscillator();
+            const subGain = this.ctx.createGain();
+            subOsc.type = 'sine';
+            subOsc.frequency.setValueAtTime(75, t);
+
+            subGain.gain.setValueAtTime(0.0001, t);
+            subGain.gain.linearRampToValueAtTime(0.03, t + 0.5);
+            subGain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);
+
+            subOsc.connect(subGain);
+            subGain.connect(this.ctx.destination);
+
+            subOsc.start(t);
+            subOsc.stop(t + 2.2);
+
         } catch (e) {}
     }
 }
 
-const zenSound = new DeepZenSoundEngine();
+const zenSound = new DeepGraveWindEngine();
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Asignar el sonido profundo Zen al hacer hover en elementos clave (con cooldown anti-superposición)
+    // Asignar el sonido ambiental de viento grave Zen al hacer hover
     document.querySelectorAll('.btn, .feature-card, .promo-card, .btn-app-main, .btn-app-tregua').forEach(el => {
-        el.addEventListener('mouseenter', () => zenSound.playDeepBowl());
+        el.addEventListener('mouseenter', () => zenSound.playZenWind());
     });
 
     // 1. Scroll Reveal Animations (Animaciones fluidas al bajar por la página)
@@ -126,7 +170,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startDemoFocus() {
-        zenSound.playDeepBowl();
+        zenSound.playZenWind();
         isLocked = true;
         remainingSeconds = targetMinutes * 60;
         demoStatus.textContent = "MODO ENFOQUE ACTIVO";
@@ -269,7 +313,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const btnCloseIosModal = document.getElementById('btn-close-ios-modal');
 
     function openIosModal() {
-        zenSound.playDeepBowl();
+        zenSound.playZenWind();
         if (iosGuideModal) iosGuideModal.classList.remove('hidden');
     }
 
