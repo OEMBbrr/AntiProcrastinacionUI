@@ -88,7 +88,7 @@ function updateNetRules() {
                 id: index + 1,
                 priority: 1,
                 action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
-                condition: { urlFilter: `*${domain}*`, resourceTypes: ['main_frame', 'sub_frame'] }
+                condition: { regexFilter: `.*${domain.replace('.', '\\.')}.*`, resourceTypes: ['main_frame', 'sub_frame'] }
             }));
 
             chrome.declarativeNetRequest.updateDynamicRules({
@@ -102,6 +102,19 @@ function updateNetRules() {
         }
     });
 }
+
+// Fail-safe Tab Interceptor (Redirección instantánea basada en pestañas activas)
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+    const url = changeInfo.url || (tab && tab.url);
+    if (!url || url.includes('/blocked.html') || url.startsWith('chrome://')) return;
+
+    const activeList = getActiveRulesList();
+    const isMatch = activeList.some(domain => url.toLowerCase().includes(domain.toLowerCase()));
+
+    if (isMatch && (isLocked || parentalEnabled)) {
+        chrome.tabs.update(tabId, { url: chrome.runtime.getURL('/blocked.html') });
+    }
+});
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getState') {
