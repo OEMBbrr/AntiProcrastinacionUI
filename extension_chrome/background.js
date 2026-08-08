@@ -78,17 +78,35 @@ function getActiveRulesList() {
     return active;
 }
 
+function getActiveKeywords() {
+    const rawList = getActiveRulesList();
+    const keywords = new Set();
+
+    rawList.forEach(item => {
+        const lower = item.toLowerCase().trim();
+        keywords.add(lower);
+
+        // Extraer palabra clave de marca raíz ej. "instagram", "facebook", "pornhub", "tiktok", "youtube"
+        const brandKey = lower.replace(/^https?:\/\//, '').replace(/^www\./, '').split('.')[0];
+        if (brandKey && brandKey.length >= 3) {
+            keywords.add(brandKey);
+        }
+    });
+
+    return Array.from(keywords);
+}
+
 function updateNetRules() {
     chrome.declarativeNetRequest.getDynamicRules((existingRules) => {
         const removeIds = existingRules.map(r => r.id);
-        const activeList = getActiveRulesList();
+        const activeKeywords = getActiveKeywords();
 
         if (isLocked || parentalEnabled) {
-            const rules = activeList.map((domain, index) => ({
+            const rules = activeKeywords.map((kw, index) => ({
                 id: index + 1,
                 priority: 1,
                 action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
-                condition: { regexFilter: `.*${domain.replace('.', '\\.')}.*`, resourceTypes: ['main_frame', 'sub_frame'] }
+                condition: { urlFilter: `*${kw}*`, resourceTypes: ['main_frame', 'sub_frame'] }
             }));
 
             chrome.declarativeNetRequest.updateDynamicRules({
@@ -103,35 +121,27 @@ function updateNetRules() {
     });
 }
 
-// Interceptor Temprano de Navegación de Enlaces Directos de Video (webNavigation)
+function isUrlBlocked(url) {
+    if (!url || url.includes('/blocked.html') || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
+        return false;
+    }
+    const lowerUrl = url.toLowerCase();
+    const keywords = getActiveKeywords();
+    return keywords.some(kw => lowerUrl.includes(kw));
+}
+
+// Interceptor Temprano de Navegación de Enlaces Directos, Reels, Perfiles y Subrutas (webNavigation)
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
-    if (details.frameId !== 0) return; // Solo marco principal
-    const url = details.url;
-    if (!url || url.includes('/blocked.html') || url.startsWith('chrome://')) return;
-
-    const activeList = getActiveRulesList();
-    const isMatch = activeList.some(domain => {
-        const cleanKeyword = domain.replace('.com', '').replace('.net', '').replace('.org', '').replace('.es', '');
-        return url.toLowerCase().includes(domain.toLowerCase()) || (cleanKeyword.length > 3 && url.toLowerCase().includes(cleanKeyword.toLowerCase()));
-    });
-
-    if (isMatch && (isLocked || parentalEnabled)) {
+    if (details.frameId !== 0) return;
+    if ((isLocked || parentalEnabled) && isUrlBlocked(details.url)) {
         chrome.tabs.update(details.tabId, { url: chrome.runtime.getURL('/blocked.html') });
     }
 });
 
 // Fail-safe Tab Interceptor (Redirección instantánea basada en pestañas activas)
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-    const url = changeInfo.url || (tab && tab.url);
-    if (!url || url.includes('/blocked.html') || url.startsWith('chrome://')) return;
-
-    const activeList = getActiveRulesList();
-    const isMatch = activeList.some(domain => {
-        const cleanKeyword = domain.replace('.com', '').replace('.net', '').replace('.org', '').replace('.es', '');
-        return url.toLowerCase().includes(domain.toLowerCase()) || (cleanKeyword.length > 3 && url.toLowerCase().includes(cleanKeyword.toLowerCase()));
-    });
-
-    if (isMatch && (isLocked || parentalEnabled)) {
+    const targetUrl = changeInfo.url || (tab && tab.url);
+    if ((isLocked || parentalEnabled) && isUrlBlocked(targetUrl)) {
         chrome.tabs.update(tabId, { url: chrome.runtime.getURL('/blocked.html') });
     }
 });
