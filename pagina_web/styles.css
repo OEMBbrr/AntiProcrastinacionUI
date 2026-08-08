@@ -1,11 +1,12 @@
 :root {
-    --bg-dark: #0A0E1A;
+    --bg-dark: #0F171E;
     --card-bg: rgba(255, 255, 255, 0.04);
     --card-border: rgba(255, 255, 255, 0.08);
-    --text-main: #F8FAFC;
+    --text-main: #F1F5F9;
     --text-muted: #94A3B8;
-    --zen-olive: #658332;
-    --zen-olive-bright: #82A740;
+    --zen-olive: #4A5D4E;
+    --zen-olive-bright: #5F7564;
+    --zen-dark-slate: #2C3A33;
     --zen-coral: #E57373;
     --accent-blue: #38BDF8;
     --accent-purple: #818CF8;
