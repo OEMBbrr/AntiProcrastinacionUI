@@ -458,6 +458,65 @@ body {
     color: var(--text-muted);
 }
 
+/* Zen Banner Showcase */
+.promo-showcase {
+    padding: 40px 24px 60px;
+    max-width: 1000px;
+    margin: 0 auto;
+}
+.promo-container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--card-border);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+}
+.promo-card {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    align-items: center;
+    gap: 30px;
+    padding: 24px;
+}
+.promo-img {
+    width: 100%;
+    max-height: 420px;
+    object-fit: cover;
+    border-radius: var(--radius-md);
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+.badge-zen {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: rgba(101, 131, 50, 0.2);
+    border: 1px solid rgba(101, 131, 50, 0.4);
+    color: #A3E635;
+    padding: 6px 14px;
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 600;
+    margin-bottom: 16px;
+}
+.promo-overlay-text h2 {
+    font-family: var(--font-heading);
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 14px;
+    color: #fff;
+}
+.promo-overlay-text p {
+    color: var(--text-muted);
+    font-size: 0.95rem;
+    line-height: 1.6;
+}
+
+@media (max-width: 768px) {
+    .promo-card {
+        grid-template-columns: 1fr;
+    }
+}
+
 /* Challenge Sandbox */
 .simulator-section {
     padding: 60px 24px;
