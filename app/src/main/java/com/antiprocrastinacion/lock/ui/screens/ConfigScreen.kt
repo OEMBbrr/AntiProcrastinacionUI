@@ -230,12 +230,45 @@ fun ConfigScreen(
                 }
             }
 
+            // Indicador de Conexión en la esquina superior izquierda (Verde / Rojo)
+            var isConnected by remember { mutableStateOf(true) }
+            
+            // Enviar latido (heartbeat) a Firebase periódicamente
+            LaunchedEffect(Unit) {
+                while(true) {
+                    lockManager.pushDeviceHeartbeatToFirebase()
+                    kotlinx.coroutines.delay(5000)
+                }
+            }
+
             // Cabecera Minimalista
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .padding(top = 4.dp)
             ) {
+                // Punto de Conexión Verde/Rojo en la esquina superior izquierda
+                Box(
+                    modifier = Modifier.align(Alignment.TopStart)
+                ) {
+                    Surface(
+                        onClick = { showSyncModal = true },
+                        shape = CircleShape,
+                        color = if (isConnected) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
+                        border = BorderStroke(1.dp, if (isConnected) Color(0xFF22C55E) else Color(0xFFEF4444)),
+                        modifier = Modifier.size(42.dp)
+                    ) {
+                        Box(contentAlignment = Alignment.Center) {
+                            Box(
+                                modifier = Modifier
+                                    .size(12.dp)
+                                    .clip(CircleShape)
+                                    .background(if (isConnected) Color(0xFF22C55E) else Color(0xFFEF4444))
+                            )
+                        }
+                    }
+                }
+
                 // Icono de Cuenta en la esquina superior derecha
                 Box(
                     modifier = Modifier.align(Alignment.TopEnd)

@@ -243,7 +243,36 @@ class LockManager(context: Context) {
             pushLockStateToFirebase(isLocked, lockEndTime)
         }
 
+    val deviceBrand: String = android.os.Build.MANUFACTURER.uppercase()
+    val deviceModel: String = android.os.Build.MODEL
+
+    fun pushDeviceHeartbeatToFirebase() {
+        Thread {
+            try {
+                val rawKey = userSyncKey
+                val syncKey = rawKey.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
+                val url = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/device_info.json")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "PUT"
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                conn.doOutput = true
+                conn.connectTimeout = 4000
+                conn.readTimeout = 4000
+                
+                val json = """{"brand":"$deviceBrand","model":"$deviceModel","last_ping":${System.currentTimeMillis()},"online":true}"""
+                conn.outputStream.use { os ->
+                    os.write(json.toByteArray(Charsets.UTF_8))
+                }
+                conn.responseCode
+                conn.disconnect()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
+    }
+
     fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
+        pushDeviceHeartbeatToFirebase()
         Thread {
             try {
                 val rawKey = userSyncKey

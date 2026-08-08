@@ -146,9 +146,11 @@ chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     }
 });
 
+let connectedDeviceInfo = null;
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getState') {
-        sendResponse({ isLocked, remainingSeconds, customDomains, parentalEnabled });
+        sendResponse({ isLocked, remainingSeconds, customDomains, parentalEnabled, connectedDeviceInfo });
     } else if (request.action === 'startTimer') {
         isLocked = true;
         remainingSeconds = request.minutes * 60;
@@ -243,6 +245,26 @@ function pushLockStateToFirebase(locked, durationMinutes) {
 
 function pollFirebaseSync() {
     const targetKey = cleanSyncKey(firebaseSyncKey);
+
+    // 1. Obtener información de dispositivo y comprobar latido (Heartbeat)
+    fetch(`${firebaseDbUrl}/users/${targetKey}/device_info.json`)
+        .then(res => res.json())
+        .then(deviceData => {
+            if (deviceData && deviceData.brand && deviceData.last_ping) {
+                const now = Date.now();
+                // Latido válido si se ha recibido en los últimos 60 segundos
+                if (now - deviceData.last_ping < 60000) {
+                    connectedDeviceInfo = deviceData;
+                } else {
+                    connectedDeviceInfo = null; // Dispositivo desconectado (ping viejo)
+                }
+            } else {
+                connectedDeviceInfo = null;
+            }
+        })
+        .catch(() => { connectedDeviceInfo = null; });
+
+    // 2. Obtener estado de bloqueo
     fetch(`${firebaseDbUrl}/users/${targetKey}/lock_state.json`)
         .then(res => res.json())
         .then(data => {

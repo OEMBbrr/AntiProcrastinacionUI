@@ -92,6 +92,10 @@ body {
     background: #DCFCE7;
     color: #166534;
 }
+.sync-badge.disconnected {
+    background: #FEE2E2;
+    color: #991B1B;
+}
 .account-inputs {
     display: flex;
     gap: 6px;

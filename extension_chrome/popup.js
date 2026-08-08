@@ -82,24 +82,32 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateUI() {
-        chrome.storage.local.get(['syncKey'], (res) => {
-            if (res.syncKey) {
-                if (syncStatusBadge) {
-                    syncStatusBadge.textContent = "🟢 Vinculado";
-                    syncStatusBadge.classList.add("connected");
-                }
-                if (syncKeyInput && !syncKeyInput.value) {
-                    syncKeyInput.value = res.syncKey;
-                }
-            }
-        });
-
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
-            const { isLocked, remainingSeconds, customDomains, parentalEnabled } = response;
+            const { isLocked, remainingSeconds, customDomains, parentalEnabled, connectedDeviceInfo } = response;
 
             if (parentalSwitch) parentalSwitch.checked = !!parentalEnabled;
             if (customDomains) renderSiteTags(customDomains);
+
+            // Actualizar Badge de Detección Real de Dispositivo
+            if (syncStatusBadge) {
+                if (connectedDeviceInfo && connectedDeviceInfo.brand) {
+                    const devName = `${connectedDeviceInfo.brand} ${connectedDeviceInfo.model || ''}`.trim();
+                    syncStatusBadge.textContent = `🟢 Conectado: ${devName}`;
+                    syncStatusBadge.classList.add("connected");
+                    syncStatusBadge.classList.remove("disconnected");
+                } else {
+                    syncStatusBadge.textContent = "🔴 Desvinculado";
+                    syncStatusBadge.classList.remove("connected");
+                    syncStatusBadge.classList.add("disconnected");
+                }
+            }
+
+            chrome.storage.local.get(['syncKey'], (res) => {
+                if (res.syncKey && syncKeyInput && !syncKeyInput.value) {
+                    syncKeyInput.value = res.syncKey;
+                }
+            });
 
             if (isLocked) {
                 statusPill.textContent = "MODO ENFOQUE ACTIVO";
