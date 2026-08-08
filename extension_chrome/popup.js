@@ -158,8 +158,8 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             chrome.storage.local.get(['syncKey'], (res) => {
-                if (res.syncKey && syncKeyInput && !syncKeyInput.value) {
-                    syncKeyInput.value = res.syncKey;
+                if (res.syncKey && btnGoogleLogin) {
+                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${res.syncKey}`;
                 }
             });
 
@@ -190,6 +190,21 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
+
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+
+    if (btnGoogleLogin) {
+        btnGoogleLogin.addEventListener('click', () => {
+            const googleEmail = prompt("Ingresa tu correo de Google para vincular:", "mi_cuenta_google@gmail.com");
+            if (googleEmail) {
+                const cleanKey = googleEmail.trim().toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
+                chrome.runtime.sendMessage({ action: 'setSyncKey', syncKey: cleanKey }, () => {
+                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${googleEmail}`;
+                    updateUI();
+                });
+            }
+        });
+    }
 
     if (parentalSwitch) {
         parentalSwitch.addEventListener('change', () => {

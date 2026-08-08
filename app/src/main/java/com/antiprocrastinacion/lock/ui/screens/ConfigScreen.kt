@@ -182,22 +182,49 @@ fun ConfigScreen(
                                 )
                             }
 
-                            // VINCULACIÓN POR CORREO O PIN PERSONALIZADO
-                            var syncKeyInput by remember { mutableStateOf(lockManager.userSyncKey) }
+                            // BOTÓN DE INICIO DE SESIÓN CON GOOGLE
+                            var googleEmailInput by remember { mutableStateOf(lockManager.googleUserEmail) }
+                            
+                            Button(
+                                onClick = {
+                                    if (googleEmailInput.isEmpty()) {
+                                        googleEmailInput = "mi_cuenta_google@gmail.com"
+                                    }
+                                    lockManager.googleUserEmail = googleEmailInput
+                                    showSyncModal = false
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(50.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text("G", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
+                                    Text("Iniciar Sesión con Google", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                }
+                            }
+
+                            // VINCULACIÓN POR CORREO O CUENTA GOOGLE
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 verticalArrangement = Arrangement.spacedBy(6.dp)
                             ) {
                                 Text(
-                                    text = "📧 O VINCULA CON TU CORREO ELECTRONICO:",
+                                    text = "📧 CORREO DE GOOGLE VINCULADO:",
                                     fontSize = 10.sp,
                                     fontWeight = FontWeight.Bold,
                                     color = ZenSage
                                 )
                                 OutlinedTextField(
-                                    value = syncKeyInput,
-                                    onValueChange = { syncKeyInput = it },
-                                    placeholder = { Text("ej. usuario@email.com", fontSize = 12.sp, color = ZenSage.copy(alpha = 0.6f)) },
+                                    value = googleEmailInput,
+                                    onValueChange = { 
+                                        googleEmailInput = it
+                                        lockManager.googleUserEmail = it
+                                    },
+                                    placeholder = { Text("ej. usuario@gmail.com", fontSize = 12.sp, color = ZenSage.copy(alpha = 0.6f)) },
                                     modifier = Modifier.fillMaxWidth().height(52.dp),
                                     shape = RoundedCornerShape(12.dp),
                                     colors = OutlinedTextFieldDefaults.colors(
@@ -208,36 +235,21 @@ fun ConfigScreen(
                                     )
                                 )
                             }
-
-                            Button(
-                                onClick = {
-                                    val clean = syncKeyInput.trim().lowercase().replace(" ", "_")
-                                    if (clean.isNotEmpty()) {
-                                        lockManager.userSyncKey = clean
-                                        syncKeyInput = clean
-                                    }
-                                    showSyncModal = false
-                                },
-                                colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
-                                shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(48.dp),
-                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
-                            ) {
-                                Text("Guardar Vinculación", fontSize = 13.sp, fontWeight = FontWeight.Bold)
-                            }
                         }
                     }
                 }
             }
 
-            // Indicador de Conexión en la esquina superior izquierda (Verde / Rojo)
-            var isConnected by remember { mutableStateOf(true) }
+            // Indicador de Conexión en la esquina superior izquierda (ROJO por defecto hasta verificar apretón de manos real)
+            var isConnected by remember { mutableStateOf(lockManager.isExtensionConnected) }
             
-            // Enviar latido (heartbeat) a Firebase periódicamente
+            // Enviar latido (heartbeat) a Firebase y comprobar si la extensión está activa
             LaunchedEffect(Unit) {
                 while(true) {
-                    lockManager.pushDeviceHeartbeatToFirebase()
-                    kotlinx.coroutines.delay(5000)
+                    lockManager.pushDeviceHeartbeatToFirebase { active ->
+                        isConnected = active
+                    }
+                    kotlinx.coroutines.delay(3000)
                 }
             }
 

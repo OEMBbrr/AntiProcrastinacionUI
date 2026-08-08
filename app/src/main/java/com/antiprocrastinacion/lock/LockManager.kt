@@ -250,7 +250,20 @@ class LockManager(context: Context) {
     val deviceBrand: String = android.os.Build.MANUFACTURER.uppercase()
     val deviceModel: String = android.os.Build.MODEL
 
-    fun pushDeviceHeartbeatToFirebase() {
+    var isExtensionConnected: Boolean = false
+        private set
+
+    var googleUserEmail: String
+        get() = prefs.getString("google_user_email", "") ?: ""
+        set(value) {
+            val clean = value.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
+            prefs.edit().putString("google_user_email", clean).apply()
+            if (clean.isNotEmpty()) {
+                userSyncKey = clean
+            }
+        }
+
+    fun pushDeviceHeartbeatToFirebase(onResult: ((Boolean) -> Unit)? = null) {
         Thread {
             try {
                 val rawKey = userSyncKey
@@ -263,14 +276,32 @@ class LockManager(context: Context) {
                 conn.connectTimeout = 4000
                 conn.readTimeout = 4000
                 
-                val json = """{"brand":"$deviceBrand","model":"$deviceModel","last_ping":${System.currentTimeMillis()},"online":true}"""
+                val now = System.currentTimeMillis()
+                val json = """{"brand":"$deviceBrand","model":"$deviceModel","android_last_ping":$now,"last_ping":$now,"online":true}"""
                 conn.outputStream.use { os ->
                     os.write(json.toByteArray(Charsets.UTF_8))
                 }
                 conn.responseCode
                 conn.disconnect()
+
+                // Comprobar si la extensión de Chrome ha enviado latido en los últimos 30 segundos
+                val checkUrl = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/device_info/extension_last_ping.json")
+                val connCheck = checkUrl.openConnection() as java.net.HttpURLConnection
+                connCheck.requestMethod = "GET"
+                connCheck.connectTimeout = 4000
+                connCheck.readTimeout = 4000
+                if (connCheck.responseCode == 200) {
+                    val body = connCheck.inputStream.bufferedReader().use { it.readText() }.trim()
+                    val extPing = body.toLongOrNull() ?: 0L
+                    isExtensionConnected = (now - extPing) < 30000
+                } else {
+                    isExtensionConnected = false
+                }
+                connCheck.disconnect()
+                onResult?.invoke(isExtensionConnected)
             } catch (e: Exception) {
-                e.printStackTrace()
+                isExtensionConnected = false
+                onResult?.invoke(false)
             }
         }.start()
     }

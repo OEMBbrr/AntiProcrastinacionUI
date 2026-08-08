@@ -245,18 +245,26 @@ function pushLockStateToFirebase(locked, durationMinutes) {
 
 function pollFirebaseSync() {
     const targetKey = cleanSyncKey(firebaseSyncKey);
+    const now = Date.now();
 
-    // 1. Obtener información de dispositivo y comprobar latido (Heartbeat)
+    // 1. Enviar latido de la Extensión (extension_last_ping)
+    fetch(`${firebaseDbUrl}/users/${targetKey}/device_info/extension_last_ping.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(now)
+    }).catch(() => {});
+
+    // 2. Obtener información de dispositivo y comprobar si Android ha enviado latido en los últimos 30s
     fetch(`${firebaseDbUrl}/users/${targetKey}/device_info.json`)
         .then(res => res.json())
         .then(deviceData => {
-            if (deviceData && deviceData.brand && deviceData.last_ping) {
-                const now = Date.now();
-                // Latido válido si se ha recibido en los últimos 60 segundos
-                if (now - deviceData.last_ping < 60000) {
+            if (deviceData && (deviceData.brand || deviceData.model)) {
+                const androidPing = deviceData.android_last_ping || deviceData.last_ping || 0;
+                // Conectado REAL solo si Android envió latido en los últimos 30 segundos
+                if (now - androidPing < 30000) {
                     connectedDeviceInfo = deviceData;
                 } else {
-                    connectedDeviceInfo = null; // Dispositivo desconectado (ping viejo)
+                    connectedDeviceInfo = null; // Esperando latido de Android
                 }
             } else {
                 connectedDeviceInfo = null;

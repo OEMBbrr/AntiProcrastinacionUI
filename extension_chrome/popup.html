@@ -13,15 +13,16 @@
         <span class="status-pill" id="status-pill">MODO LIBRE</span>
     </div>
 
-    <!-- Account Sync Box -->
+    <!-- Account Sync Box with Google Sign-In -->
     <div class="account-box">
         <div class="account-header">
-            <span class="account-title">👤 Sincronización con Android</span>
-            <span class="sync-badge" id="sync-status-badge">Desconectado</span>
+            <span class="account-title">👤 Cuenta de Google</span>
+            <span class="sync-badge disconnected" id="sync-status-badge">🔴 Desvinculado</span>
         </div>
-        <div class="account-inputs" id="account-inputs-area">
-            <input type="text" id="sync-key-input" placeholder="Email o Código PIN (ej. usuario@email.com)">
-            <button class="btn-sync" id="btn-save-sync">Vincular</button>
+        <div class="account-actions">
+            <button class="btn-google-login" id="btn-google-login">
+                <span class="google-icon">G</span> Iniciar Sesión con Google
+            </button>
         </div>
     </div>
 
