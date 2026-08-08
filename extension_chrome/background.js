@@ -213,9 +213,15 @@ function startBackgroundTimer() {
 let firebaseSyncKey = "USER_DEFAULT_12345";
 let firebaseDbUrl = "https://antiprocrastinacion-sync-default-rtdb.firebaseio.com";
 
+function cleanSyncKey(key) {
+    if (!key) return "USER_DEFAULT_12345";
+    return key.toLowerCase().trim().replace(/[^a-z0-9_@.-]/g, '_');
+}
+
 chrome.storage.local.get(['syncKey', 'firebaseDbUrl'], (res) => {
-    if (res.syncKey) firebaseSyncKey = res.syncKey;
+    if (res.syncKey) firebaseSyncKey = cleanSyncKey(res.syncKey);
     if (res.firebaseDbUrl) firebaseDbUrl = res.firebaseDbUrl;
+    pollFirebaseSync();
 });
 
 function pushLockStateToFirebase(locked, durationMinutes) {
@@ -227,7 +233,8 @@ function pushLockStateToFirebase(locked, durationMinutes) {
         source_device: "chrome_extension"
     };
 
-    fetch(`${firebaseDbUrl}/users/${firebaseSyncKey}/lock_state.json`, {
+    const targetKey = cleanSyncKey(firebaseSyncKey);
+    fetch(`${firebaseDbUrl}/users/${targetKey}/lock_state.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -235,7 +242,8 @@ function pushLockStateToFirebase(locked, durationMinutes) {
 }
 
 function pollFirebaseSync() {
-    fetch(`${firebaseDbUrl}/users/${firebaseSyncKey}/lock_state.json`)
+    const targetKey = cleanSyncKey(firebaseSyncKey);
+    fetch(`${firebaseDbUrl}/users/${targetKey}/lock_state.json`)
         .then(res => res.json())
         .then(data => {
             if (data && typeof data.is_locked === 'boolean') {
@@ -244,17 +252,16 @@ function pollFirebaseSync() {
                 const now = Date.now();
 
                 if (cloudLocked && now < expiresAt) {
-                    if (!isLocked) {
-                        isLocked = true;
-                        remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
-                        updateNetRules();
-                        startBackgroundTimer();
-                    }
+                    isLocked = true;
+                    remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+                    updateNetRules();
+                    if (!lockInterval) startBackgroundTimer();
                 } else if (!cloudLocked || now >= expiresAt) {
                     if (isLocked) {
                         isLocked = false;
                         remainingSeconds = 0;
                         clearInterval(lockInterval);
+                        lockInterval = null;
                         updateNetRules();
                     }
                 }
@@ -263,7 +270,5 @@ function pollFirebaseSync() {
         .catch(() => {});
 }
 
-// Escuchar inicio o parada local y enviar a Firebase
-const originalOnMessage = chrome.runtime.onMessage;
-setInterval(pollFirebaseSync, 3000);
+setInterval(pollFirebaseSync, 1500);
 pollFirebaseSync();

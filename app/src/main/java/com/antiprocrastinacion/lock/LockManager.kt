@@ -237,12 +237,17 @@ class LockManager(context: Context) {
             val key = prefs.getString("user_sync_key", "") ?: ""
             return if (key.isNotEmpty()) key else devicePin
         }
-        set(value) = prefs.edit().putString("user_sync_key", value).apply()
+        set(value) {
+            val clean = value.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
+            prefs.edit().putString("user_sync_key", clean).apply()
+            pushLockStateToFirebase(isLocked, lockEndTime)
+        }
 
-    private fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
+    fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
         Thread {
             try {
-                val syncKey = userSyncKey
+                val rawKey = userSyncKey
+                val syncKey = rawKey.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
                 val url = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/lock_state.json")
                 val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = "PUT"
