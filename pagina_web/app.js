@@ -1,7 +1,9 @@
-// Web Audio API Synthesized Zen Sound Engine
-class ZenSoundEngine {
+// Web Audio API Deep Resonant Zen Singing Bowl Engine with Strict Anti-Overlap Cooldown
+class DeepZenSoundEngine {
     constructor() {
         this.ctx = null;
+        this.lastPlayTime = 0;
+        this.cooldownMs = 2000; // Cooldown de 2.0 segundos para evitar sonidos bugueados al pasar el ratón rápido
     }
 
     initCtx() {
@@ -14,99 +16,70 @@ class ZenSoundEngine {
         }
     }
 
-    // 1. Zen Tibetan Bell / Singing Bowl (432 Hz Healing Tone)
-    playChime() {
+    // Sonido Profundo y Largo de Cuenco Tibetano Zen (432 Hz y 528 Hz con caída natural de 3.5 segundos)
+    playDeepBowl() {
+        const nowMs = Date.now();
+        if (nowMs - this.lastPlayTime < this.cooldownMs) return; // Evita superposición o sonido bugueado
+        this.lastPlayTime = nowMs;
+
         try {
             this.initCtx();
             if (!this.ctx) return;
-            const now = this.ctx.currentTime;
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
+            const t = this.ctx.currentTime;
 
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(432, now);
+            // Frecuencias Zen fundamentales (432 Hz armónico y 528 Hz frecuencia de transformación)
+            const frequencies = [432, 528];
+            frequencies.forEach((freq, idx) => {
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
 
-            gain.gain.setValueAtTime(0.001, now);
-            gain.gain.exponentialRampToValueAtTime(0.25, now + 0.04);
-            gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.2);
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(freq, t);
 
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start(now);
-            osc.stop(now + 2.2);
-        } catch (e) {}
-    }
+                const volume = idx === 0 ? 0.16 : 0.07;
+                gain.gain.setValueAtTime(0.001, t);
+                gain.gain.linearRampToValueAtTime(volume, t + 0.18);
+                gain.gain.exponentialRampToValueAtTime(0.0001, t + 3.6);
 
-    // 2. Soft Zen Air Whoosh (Hover and modal open sound)
-    playWhoosh() {
-        try {
-            this.initCtx();
-            if (!this.ctx) return;
-            const now = this.ctx.currentTime;
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
 
-            const bufferSize = this.ctx.sampleRate * 0.25;
-            const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
-            const output = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                output[i] = Math.random() * 2 - 1;
-            }
-
-            const whiteNoise = this.ctx.createBufferSource();
-            whiteNoise.buffer = buffer;
-
-            const filter = this.ctx.createBiquadFilter();
-            filter.type = 'bandpass';
-            filter.frequency.setValueAtTime(300, now);
-            filter.frequency.exponentialRampToValueAtTime(1100, now + 0.12);
-            filter.frequency.exponentialRampToValueAtTime(200, now + 0.25);
-            filter.Q.value = 2.5;
-
-            const gain = this.ctx.createGain();
-            gain.gain.setValueAtTime(0.001, now);
-            gain.gain.linearRampToValueAtTime(0.12, now + 0.12);
-            gain.gain.linearRampToValueAtTime(0.001, now + 0.25);
-
-            whiteNoise.connect(filter);
-            filter.connect(gain);
-            gain.connect(this.ctx.destination);
-            whiteNoise.start(now);
-            whiteNoise.stop(now + 0.25);
-        } catch (e) {}
-    }
-
-    // 3. Bamboo Woodblock Tap (Typing and button click sound)
-    playTap() {
-        try {
-            this.initCtx();
-            if (!this.ctx) return;
-            const now = this.ctx.currentTime;
-            const osc = this.ctx.createOscillator();
-            const gain = this.ctx.createGain();
-
-            osc.type = 'triangle';
-            osc.frequency.setValueAtTime(750, now);
-            osc.frequency.exponentialRampToValueAtTime(280, now + 0.04);
-
-            gain.gain.setValueAtTime(0.15, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
-
-            osc.connect(gain);
-            gain.connect(this.ctx.destination);
-            osc.start(now);
-            osc.stop(now + 0.04);
+                osc.start(t);
+                osc.stop(t + 3.6);
+            });
         } catch (e) {}
     }
 }
 
-const zenSound = new ZenSoundEngine();
+const zenSound = new DeepZenSoundEngine();
 
 document.addEventListener('DOMContentLoaded', () => {
-    // Attach Whoosh sound on hover to interactive buttons and cards
-    document.querySelectorAll('.btn, .feature-card, .btn-adjust, .btn-app-main, .btn-app-outline, .btn-app-tregua, .btn-emergency').forEach(el => {
-        el.addEventListener('mouseenter', () => zenSound.playWhoosh());
+    // Asignar el sonido profundo Zen al hacer hover en elementos clave (con cooldown anti-superposición)
+    document.querySelectorAll('.btn, .feature-card, .promo-card, .btn-app-main, .btn-app-tregua').forEach(el => {
+        el.addEventListener('mouseenter', () => zenSound.playDeepBowl());
     });
 
-    // 1. Phone Demo State Controls
+    // 1. Scroll Reveal Animations (Animaciones fluidas al bajar por la página)
+    const observerOptions = {
+        root: null,
+        rootMargin: '0px',
+        threshold: 0.12
+    };
+
+    const scrollObserver = new IntersectionObserver((entries) => {
+        entries.forEach(entry => {
+            if (entry.isIntersecting) {
+                entry.target.classList.add('is-visible');
+            }
+        });
+    }, observerOptions);
+
+    document.querySelectorAll('.feature-card, .promo-container, .challenge-sandbox, .cta-card, .section-header').forEach(el => {
+        el.classList.add('reveal-on-scroll');
+        scrollObserver.observe(el);
+    });
+
+    // 2. Phone Demo State Controls
     let targetMinutes = 10;
     let remainingSeconds = 0;
     let timerInterval = null;
@@ -150,7 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function startDemoFocus() {
-        zenSound.playChime();
+        zenSound.playDeepBowl();
         isLocked = true;
         remainingSeconds = targetMinutes * 60;
         demoStatus.textContent = "MODO ENFOQUE ACTIVO";
@@ -186,7 +159,7 @@ document.addEventListener('DOMContentLoaded', () => {
         btnStart.addEventListener('click', startDemoFocus);
     }
 
-    // 2. Modal Challenge Popups for Phone Demo
+    // 3. Modal Challenge Popups for Phone Demo
     const demoModal = document.getElementById('demo-modal');
     const modalTitle = document.getElementById('modal-title');
     const modalDesc = document.getElementById('modal-desc');
@@ -245,7 +218,7 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 3. Interactive Typing Sandbox Verification
+    // 4. Interactive Typing Sandbox Verification
     const samplePhraseEl = document.getElementById('sample-phrase');
     const typingInputEl = document.getElementById('typing-input');
     const typingProgressEl = document.getElementById('typing-progress');
@@ -275,7 +248,7 @@ document.addEventListener('DOMContentLoaded', () => {
             wordCountEl.textContent = `${userWords} / ${totalWords} palabras`;
 
             if (userText === requiredText) {
-                matchStatusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #A3E635;"></i> ¡Coincidencia Perfecta!';
+                matchStatusEl.innerHTML = '<i class="fa-solid fa-circle-check" style="color: #8C9B90;"></i> ¡Coincidencia Perfecta!';
             } else if (matchingLength === userText.length && userText.length > 0) {
                 matchStatusEl.innerHTML = '<i class="fa-solid fa-pen-nib" style="color: #38BDF8;"></i> Escribiendo correctamente...';
             } else if (userText.length > 0) {
@@ -286,14 +259,14 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // 4. iOS Guide Modal Handlers
+    // 5. iOS Guide Modal Handlers
     const iosGuideModal = document.getElementById('ios-guide-modal');
     const btnOpenIosModal1 = document.getElementById('btn-open-ios-modal');
     const btnOpenIosModal2 = document.getElementById('btn-open-ios-modal-2');
     const btnCloseIosModal = document.getElementById('btn-close-ios-modal');
 
     function openIosModal() {
-        zenSound.playWhoosh();
+        zenSound.playDeepBowl();
         if (iosGuideModal) iosGuideModal.classList.remove('hidden');
     }
 
@@ -305,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnOpenIosModal2) btnOpenIosModal2.addEventListener('click', openIosModal);
     if (btnCloseIosModal) btnCloseIosModal.addEventListener('click', closeIosModal);
 
-    // 5. Light/Dark Mode Theme Toggle Handler
+    // 6. Light/Dark Mode Theme Toggle Handler
     const themeToggleBtn = document.getElementById('theme-toggle-btn');
     const themeIcon = document.getElementById('theme-icon');
 
@@ -320,7 +293,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (themeToggleBtn) {
         themeToggleBtn.addEventListener('click', () => {
-            zenSound.playChime();
+            zenSound.playDeepBowl();
             const isLight = document.body.classList.toggle('light-mode');
             if (themeIcon) {
                 if (isLight) {
