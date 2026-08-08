@@ -62,7 +62,38 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const syncStatusBadge = document.getElementById('sync-status-badge');
+    const syncKeyInput = document.getElementById('sync-key-input');
+    const btnSaveSync = document.getElementById('btn-save-sync');
+
+    if (btnSaveSync) {
+        btnSaveSync.addEventListener('click', () => {
+            const raw = syncKeyInput.value.trim();
+            if (raw) {
+                const cleanKey = raw.toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
+                chrome.storage.local.set({ syncKey: cleanKey }, () => {
+                    chrome.runtime.sendMessage({ action: 'setSyncKey', syncKey: cleanKey }, () => {
+                        alert("¡Cuenta vinculada con éxito! La extensión se sincronizará con tu teléfono.");
+                        updateUI();
+                    });
+                });
+            }
+        });
+    }
+
     function updateUI() {
+        chrome.storage.local.get(['syncKey'], (res) => {
+            if (res.syncKey) {
+                if (syncStatusBadge) {
+                    syncStatusBadge.textContent = "🟢 Vinculado";
+                    syncStatusBadge.classList.add("connected");
+                }
+                if (syncKeyInput && !syncKeyInput.value) {
+                    syncKeyInput.value = res.syncKey;
+                }
+            }
+        });
+
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
             const { isLocked, remainingSeconds, customDomains, parentalEnabled } = response;

@@ -174,6 +174,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.storage.local.set({ parentalEnabled });
         updateNetRules();
         sendResponse({ success: true, parentalEnabled });
+    } else if (request.action === 'setSyncKey') {
+        firebaseSyncKey = request.syncKey;
+        chrome.storage.local.set({ syncKey: firebaseSyncKey });
+        pollFirebaseSync();
+        sendResponse({ success: true, firebaseSyncKey });
     }
     return true;
 });

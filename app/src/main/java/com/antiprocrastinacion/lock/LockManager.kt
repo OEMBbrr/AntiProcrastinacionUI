@@ -221,10 +221,14 @@ class LockManager(context: Context) {
         cooldownEndTime = now + (15 * 60 * 1000)
     }
 
+    var userSyncKey: String
+        get() = prefs.getString("user_sync_key", "USER_DEFAULT_12345") ?: "USER_DEFAULT_12345"
+        set(value) = prefs.edit().putString("user_sync_key", value).apply()
+
     private fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
         Thread {
             try {
-                val syncKey = "USER_DEFAULT_12345"
+                val syncKey = userSyncKey
                 val url = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/lock_state.json")
                 val conn = url.openConnection() as java.net.HttpURLConnection
                 conn.requestMethod = "PUT"

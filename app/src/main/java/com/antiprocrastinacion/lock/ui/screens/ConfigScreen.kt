@@ -438,6 +438,60 @@ fun ConfigScreen(
                     }
                 }
 
+                // Sincronización de Cuenta con Extensión de Chrome
+                var syncKeyText by remember { mutableStateOf(lockManager.userSyncKey) }
+                
+                Column {
+                    Text(
+                        text = "VINCULACIÓN DE CUENTA CON CHROME EXTENSION",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = ZenSage,
+                        modifier = Modifier.padding(start = 4.dp, bottom = 6.dp)
+                    )
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                        border = BorderStroke(1.dp, ZenSage.copy(alpha = 0.2f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                            Text(
+                                text = "Ingresa tu email o código PIN de vinculación para sincronizar este teléfono con la Extensión de Chrome de tu PC:",
+                                fontSize = 11.sp,
+                                color = ZenCharcoal
+                            )
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                OutlinedTextField(
+                                    value = syncKeyText,
+                                    onValueChange = { syncKeyText = it },
+                                    placeholder = { Text("ej. usuario@email.com", fontSize = 11.sp) },
+                                    modifier = Modifier.weight(1f).height(48.dp),
+                                    shape = RoundedCornerShape(8.dp)
+                                )
+                                Button(
+                                    onClick = {
+                                        val clean = syncKeyText.trim().lowercase().replace(" ", "_")
+                                        if (clean.isNotEmpty()) {
+                                            lockManager.userSyncKey = clean
+                                            syncKeyText = clean
+                                        }
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
+                                    shape = RoundedCornerShape(8.dp)
+                                ) {
+                                    Text("Guardar", fontSize = 11.sp)
+                                }
+                            }
+                        }
+                    }
+                }
+
                 // Frase aleatoria de enfoque (Selección automática de la colección de 55+ frases)
                 Column {
                     Text(
