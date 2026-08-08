@@ -304,4 +304,35 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnOpenIosModal1) btnOpenIosModal1.addEventListener('click', openIosModal);
     if (btnOpenIosModal2) btnOpenIosModal2.addEventListener('click', openIosModal);
     if (btnCloseIosModal) btnCloseIosModal.addEventListener('click', closeIosModal);
+
+    // 5. Light/Dark Mode Theme Toggle Handler
+    const themeToggleBtn = document.getElementById('theme-toggle-btn');
+    const themeIcon = document.getElementById('theme-icon');
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme === 'light') {
+        document.body.classList.add('light-mode');
+        if (themeIcon) {
+            themeIcon.classList.remove('fa-moon');
+            themeIcon.classList.add('fa-sun');
+        }
+    }
+
+    if (themeToggleBtn) {
+        themeToggleBtn.addEventListener('click', () => {
+            zenSound.playChime();
+            const isLight = document.body.classList.toggle('light-mode');
+            if (themeIcon) {
+                if (isLight) {
+                    themeIcon.classList.remove('fa-moon');
+                    themeIcon.classList.add('fa-sun');
+                    localStorage.setItem('theme', 'light');
+                } else {
+                    themeIcon.classList.remove('fa-sun');
+                    themeIcon.classList.add('fa-moon');
+                    localStorage.setItem('theme', 'dark');
+                }
+            }
+        });
+    }
 });
