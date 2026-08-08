@@ -36,6 +36,11 @@ const adultDomains = [
     
     // Red oficial de sitios hermanos de Pornhub (MindGeek / Aylo Network)
     "thumbzilla.com",
+    "thumbzilla.net",
+    "thumbzilla.org",
+    "thumbzilla",
+    "m.thumbzilla.com",
+    "tza.co",
     "youporn.com",
     "redtube.com",
     "tube8.com",
@@ -83,7 +88,7 @@ function updateNetRules() {
                 id: index + 1,
                 priority: 1,
                 action: { type: 'redirect', redirect: { extensionPath: '/blocked.html' } },
-                condition: { urlFilter: `*://${domain}/*`, resourceTypes: ['main_frame'] }
+                condition: { urlFilter: `*${domain}*`, resourceTypes: ['main_frame', 'sub_frame'] }
             }));
 
             chrome.declarativeNetRequest.updateDynamicRules({
