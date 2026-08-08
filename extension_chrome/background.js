@@ -144,12 +144,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         remainingSeconds = request.minutes * 60;
         updateNetRules();
         startBackgroundTimer();
+        pushLockStateToFirebase(true, request.minutes);
         sendResponse({ success: true });
     } else if (request.action === 'stopTimer') {
         isLocked = false;
         remainingSeconds = 0;
         clearInterval(lockInterval);
         updateNetRules();
+        pushLockStateToFirebase(false, 0);
         sendResponse({ success: true });
     } else if (request.action === 'grantTregua') {
         remainingSeconds = request.minutes * 60;
@@ -185,6 +187,68 @@ function startBackgroundTimer() {
             isLocked = false;
             clearInterval(lockInterval);
             updateNetRules();
+            pushLockStateToFirebase(false, 0);
         }
     }, 1000);
 }
+
+// ================================================================================
+// FIREBASE REALTIME DATABASE SYNC CLIENT (SINGLE SOURCE OF TRUTH)
+// ================================================================================
+let firebaseSyncKey = "USER_DEFAULT_12345";
+let firebaseDbUrl = "https://antiprocrastinacion-sync-default-rtdb.firebaseio.com";
+
+chrome.storage.local.get(['syncKey', 'firebaseDbUrl'], (res) => {
+    if (res.syncKey) firebaseSyncKey = res.syncKey;
+    if (res.firebaseDbUrl) firebaseDbUrl = res.firebaseDbUrl;
+});
+
+function pushLockStateToFirebase(locked, durationMinutes) {
+    const expiresAt = locked ? (Date.now() + (durationMinutes * 60 * 1000)) : 0;
+    const payload = {
+        is_locked: locked,
+        expires_at: expiresAt,
+        updated_at: Date.now(),
+        source_device: "chrome_extension"
+    };
+
+    fetch(`${firebaseDbUrl}/users/${firebaseSyncKey}/lock_state.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+    }).catch(() => {});
+}
+
+function pollFirebaseSync() {
+    fetch(`${firebaseDbUrl}/users/${firebaseSyncKey}/lock_state.json`)
+        .then(res => res.json())
+        .then(data => {
+            if (data && typeof data.is_locked === 'boolean') {
+                const cloudLocked = data.is_locked;
+                const expiresAt = data.expires_at || 0;
+                const now = Date.now();
+
+                if (cloudLocked && now < expiresAt) {
+                    if (!isLocked) {
+                        isLocked = true;
+                        remainingSeconds = Math.max(0, Math.floor((expiresAt - now) / 1000));
+                        updateNetRules();
+                        startBackgroundTimer();
+                    }
+                } else if (!cloudLocked || now >= expiresAt) {
+                    if (isLocked) {
+                        isLocked = false;
+                        remainingSeconds = 0;
+                        clearInterval(lockInterval);
+                        updateNetRules();
+                    }
+                }
+            }
+        })
+        .catch(() => {});
+}
+
+// Escuchar inicio o parada local y enviar a Firebase
+const originalOnMessage = chrome.runtime.onMessage;
+setInterval(pollFirebaseSync, 3000);
+pollFirebaseSync();

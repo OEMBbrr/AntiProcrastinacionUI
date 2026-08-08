@@ -204,6 +204,7 @@ class LockManager(context: Context) {
         isLocked = true
         tempUnlockEndTime = 0L
         cooldownEndTime = 0L
+        pushLockStateToFirebase(true, endTime)
     }
 
     fun stopLock() {
@@ -211,11 +212,36 @@ class LockManager(context: Context) {
         lockEndTime = 0L
         tempUnlockEndTime = 0L
         cooldownEndTime = 0L
+        pushLockStateToFirebase(false, 0L)
     }
 
     fun startTempUnlock() {
         val now = System.currentTimeMillis()
         tempUnlockEndTime = now + (5 * 60 * 1000)
         cooldownEndTime = now + (15 * 60 * 1000)
+    }
+
+    private fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
+        Thread {
+            try {
+                val syncKey = "USER_DEFAULT_12345"
+                val url = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/lock_state.json")
+                val conn = url.openConnection() as java.net.HttpURLConnection
+                conn.requestMethod = "PUT"
+                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
+                conn.doOutput = true
+                conn.connectTimeout = 5000
+                conn.readTimeout = 5000
+                
+                val json = """{"is_locked":$locked,"expires_at":$expiresAt,"updated_at":${System.currentTimeMillis()},"source_device":"android"}"""
+                conn.outputStream.use { os ->
+                    os.write(json.toByteArray(Charsets.UTF_8))
+                }
+                conn.responseCode
+                conn.disconnect()
+            } catch (e: Exception) {
+                e.printStackTrace()
+            }
+        }.start()
     }
 }
