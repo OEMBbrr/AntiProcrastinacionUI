@@ -2,6 +2,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -12,8 +13,8 @@ android {
         applicationId = "com.antiprocrastinacion.lock"
         minSdk = 26
         targetSdk = 35
-        versionCode = 13
-        versionName = "13.0.0"
+        versionCode = 14
+        versionName = "14.0.0"
     }
 
     buildTypes {
@@ -51,6 +52,16 @@ dependencies {
     
     // JSON serialization
     implementation("com.google.code.gson:gson:2.11.0")
+
+    // Firebase BoM + Auth + Realtime Database
+    implementation(platform("com.google.firebase:firebase-bom:33.7.0"))
+    implementation("com.google.firebase:firebase-auth-ktx")
+    implementation("com.google.firebase:firebase-database-ktx")
+
+    // Google Sign-In con Credential Manager
+    implementation("androidx.credentials:credentials:1.3.0")
+    implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
+    implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

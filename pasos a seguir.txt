@@ -1,0 +1,74 @@
+Hola IA de Programación. Estoy desarrollando el ecosistema "AntiProcrastinación" (Android Nativo, Extensión de Chrome Manifest V3 y Landing Page Web). 
+
+Necesito que implementes el sistema de autenticación de Google y la sincronización en tiempo real utilizando Firebase como la "Única Fuente de la Verdad" (Single Source of Truth). 
+
+Aquí tienes las especificaciones exactas, la estructura de la base de datos y la guía de implementación para que desarrolles el código:
+
+================================================================================
+1. ESQUEMA DE LA BASE DE DATOS (Firebase Realtime Database)
+================================================================================
+Usaremos sobrescritura directa en este nodo de cada usuario para mantener el consumo de datos al mínimo:
+
+{
+  "users": {
+    "UID_USUARIO_12345": {
+      "profile": {
+        "email": "usuario@email.com",
+        "role": "admin" // 'admin' (padre) o 'child' (hijo)
+      },
+      "device_info": {
+        "android_last_ping": 1723156000, // Unix Timestamp
+        "extension_last_ping": 1723156000
+      },
+      "lock_state": {
+        "is_locked": true,
+        "expires_at": 1723156000,
+        "allowed_apps": ["com.whatsapp", "com.google.android.calculator"]
+      }
+    }
+  }
+}
+
+================================================================================
+2. IMPLEMENTACIÓN: CLIENTE ANDROID NATIVO (Kotlin & Jetpack Compose)
+================================================================================
+- Build System: Gradle con Kotlin DSL (.kts). El archivo 'google-services.json' ya está en la carpeta 'app/'.
+- Dependencias añadidas: Firebase BoM, firebase-database y firebase-auth.
+- Tareas requeridas:
+  1. Autenticación: Implementar el inicio de sesión con Google de un solo clic utilizando el SDK de "Credential Manager" de Android. Obtener el ID Token de Google, crear una credencial de Firebase ('GoogleAuthProvider.getCredential') e iniciar sesión con 'auth.signInWithCredential'.
+  2. Latido (Ping): En el servicio 'LockMonitoringService.kt', enviar un timestamp Unix actual a '/users/<UID>/device_info/android_last_ping' de manera periódica (cada 15-20 segundos).
+  3. Apretón de Manos (Handshake): Escuchar en tiempo real el nodo '/users/<UID>/device_info/extension_last_ping'. Si el timestamp de la extensión tiene menos de 30 segundos de diferencia con el tiempo actual, cambia el punto de estado de la UI (un punto de Compose) de ROJO (🔴) a VERDE (🟢).
+
+================================================================================
+3. IMPLEMENTACIÓN: EXTENSIÓN DE CHROME (Manifest V3 - Vanilla JS)
+================================================================================
+- Arquitectura: JavaScript Puro (Vanilla JS). Los SDKs de Firebase (App, Auth, Database) ya están descargados localmente en 'libs/'.
+- Configuración: Inicializar Firebase en 'background.js' utilizando 'importScripts()' y el objeto 'firebaseConfig'.
+- Tareas requeridas:
+  1. Autenticación (API de Identidad Nativa): Para evitar problemas en el Service Worker de MV3, utiliza la API de Chrome 'chrome.identity.getAuthToken()' para obtener el token de acceso de Google directamente del navegador. Intercambia este token con Firebase Auth utilizando 'signInWithCredential'.
+  2. Latido (Ping): Enviar un timestamp Unix actual a '/users/<UID>/device_info/extension_last_ping' de manera periódica.
+  3. Apretón de Manos (Handshake): Escuchar en tiempo real el nodo '/users/<UID>/device_info/android_last_ping'. Si la diferencia es menor a 30 segundos, actualiza el Badge de la extensión (el icono de la barra de herramientas) de ROJO (🔴) a VERDE (🟢) con el texto "Conectado".
+  4. Bloqueo en tiempo real: Escuchar el nodo '/users/<UID>/lock_state/is_locked'. Si cambia a 'true', inyectar reglas de 'declarativeNetRequest' o redirigir las pestañas bloqueadas a 'blocked.html'.
+
+================================================================================
+4. REGLAS DE SEGURIDAD DE FIREBASE (Security Rules)
+================================================================================
+Aplica esta estructura para garantizar que un usuario hijo no pueda apagar el bloqueo de forma fraudulenta desde la consola del navegador:
+
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null && auth.uid == $uid",
+        "lock_state": {
+          ".write": "auth != null && auth.uid == $uid && data.parent().child('profile/role').val() == 'admin'"
+        },
+        "device_info": {
+          ".write": "auth != null && auth.uid == $uid"
+        }
+      }
+    }
+  }
+}
+
+Por favor, escribe el código de manera modular y limpia para ambos clientes, siguiendo las mejores prácticas para Kotlin DSL y Manifest V3.

@@ -3,6 +3,149 @@ let remainingSeconds = 0;
 let lockInterval = null;
 let parentalEnabled = false;
 
+// ================================================================================
+// FIREBASE AUTH & CONFIG
+// ================================================================================
+const FIREBASE_API_KEY = "AIzaSyBNw12V7mMCt76ZdP89NEYQwg_E2vshRto";
+const FIREBASE_DB_URL = "https://antiprocrastinacion-26975-default-rtdb.firebaseio.com";
+const WEB_CLIENT_ID = "927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com";
+
+let firebaseUid = null;
+let firebaseIdToken = null;
+let firebaseRefreshToken = null;
+let userEmail = "";
+
+// Cargar sesión guardada
+chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail'], (res) => {
+    if (res.firebaseUid) firebaseUid = res.firebaseUid;
+    if (res.firebaseIdToken) firebaseIdToken = res.firebaseIdToken;
+    if (res.firebaseRefreshToken) firebaseRefreshToken = res.firebaseRefreshToken;
+    if (res.userEmail) userEmail = res.userEmail;
+    if (firebaseUid) {
+        pollFirebaseSync();
+    }
+});
+
+/**
+ * Inicia sesión con Google usando chrome.identity.launchWebAuthFlow()
+ * Intercambia el código de autorización con Firebase Auth REST API
+ */
+function signInWithGoogle() {
+    return new Promise((resolve, reject) => {
+        const redirectUrl = chrome.identity.getRedirectURL();
+        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+            `client_id=${WEB_CLIENT_ID}` +
+            `&response_type=token id_token` +
+            `&redirect_uri=${encodeURIComponent(redirectUrl)}` +
+            `&scope=${encodeURIComponent('openid email profile')}` +
+            `&nonce=${Math.random().toString(36).substr(2)}`;
+
+        chrome.identity.launchWebAuthFlow(
+            { url: authUrl, interactive: true },
+            (responseUrl) => {
+                if (chrome.runtime.lastError || !responseUrl) {
+                    reject(chrome.runtime.lastError?.message || "Auth cancelada");
+                    return;
+                }
+
+                // Extraer id_token de la URL de respuesta
+                const hashParams = new URLSearchParams(responseUrl.split('#')[1]);
+                const idToken = hashParams.get('id_token');
+                const accessToken = hashParams.get('access_token');
+
+                if (!idToken) {
+                    reject("No se obtuvo id_token");
+                    return;
+                }
+
+                // Intercambiar con Firebase Auth REST API
+                fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${FIREBASE_API_KEY}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        postBody: `id_token=${idToken}&providerId=google.com`,
+                        requestUri: redirectUrl,
+                        returnIdpCredential: true,
+                        returnSecureToken: true
+                    })
+                })
+                .then(res => res.json())
+                .then(data => {
+                    if (data.localId) {
+                        firebaseUid = data.localId;
+                        firebaseIdToken = data.idToken;
+                        firebaseRefreshToken = data.refreshToken;
+                        userEmail = data.email || "";
+
+                        chrome.storage.local.set({
+                            firebaseUid,
+                            firebaseIdToken,
+                            firebaseRefreshToken,
+                            userEmail
+                        });
+
+                        // Escribir perfil
+                        pushProfileToFirebase();
+                        pollFirebaseSync();
+                        resolve({ uid: firebaseUid, email: userEmail });
+                    } else {
+                        reject(data.error?.message || "Error Firebase Auth");
+                    }
+                })
+                .catch(err => reject(err.message));
+            }
+        );
+    });
+}
+
+/**
+ * Refresca el Firebase ID Token usando el refresh token
+ */
+function refreshFirebaseToken() {
+    if (!firebaseRefreshToken) return Promise.resolve(null);
+
+    return fetch(`https://securetoken.googleapis.com/v1/token?key=${FIREBASE_API_KEY}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=refresh_token&refresh_token=${firebaseRefreshToken}`
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.id_token) {
+            firebaseIdToken = data.id_token;
+            firebaseRefreshToken = data.refresh_token;
+            chrome.storage.local.set({ firebaseIdToken, firebaseRefreshToken });
+            return firebaseIdToken;
+        }
+        return null;
+    })
+    .catch(() => null);
+}
+
+/**
+ * Hace un fetch autenticado a Firebase RTDB, refrescando el token si es necesario
+ */
+async function authFetch(url, options = {}) {
+    if (!firebaseIdToken) return null;
+
+    let fullUrl = `${url}?auth=${firebaseIdToken}`;
+    let res = await fetch(fullUrl, options);
+
+    // Si el token expiró (401), refrescar e intentar de nuevo
+    if (res.status === 401) {
+        const newToken = await refreshFirebaseToken();
+        if (newToken) {
+            fullUrl = `${url}?auth=${newToken}`;
+            res = await fetch(fullUrl, options);
+        }
+    }
+
+    return res;
+}
+
+// ================================================================================
+// DOMINIOS Y BLOQUEO
+// ================================================================================
 let defaultDomains = [
     "facebook.com",
     "instagram.com",
@@ -14,47 +157,14 @@ let defaultDomains = [
 ];
 
 const adultDomains = [
-    // Pornhub dominios principales y TLDs internacionales
-    "pornhub.com",
-    "pornhub.net",
-    "pornhub.org",
-    "pornhub.club",
-    "pornhubselect.com",
-    "pornhubpremium.com",
-    "pornhublive.com",
-    "pornhubvids.com",
-    "pornhubcasino.com",
-    "pornhub.es",
-    "pornhub.fr",
-    "pornhub.de",
-    "pornhub.it",
-    "pornhub.cz",
-    "pornhub.com.br",
-    "phncdn.com",
-    "phprcdn.com",
-    "phncdn.net",
-    
-    // Red oficial de sitios hermanos de Pornhub (MindGeek / Aylo Network)
-    "thumbzilla.com",
-    "thumbzilla.net",
-    "thumbzilla.org",
-    "thumbzilla",
-    "m.thumbzilla.com",
-    "tza.co",
-    "youporn.com",
-    "redtube.com",
-    "tube8.com",
-    "spankwire.com",
-    "gaytube.com",
-    "extremetube.com",
-
-    // Otros portales adultos principales
-    "xvideos.com",
-    "xnxx.com",
-    "xhamster.com",
-    "onlyfans.com",
-    "chaturbate.com",
-    "stripchat.com"
+    "pornhub.com", "pornhub.net", "pornhub.org", "pornhub.club",
+    "pornhubselect.com", "pornhubpremium.com", "pornhublive.com",
+    "pornhub.es", "pornhub.fr", "pornhub.de", "pornhub.it",
+    "phncdn.com", "phprcdn.com", "phncdn.net",
+    "thumbzilla.com", "youporn.com", "redtube.com", "tube8.com",
+    "spankwire.com", "gaytube.com", "extremetube.com",
+    "xvideos.com", "xnxx.com", "xhamster.com",
+    "onlyfans.com", "chaturbate.com", "stripchat.com"
 ];
 
 let customDomains = [...defaultDomains];
@@ -70,30 +180,33 @@ chrome.storage.local.get(['customDomains', 'parentalEnabled'], (res) => {
     updateNetRules();
 });
 
+// Obtener lista de dominios activos SEPARANDO enfoque y parental
 function getActiveRulesList() {
-    let active = [...customDomains];
+    let active = [];
+    if (isLocked) {
+        active = [...customDomains];
+    }
     if (parentalEnabled) {
         active = [...new Set([...active, ...adultDomains])];
     }
     return active;
 }
 
-function getActiveKeywords() {
-    const rawList = getActiveRulesList();
+function extractKeywords(domainList) {
     const keywords = new Set();
-
-    rawList.forEach(item => {
+    domainList.forEach(item => {
         const lower = item.toLowerCase().trim();
         keywords.add(lower);
-
-        // Extraer palabra clave de marca raíz ej. "instagram", "facebook", "pornhub", "tiktok", "youtube"
         const brandKey = lower.replace(/^https?:\/\//, '').replace(/^www\./, '').split('.')[0];
         if (brandKey && brandKey.length >= 3) {
             keywords.add(brandKey);
         }
     });
-
     return Array.from(keywords);
+}
+
+function getActiveKeywords() {
+    return extractKeywords(getActiveRulesList());
 }
 
 function updateNetRules() {
@@ -101,7 +214,7 @@ function updateNetRules() {
         const removeIds = existingRules.map(r => r.id);
         const activeKeywords = getActiveKeywords();
 
-        if (isLocked || parentalEnabled) {
+        if (activeKeywords.length > 0) {
             const rules = activeKeywords.map((kw, index) => ({
                 id: index + 1,
                 priority: 1,
@@ -126,31 +239,49 @@ function isUrlBlocked(url) {
         return false;
     }
     const lowerUrl = url.toLowerCase();
-    const keywords = getActiveKeywords();
-    return keywords.some(kw => lowerUrl.includes(kw));
+
+    // Verificar sitios personalizados SOLO si está en modo enfoque
+    if (isLocked) {
+        const focusKeywords = extractKeywords(customDomains);
+        if (focusKeywords.some(kw => lowerUrl.includes(kw))) return true;
+    }
+
+    // Verificar sitios adultos SOLO si control parental está activo
+    if (parentalEnabled) {
+        const parentalKeywords = extractKeywords(adultDomains);
+        if (parentalKeywords.some(kw => lowerUrl.includes(kw))) return true;
+    }
+
+    return false;
 }
 
-// Interceptor Temprano de Navegación de Enlaces Directos, Reels, Perfiles y Subrutas (webNavigation)
+// Interceptor de Navegación
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
     if (details.frameId !== 0) return;
-    if ((isLocked || parentalEnabled) && isUrlBlocked(details.url)) {
+    if (isUrlBlocked(details.url)) {
         chrome.tabs.update(details.tabId, { url: chrome.runtime.getURL('/blocked.html') });
     }
 });
 
-// Fail-safe Tab Interceptor (Redirección instantánea basada en pestañas activas)
+// Fail-safe Tab Interceptor
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const targetUrl = changeInfo.url || (tab && tab.url);
-    if ((isLocked || parentalEnabled) && isUrlBlocked(targetUrl)) {
+    if (isUrlBlocked(targetUrl)) {
         chrome.tabs.update(tabId, { url: chrome.runtime.getURL('/blocked.html') });
     }
 });
 
+// ================================================================================
+// MENSAJES DEL POPUP
+// ================================================================================
 let connectedDeviceInfo = null;
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getState') {
-        sendResponse({ isLocked, remainingSeconds, customDomains, parentalEnabled, connectedDeviceInfo });
+        sendResponse({
+            isLocked, remainingSeconds, customDomains, parentalEnabled,
+            connectedDeviceInfo, firebaseUid, userEmail
+        });
     } else if (request.action === 'startTimer') {
         isLocked = true;
         remainingSeconds = request.minutes * 60;
@@ -186,11 +317,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.storage.local.set({ parentalEnabled });
         updateNetRules();
         sendResponse({ success: true, parentalEnabled });
-    } else if (request.action === 'setSyncKey') {
-        firebaseSyncKey = request.syncKey;
-        chrome.storage.local.set({ syncKey: firebaseSyncKey });
-        pollFirebaseSync();
-        sendResponse({ success: true, firebaseSyncKey });
+    } else if (request.action === 'googleSignIn') {
+        signInWithGoogle()
+            .then(result => sendResponse({ success: true, ...result }))
+            .catch(err => sendResponse({ success: false, error: err }));
+        return true; // Keep message channel open for async response
     }
     return true;
 });
@@ -210,23 +341,20 @@ function startBackgroundTimer() {
 }
 
 // ================================================================================
-// FIREBASE REALTIME DATABASE SYNC CLIENT (SINGLE SOURCE OF TRUTH)
+// FIREBASE REALTIME DATABASE SYNC (CON AUTENTICACIÓN)
 // ================================================================================
-let firebaseSyncKey = "USER_DEFAULT_12345";
-let firebaseDbUrl = "https://antiprocrastinacion-sync-default-rtdb.firebaseio.com";
 
-function cleanSyncKey(key) {
-    if (!key) return "USER_DEFAULT_12345";
-    return key.toLowerCase().trim().replace(/[^a-z0-9_@.-]/g, '_');
+function pushProfileToFirebase() {
+    if (!firebaseUid || !firebaseIdToken) return;
+    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/profile.json`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: userEmail, role: "admin" })
+    }).catch(() => {});
 }
 
-chrome.storage.local.get(['syncKey', 'firebaseDbUrl'], (res) => {
-    if (res.syncKey) firebaseSyncKey = cleanSyncKey(res.syncKey);
-    if (res.firebaseDbUrl) firebaseDbUrl = res.firebaseDbUrl;
-    pollFirebaseSync();
-});
-
 function pushLockStateToFirebase(locked, durationMinutes) {
+    if (!firebaseUid || !firebaseIdToken) return;
     const expiresAt = locked ? (Date.now() + (durationMinutes * 60 * 1000)) : 0;
     const payload = {
         is_locked: locked,
@@ -235,8 +363,7 @@ function pushLockStateToFirebase(locked, durationMinutes) {
         source_device: "chrome_extension"
     };
 
-    const targetKey = cleanSyncKey(firebaseSyncKey);
-    fetch(`${firebaseDbUrl}/users/${targetKey}/lock_state.json`, {
+    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/lock_state.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -244,27 +371,26 @@ function pushLockStateToFirebase(locked, durationMinutes) {
 }
 
 function pollFirebaseSync() {
-    const targetKey = cleanSyncKey(firebaseSyncKey);
+    if (!firebaseUid || !firebaseIdToken) return;
     const now = Date.now();
 
     // 1. Enviar latido de la Extensión (extension_last_ping)
-    fetch(`${firebaseDbUrl}/users/${targetKey}/device_info/extension_last_ping.json`, {
+    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/device_info/extension_last_ping.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(now)
     }).catch(() => {});
 
-    // 2. Obtener información de dispositivo y comprobar si Android ha enviado latido en los últimos 30s
-    fetch(`${firebaseDbUrl}/users/${targetKey}/device_info.json`)
-        .then(res => res.json())
+    // 2. Obtener información de dispositivo Android y comprobar latido
+    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/device_info.json`)
+        .then(res => res ? res.json() : null)
         .then(deviceData => {
             if (deviceData && (deviceData.brand || deviceData.model)) {
                 const androidPing = deviceData.android_last_ping || deviceData.last_ping || 0;
-                // Conectado REAL solo si Android envió latido en los últimos 30 segundos
                 if (now - androidPing < 30000) {
                     connectedDeviceInfo = deviceData;
                 } else {
-                    connectedDeviceInfo = null; // Esperando latido de Android
+                    connectedDeviceInfo = null;
                 }
             } else {
                 connectedDeviceInfo = null;
@@ -272,9 +398,9 @@ function pollFirebaseSync() {
         })
         .catch(() => { connectedDeviceInfo = null; });
 
-    // 2. Obtener estado de bloqueo
-    fetch(`${firebaseDbUrl}/users/${targetKey}/lock_state.json`)
-        .then(res => res.json())
+    // 3. Obtener estado de bloqueo
+    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/lock_state.json`)
+        .then(res => res ? res.json() : null)
         .then(data => {
             if (data && typeof data.is_locked === 'boolean') {
                 const cloudLocked = data.is_locked;

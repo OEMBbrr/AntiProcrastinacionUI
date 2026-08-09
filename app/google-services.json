@@ -1,0 +1,47 @@
+{
+  "project_info": {
+    "project_number": "927134130052",
+    "project_id": "antiprocrastinacion-26975",
+    "storage_bucket": "antiprocrastinacion-26975.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:927134130052:android:1b6b6f22adf1493ea5c7d1",
+        "android_client_info": {
+          "package_name": "com.antiprocrastinacion.lock"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "927134130052-ni3mc1lhfqis0l07r1ic8mdlju7iqi9p.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.antiprocrastinacion.lock",
+            "certificate_hash": "6da163c7df5c179220435bb4d227cf29bb65e147"
+          }
+        },
+        {
+          "client_id": "927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBNw12V7mMCt76ZdP89NEYQwg_E2vshRto"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

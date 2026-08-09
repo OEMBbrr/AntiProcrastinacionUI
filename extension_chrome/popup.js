@@ -117,28 +117,11 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const syncStatusBadge = document.getElementById('sync-status-badge');
-    const syncKeyInput = document.getElementById('sync-key-input');
-    const btnSaveSync = document.getElementById('btn-save-sync');
-
-    if (btnSaveSync) {
-        btnSaveSync.addEventListener('click', () => {
-            const raw = syncKeyInput.value.trim();
-            if (raw) {
-                const cleanKey = raw.toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
-                chrome.storage.local.set({ syncKey: cleanKey }, () => {
-                    chrome.runtime.sendMessage({ action: 'setSyncKey', syncKey: cleanKey }, () => {
-                        alert("¡Cuenta vinculada con éxito! La extensión se sincronizará con tu teléfono.");
-                        updateUI();
-                    });
-                });
-            }
-        });
-    }
 
     function updateUI() {
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
-            const { isLocked, remainingSeconds, customDomains, parentalEnabled, connectedDeviceInfo } = response;
+            const { isLocked, remainingSeconds, customDomains, parentalEnabled, connectedDeviceInfo, firebaseUid, userEmail } = response;
 
             if (parentalSwitch) parentalSwitch.checked = !!parentalEnabled;
             if (customDomains) renderSiteTags(customDomains);
@@ -157,11 +140,16 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            chrome.storage.local.get(['syncKey'], (res) => {
-                if (res.syncKey && btnGoogleLogin) {
-                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${res.syncKey}`;
+            // Actualizar botón de Google con email real
+            if (btnGoogleLogin) {
+                if (firebaseUid && userEmail) {
+                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${userEmail}`;
+                    btnGoogleLogin.style.backgroundColor = '#34A853';
+                } else {
+                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Iniciar Sesión con Google`;
+                    btnGoogleLogin.style.backgroundColor = '#4285F4';
                 }
-            });
+            }
 
             if (isLocked) {
                 statusPill.textContent = "MODO ENFOQUE ACTIVO";
@@ -181,6 +169,33 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+
+    if (btnGoogleLogin) {
+        btnGoogleLogin.addEventListener('click', () => {
+            // Verificar si ya hay sesión
+            chrome.runtime.sendMessage({ action: 'getState' }, (res) => {
+                if (res && res.firebaseUid) {
+                    // Ya autenticado, no hacer nada
+                    return;
+                }
+                btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Conectando...`;
+                btnGoogleLogin.disabled = true;
+                chrome.runtime.sendMessage({ action: 'googleSignIn' }, (result) => {
+                    btnGoogleLogin.disabled = false;
+                    if (result && result.success) {
+                        btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${result.email}`;
+                        btnGoogleLogin.style.backgroundColor = '#34A853';
+                    } else {
+                        btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Iniciar Sesión con Google`;
+                        alert("Error al iniciar sesión: " + (result?.error || "Inténtalo de nuevo"));
+                    }
+                    updateUI();
+                });
+            });
+        });
+    }
+
     btnAddSite.addEventListener('click', () => {
         const val = newSiteInput.value.trim();
         if (val) {
@@ -190,21 +205,6 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         }
     });
-
-    const btnGoogleLogin = document.getElementById('btn-google-login');
-
-    if (btnGoogleLogin) {
-        btnGoogleLogin.addEventListener('click', () => {
-            const googleEmail = prompt("Ingresa tu correo de Google para vincular:", "mi_cuenta_google@gmail.com");
-            if (googleEmail) {
-                const cleanKey = googleEmail.trim().toLowerCase().replace(/[^a-z0-9_@.-]/g, '_');
-                chrome.runtime.sendMessage({ action: 'setSyncKey', syncKey: cleanKey }, () => {
-                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${googleEmail}`;
-                    updateUI();
-                });
-            }
-        });
-    }
 
     if (parentalSwitch) {
         parentalSwitch.addEventListener('change', () => {

@@ -2,6 +2,9 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:tools="http://schemas.android.com/tools">
 
+    <!-- Permiso de Internet para Firebase SDK -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <!-- Permiso para iniciar en el boot y mantener el bloqueo tras reiniciar -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     

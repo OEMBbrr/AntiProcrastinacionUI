@@ -2,6 +2,11 @@ package com.antiprocrastinacion.lock
 
 import android.content.Context
 import android.content.SharedPreferences
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.database.DataSnapshot
+import com.google.firebase.database.DatabaseError
+import com.google.firebase.database.FirebaseDatabase
+import com.google.firebase.database.ValueEventListener
 
 class LockManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("anti_procrastinacion_prefs", Context.MODE_PRIVATE)
@@ -253,82 +258,113 @@ class LockManager(context: Context) {
     var isExtensionConnected: Boolean = false
         private set
 
-    var googleUserEmail: String
-        get() = prefs.getString("google_user_email", "") ?: ""
-        set(value) {
-            val clean = value.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
-            prefs.edit().putString("google_user_email", clean).apply()
-            if (clean.isNotEmpty()) {
-                userSyncKey = clean
+    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
+    private val firebaseDb: FirebaseDatabase = FirebaseDatabase.getInstance("https://antiprocrastinacion-26975-default-rtdb.firebaseio.com")
+
+    /** UID de Firebase Auth (null si no ha iniciado sesión) */
+    val firebaseUid: String?
+        get() = firebaseAuth.currentUser?.uid
+
+    /** Email de Google del usuario autenticado */
+    val googleUserEmail: String
+        get() = firebaseAuth.currentUser?.email ?: ""
+
+    /** Referencia base al nodo del usuario autenticado */
+    private fun userRef() = firebaseUid?.let { firebaseDb.getReference("users").child(it) }
+
+    private var extensionPingListener: ValueEventListener? = null
+
+    /**
+     * Inicia el listener en tiempo real para detectar si la extensión de Chrome está conectada.
+     * Escucha /users/<UID>/device_info/extension_last_ping y compara con el tiempo actual.
+     */
+    fun startExtensionPingListener() {
+        val ref = userRef()?.child("device_info")?.child("extension_last_ping") ?: return
+        
+        // Eliminar listener anterior si existe
+        extensionPingListener?.let { ref.removeEventListener(it) }
+
+        extensionPingListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val extPing = snapshot.getValue(Long::class.java) ?: 0L
+                isExtensionConnected = (System.currentTimeMillis() - extPing) < 30000
+            }
+            override fun onCancelled(error: DatabaseError) {
+                isExtensionConnected = false
             }
         }
+        ref.addValueEventListener(extensionPingListener!!)
+    }
 
+    /**
+     * Envía heartbeat del dispositivo Android a Firebase usando el SDK.
+     * Escribe en /users/<UID>/device_info
+     */
     fun pushDeviceHeartbeatToFirebase(onResult: ((Boolean) -> Unit)? = null) {
-        Thread {
-            try {
-                val rawKey = userSyncKey
-                val syncKey = rawKey.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
-                val url = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/device_info.json")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.requestMethod = "PUT"
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                conn.doOutput = true
-                conn.connectTimeout = 4000
-                conn.readTimeout = 4000
-                
-                val now = System.currentTimeMillis()
-                val json = """{"brand":"$deviceBrand","model":"$deviceModel","android_last_ping":$now,"last_ping":$now,"online":true}"""
-                conn.outputStream.use { os ->
-                    os.write(json.toByteArray(Charsets.UTF_8))
-                }
-                conn.responseCode
-                conn.disconnect()
+        val ref = userRef()?.child("device_info")
+        if (ref == null) {
+            onResult?.invoke(false)
+            return
+        }
 
-                // Comprobar si la extensión de Chrome ha enviado latido en los últimos 30 segundos
-                val checkUrl = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/device_info/extension_last_ping.json")
-                val connCheck = checkUrl.openConnection() as java.net.HttpURLConnection
-                connCheck.requestMethod = "GET"
-                connCheck.connectTimeout = 4000
-                connCheck.readTimeout = 4000
-                if (connCheck.responseCode == 200) {
-                    val body = connCheck.inputStream.bufferedReader().use { it.readText() }.trim()
-                    val extPing = body.toLongOrNull() ?: 0L
+        val now = System.currentTimeMillis()
+        val data = mapOf(
+            "brand" to deviceBrand,
+            "model" to deviceModel,
+            "android_last_ping" to now,
+            "last_ping" to now,
+            "online" to true
+        )
+
+        ref.updateChildren(data).addOnCompleteListener { task ->
+            if (task.isSuccessful) {
+                // Leer extension_last_ping para verificar conexión
+                ref.child("extension_last_ping").get().addOnSuccessListener { snapshot ->
+                    val extPing = snapshot.getValue(Long::class.java) ?: 0L
                     isExtensionConnected = (now - extPing) < 30000
-                } else {
+                    onResult?.invoke(isExtensionConnected)
+                }.addOnFailureListener {
                     isExtensionConnected = false
+                    onResult?.invoke(false)
                 }
-                connCheck.disconnect()
-                onResult?.invoke(isExtensionConnected)
-            } catch (e: Exception) {
+            } else {
                 isExtensionConnected = false
                 onResult?.invoke(false)
             }
-        }.start()
+        }
     }
 
+    /**
+     * Envía estado de bloqueo a Firebase usando el SDK.
+     * Escribe en /users/<UID>/lock_state
+     */
     fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
         pushDeviceHeartbeatToFirebase()
-        Thread {
-            try {
-                val rawKey = userSyncKey
-                val syncKey = rawKey.lowercase().trim().replace(Regex("[^a-z0-9_@.-]"), "_")
-                val url = java.net.URL("https://antiprocrastinacion-sync-default-rtdb.firebaseio.com/users/$syncKey/lock_state.json")
-                val conn = url.openConnection() as java.net.HttpURLConnection
-                conn.requestMethod = "PUT"
-                conn.setRequestProperty("Content-Type", "application/json; charset=UTF-8")
-                conn.doOutput = true
-                conn.connectTimeout = 5000
-                conn.readTimeout = 5000
-                
-                val json = """{"is_locked":$locked,"expires_at":$expiresAt,"updated_at":${System.currentTimeMillis()},"source_device":"android"}"""
-                conn.outputStream.use { os ->
-                    os.write(json.toByteArray(Charsets.UTF_8))
-                }
-                conn.responseCode
-                conn.disconnect()
-            } catch (e: Exception) {
-                e.printStackTrace()
-            }
-        }.start()
+        val ref = userRef()?.child("lock_state") ?: return
+
+        val data = mapOf(
+            "is_locked" to locked,
+            "expires_at" to expiresAt,
+            "updated_at" to System.currentTimeMillis(),
+            "source_device" to "android"
+        )
+
+        ref.setValue(data)
+    }
+
+    /**
+     * Escribe el perfil del usuario en /users/<UID>/profile
+     */
+    fun pushUserProfile(role: String = "admin") {
+        val ref = userRef()?.child("profile") ?: return
+        val email = googleUserEmail
+        if (email.isNotEmpty()) {
+            val data = mapOf(
+                "email" to email,
+                "role" to role
+            )
+            ref.setValue(data)
+        }
     }
 }
+

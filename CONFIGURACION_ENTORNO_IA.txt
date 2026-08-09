@@ -4,30 +4,38 @@ ESPECIFICACIONES TÉCNICAS Y ENTORNO DE DESARROLLO - ANTIPROCRASTINACIÓN
 - Lenguaje: Kotlin
 - UI Framework: Jetpack Compose
 - Package ID: com.antiprocrastinacion.lock
-- Versión Actual: 13.0.0 (versionCode = 13, versionName = "13.0.0")
+- Versión Actual: 14.0.0 (versionCode = 14, versionName = "14.0.0")
 - Build System: Gradle con Kotlin DSL (archivos app/build.gradle.kts, build.gradle.kts, settings.gradle.kts)
-- APKs de Salida: Se generan en la raíz del proyecto (AntiProcrastinacion_v13.apk)
+- Firebase Plugin: com.google.gms.google-services (v4.4.2) + app/google-services.json
+- Autenticación: Google Sign-In nativo vía androidx.credentials (Credential Manager) + Firebase Auth (`signInWithCredential`)
+- APKs de Salida: Se generan en la raíz del proyecto (AntiProcrastinacion_v14.apk, AntiProcrastinacion.apk)
 - Min SDK: 26 (Android 8.0) | Target SDK: 35 (Android 15)
 
 2. EXTENSIÓN DE GOOGLE CHROME
-- Especificación: Manifest V3
-- Arquitectura: JavaScript puro (Vanilla JS), HTML5, CSS3 (sin frameworks como React/Vue)
+- Especificación: Manifest V3 (Versión Extensión: 2.0.0)
+- Permisos especiales: declarativeNetRequest, storage, tabs, webNavigation, alarms, identity
+- Autenticación: Google Sign-In nativo vía `chrome.identity.launchWebAuthFlow()` + Firebase Auth REST API (`signInWithIdp`)
+- Arquitectura: JavaScript puro (Vanilla JS), HTML5, CSS3
 - Archivos clave: background.js, popup.js, popup.html, blocked.html, styles.css, manifest.json
 - Paquete Web: pagina_web/downloads/extension_chrome.zip
 
 3. BACKEND Y VINCULACIÓN DE DISPOSITIVOS (FIREBASE)
+- Proyecto Firebase: antiprocrastinacion-26975 (ID Number: 927134130052)
 - Servicio Cloud: Firebase Realtime Database
-- Endpoint RTDB Base: https://antiprocrastinacion-sync-default-rtdb.firebaseio.com
-- Autenticación: Inicio de Sesión de 1 Clic con Google ("G Iniciar Sesión con Google") en Android y Chrome Extension
+- Endpoint RTDB Base: https://antiprocrastinacion-26975-default-rtdb.firebaseio.com
+- Esquema de Datos Único (Single Source of Truth):
+  /users/<FIREBASE_AUTH_UID>/profile -> { email, role: "admin" }
+  /users/<FIREBASE_AUTH_UID>/device_info -> { brand, model, android_last_ping, extension_last_ping, online }
+  /users/<FIREBASE_AUTH_UID>/lock_state -> { is_locked, expires_at, updated_at, source_device }
 - Protocolo Apretón de Manos (Handshake 2-Way):
-  * Estado por defecto: ROJO (Desvinculado) en ambos dispositivos
-  * Android envía android_last_ping a /users/<google_key>/device_info.json
-  * Chrome envía extension_last_ping a /users/<google_key>/device_info/extension_last_ping.json
-  * Cambio a VERDE (Conectado): Solo cuando ambos detectan latido mutuo activo (< 30 segundos)
+  * Estado por defecto: ROJO (🔴 Desvinculado) en ambos dispositivos
+  * Android envía android_last_ping y escucha extension_last_ping vía ValueEventListener
+  * Chrome envía extension_last_ping y consulta android_last_ping
+  * Cambio a VERDE (🟢 Conectado): Solo cuando ambos detectan latido mutuo activo (< 30 segundos)
 
 4. PLATAFORMAS ADICIONALES
 - iOS: Flutter (lib/main.dart) con build automatizado en GitHub Actions (.github/workflows/build_apps.yml)
-- Sitio Web: HTML5 / CSS3 / Vanilla JS (pagina_web/index.html) con descargas de APK v13 y Extensión ZIP
+- Sitio Web: HTML5 / CSS3 / Vanilla JS (pagina_web/index.html) con descargas de APK v14 y Extensión ZIP
 
 5. CONTROL DE VERSIONES
 - Repositorio GitHub: https://github.com/OEMBbrr/AntiProcastinacion.git (Rama main, usuario OEMBbrr)

@@ -45,7 +45,8 @@ import kotlinx.coroutines.withContext
 @Composable
 fun ConfigScreen(
     lockManager: LockManager,
-    onLockStarted: () -> Unit
+    onLockStarted: () -> Unit,
+    onGoogleSignIn: () -> Unit = {}
 ) {
     val context = LocalContext.current
     
@@ -183,17 +184,19 @@ fun ConfigScreen(
                             }
 
                             // BOTÓN DE INICIO DE SESIÓN CON GOOGLE
-                            var googleEmailInput by remember { mutableStateOf(lockManager.googleUserEmail) }
+                            val currentEmail = lockManager.googleUserEmail
+                            val isSignedIn = lockManager.firebaseUid != null
                             
                             Button(
                                 onClick = {
-                                    if (googleEmailInput.isEmpty()) {
-                                        googleEmailInput = "mi_cuenta_google@gmail.com"
+                                    if (!isSignedIn) {
+                                        onGoogleSignIn()
+                                        showSyncModal = false
                                     }
-                                    lockManager.googleUserEmail = googleEmailInput
-                                    showSyncModal = false
                                 },
-                                colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4285F4)),
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = if (isSignedIn) Color(0xFF34A853) else Color(0xFF4285F4)
+                                ),
                                 shape = RoundedCornerShape(12.dp),
                                 modifier = Modifier.fillMaxWidth().height(50.dp),
                                 elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
@@ -203,38 +206,41 @@ fun ConfigScreen(
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
                                     Text("G", fontSize = 18.sp, fontWeight = FontWeight.Black, color = Color.White)
-                                    Text("Iniciar Sesión con Google", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                                    Text(
+                                        text = if (isSignedIn) currentEmail else "Iniciar Sesión con Google",
+                                        fontSize = 13.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color.White
+                                    )
                                 }
                             }
 
-                            // VINCULACIÓN POR CORREO O CUENTA GOOGLE
-                            Column(
-                                modifier = Modifier.fillMaxWidth(),
-                                verticalArrangement = Arrangement.spacedBy(6.dp)
-                            ) {
-                                Text(
-                                    text = "📧 CORREO DE GOOGLE VINCULADO:",
-                                    fontSize = 10.sp,
-                                    fontWeight = FontWeight.Bold,
-                                    color = ZenSage
-                                )
-                                OutlinedTextField(
-                                    value = googleEmailInput,
-                                    onValueChange = { 
-                                        googleEmailInput = it
-                                        lockManager.googleUserEmail = it
-                                    },
-                                    placeholder = { Text("ej. usuario@gmail.com", fontSize = 12.sp, color = ZenSage.copy(alpha = 0.6f)) },
-                                    modifier = Modifier.fillMaxWidth().height(52.dp),
-                                    shape = RoundedCornerShape(12.dp),
-                                    colors = OutlinedTextFieldDefaults.colors(
-                                        focusedContainerColor = CreamBackground,
-                                        unfocusedContainerColor = CreamBackground,
-                                        focusedBorderColor = ZenOlive,
-                                        unfocusedBorderColor = ZenSage.copy(alpha = 0.3f)
+                            // VINCULACIÓN: mostrar UID de Firebase si está autenticado
+                            if (isSignedIn) {
+                                Column(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Text(
+                                        text = "✅ SESIÓN ACTIVA",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = Color(0xFF22C55E)
                                     )
-                                )
+                                    Text(
+                                        text = "UID: ${lockManager.firebaseUid ?: ""}",
+                                        fontSize = 10.sp,
+                                        color = ZenSage
+                                    )
+                                    Text(
+                                        text = "La extensión de Chrome debe iniciar sesión con la misma cuenta de Google para conectarse.",
+                                        fontSize = 11.sp,
+                                        color = ZenCharcoal,
+                                        textAlign = TextAlign.Center
+                                    )
+                                }
                             }
+
                         }
                     }
                 }

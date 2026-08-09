@@ -23,8 +23,9 @@ AntiProcrastinación utiliza un enfoque psicopedagógico de resistencia cognitiv
 - GESTOR DE ENLACES PERSONALIZADOS:
   Permite agregar, editar y eliminar dominios/sitios bloqueados personalizados (ej. tiktok.com, instagram.com).
 - MODO CONTROL PARENTAL (+18 EXCLUSIVO EXTENSIÓN):
-  Interruptor especial que bloquea automáticamente una lista integrada de sitios de contenido adulto e inapropiado
-  (pornhub.com, xvideos.com, xnxx.com, xhamster.com, onlyfans.com, redtube.com, youporn.com, thumbzilla.com y todas sus variantes/TLD).
+  Interruptor especial que bloquea exclusivamente la lista de sitios de contenido adulto e inapropiado
+  (pornhub.com, xvideos.com, xnxx.com, xhamster.com, onlyfans.com, redtube.com, youporn.com, thumbzilla.com y sus variantes/TLD).
+  IMPORTANTE: Las webs personalizadas SOLO se bloquean con el Modo Enfoque activo, NUNCA con solo el Control Parental.
 - TREGUA TEMPORAL DE 5 MINUTOS:
   Para emergencias, exige resolver problemas matemáticos aleatorios o teclear frases medianas preparadas.
 - BOTONES DE EMERGENCIA:
@@ -37,16 +38,17 @@ AntiProcrastinación utiliza un enfoque psicopedagógico de resistencia cognitiv
 --------------------------------------------------------------------------------
 Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\app\
 
-- Paquete: com.antiprocrastinacion.lock (Versión Actual: 13.0.0 / versionCode = 13).
+- Paquete: com.antiprocrastinacion.lock (Versión Actual: 14.0.0 / versionCode = 14).
 - Registro de APKs por Versión en la Raíz:
-  Cada compilación genera el APK en la raíz con su versión correspondiente (AntiProcrastinacion_v13.apk, v12.apk, etc.) para seguimiento en Ajustes del teléfono.
+  Cada compilación genera el APK en la raíz con su versión correspondiente (AntiProcrastinacion_v14.apk, v13.apk, etc.) para seguimiento en Ajustes del teléfono.
 - Monitoreo Hyper-Responsivo (LockMonitoringService.kt):
   Servicio en primer plano que verifica el estado cada 80ms y superpone ZenScreen al detectar lanzadores o apps no autorizadas.
-- Inicio de Sesión con Google (G Iniciar Sesión con Google):
-  Permite vinculación con 1 clic mediante la cuenta de Google del usuario (sin pines ni correos manuales).
-- Apretón de Manos Bidireccional Estricto (Handshake 2-Way Rojo/Verde):
-  * El punto de estado en la esquina superior izquierda inicia ESTRICTAMENTE EN ROJO (🔴).
-  * Envía android_last_ping a Firebase RTDB y verifica extension_last_ping de Chrome.
+- Inicio de Sesión con Google Nativo (Credential Manager + Firebase Auth):
+  Utiliza el SDK androidx.credentials con Credential Manager para inicio de sesión en 1 clic con Google, obteniendo un ID Token e iniciando sesión en Firebase Auth (`signInWithCredential`).
+- Apretón de Manos Bidireccional Estricto (Handshake 2-Way Rojo/Verde en Tiempo Real):
+  * Punto de estado inicial: ROJO (🔴).
+  * Usa Firebase Realtime Database SDK autenticado para escribir en `/users/<UID>/device_info/android_last_ping`.
+  * Escucha en tiempo real vía `ValueEventListener` en `/users/<UID>/device_info/extension_last_ping`.
   * Cambia a VERDE (🟢) únicamente cuando detecta un latido activo de la Extensión (< 30 segundos).
 
 --------------------------------------------------------------------------------
@@ -54,15 +56,18 @@ Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\app\
 --------------------------------------------------------------------------------
 Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\extension_chrome\
 
-- Especificación Manifest V3: manifest.json, background.js, popup.html, popup.js, blocked.html, styles.css.
-- Inicio de Sesión con Google & Handshake Real:
-  * Badge inicial: 🔴 Desvinculado (Fondo Rojo).
-  * Envía extension_last_ping a Firebase RTDB y lee android_last_ping.
+- Especificación Manifest V3 (v2.0.0): manifest.json, background.js, popup.html, popup.js, blocked.html, styles.css.
+- Inicio de Sesión con Google & Autenticación REST:
+  * Autenticación nativa con `chrome.identity.launchWebAuthFlow()` e integración directa con Firebase Auth REST API (`accounts:signInWithIdp`).
+  * Badge inicial: 🔴 Desvinculado.
+  * Envía latidos autenticados a `/users/<UID>/device_info/extension_last_ping` y lee `android_last_ping`.
   * Al detectar el latido del teléfono en tiempo real, activa el badge verde: 🟢 Conectado: TECNO POVA 6.
 - Selector de Tiempo Doble Horas y Minutos:
   * Controles stepper separados de HORAS (00-23) y MINUTOS (00-59) de 1 en 1 minuto.
-- Bloqueo Universal de Subpáginas, Reels y Posts por Palabra Clave:
-  * Extrae palabras clave (instagram, facebook, tiktok, pornhub, etc.) y aplica filtros comodín (*<keyword>*) en declarativeNetRequest, chrome.webNavigation.onBeforeNavigate y chrome.tabs.onUpdated. Bloquea 100% de reels, publicaciones y subrutas.
+- Bloqueo Separado (Enfoque vs Parental):
+  * Modo Enfoque: Bloquea exclusivamente sitios personalizados agregados por el usuario.
+  * Control Parental: Bloquea exclusivamente contenido adulto (+18).
+  * Filtros comodín (*<keyword>*) en declarativeNetRequest, chrome.webNavigation.onBeforeNavigate y chrome.tabs.onUpdated.
 
 --------------------------------------------------------------------------------
 4. COMPONENTE 3: APLICACIÓN MULTIPLATAFORMA IPHONE (iOS / FLUTTER / SWIFT)
@@ -92,6 +97,6 @@ Ubicación del código: C:\Users\USUARIO\Documents\AntiProcrastinacion\pagina_we
 ================================================================================
 SI ERES UNA IA CONTINUANDO ESTE PROYECTO:
 Respeta el esquema de versiones incrementales en app/build.gradle.kts, la preservación
-de APKs con versión en la raíz del proyecto, la autenticación por Google, el apretón
-de manos bidireccional Rojo/Verde en tiempo real y la estética Web Pro Zen.
+de APKs con versión en la raíz del proyecto, la autenticación por Google con Firebase Auth UID,
+el apretón de manos bidireccional Rojo/Verde en tiempo real y la estética Web Pro Zen.
 ================================================================================
