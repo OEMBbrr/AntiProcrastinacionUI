@@ -11,8 +11,15 @@ import com.google.firebase.database.ValueEventListener
 class LockManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("anti_procrastinacion_prefs", Context.MODE_PRIVATE)
 
+    private val firebaseAuth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
+    private val firebaseDb: FirebaseDatabase by lazy { FirebaseDatabase.getInstance("https://antiprocrastinacion-26975-default-rtdb.firebaseio.com") }
+
     init {
-        pushDeviceHeartbeatToFirebase()
+        try {
+            pushDeviceHeartbeatToFirebase()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
     }
 
     companion object {
@@ -258,19 +265,19 @@ class LockManager(context: Context) {
     var isExtensionConnected: Boolean = false
         private set
 
-    private val firebaseAuth: FirebaseAuth = FirebaseAuth.getInstance()
-    private val firebaseDb: FirebaseDatabase = FirebaseDatabase.getInstance("https://antiprocrastinacion-26975-default-rtdb.firebaseio.com")
-
     /** UID de Firebase Auth (null si no ha iniciado sesión) */
     val firebaseUid: String?
         get() = firebaseAuth.currentUser?.uid
 
     /** Email de Google del usuario autenticado */
     val googleUserEmail: String
-        get() = firebaseAuth.currentUser?.email ?: ""
+        get() = firebaseAuth.currentUser?.email ?: prefs.getString("google_user_email", "") ?: ""
 
-    /** Referencia base al nodo del usuario autenticado */
-    private fun userRef() = firebaseUid?.let { firebaseDb.getReference("users").child(it) }
+    /** Referencia base al nodo del usuario autenticado (o fallback a userSyncKey/devicePin) */
+    private fun userRef(): com.google.firebase.database.DatabaseReference {
+        val targetKey = firebaseUid ?: userSyncKey
+        return firebaseDb.getReference("users").child(targetKey)
+    }
 
     private var extensionPingListener: ValueEventListener? = null
 

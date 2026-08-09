@@ -140,10 +140,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
 
-            // Actualizar botón de Google con email real
+            // Actualizar botón de Google con email o clave activa
             if (btnGoogleLogin) {
-                if (firebaseUid && userEmail) {
-                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${userEmail}`;
+                const activeAccount = userEmail || syncKey;
+                if (activeAccount) {
+                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${activeAccount}`;
                     btnGoogleLogin.style.backgroundColor = '#34A853';
                 } else {
                     btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Iniciar Sesión con Google`;
@@ -173,25 +174,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     if (btnGoogleLogin) {
         btnGoogleLogin.addEventListener('click', () => {
-            // Verificar si ya hay sesión
-            chrome.runtime.sendMessage({ action: 'getState' }, (res) => {
-                if (res && res.firebaseUid) {
-                    // Ya autenticado, no hacer nada
-                    return;
-                }
-                btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Conectando...`;
-                btnGoogleLogin.disabled = true;
-                chrome.runtime.sendMessage({ action: 'googleSignIn' }, (result) => {
-                    btnGoogleLogin.disabled = false;
-                    if (result && result.success) {
-                        btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${result.email}`;
-                        btnGoogleLogin.style.backgroundColor = '#34A853';
-                    } else {
-                        btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Iniciar Sesión con Google`;
-                        alert("Error al iniciar sesión: " + (result?.error || "Inténtalo de nuevo"));
-                    }
+            btnGoogleLogin.disabled = true;
+            btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Conectando...`;
+            
+            chrome.runtime.sendMessage({ action: 'googleSignIn' }, (result) => {
+                btnGoogleLogin.disabled = false;
+                if (result && result.success && result.email) {
+                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${result.email}`;
+                    btnGoogleLogin.style.backgroundColor = '#34A853';
                     updateUI();
-                });
+                } else {
+                    // Fallback directo a Prompt de correo de Google o Código PIN (ej. ZEN-1234)
+                    const inputKey = prompt(
+                        "🔒 VINCULACIÓN CON TELÉFONO:\n\nIngresa tu correo de Google o el Código PIN de tu teléfono (ej. ZEN-1234):",
+                        "mi_cuenta_google@gmail.com"
+                    );
+                    if (inputKey && inputKey.trim()) {
+                        chrome.runtime.sendMessage({ action: 'setManualKey', key: inputKey.trim() }, () => {
+                            updateUI();
+                        });
+                    } else {
+                        updateUI();
+                    }
+                }
             });
         });
     }

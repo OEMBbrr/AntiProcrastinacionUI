@@ -14,88 +14,137 @@ let firebaseUid = null;
 let firebaseIdToken = null;
 let firebaseRefreshToken = null;
 let userEmail = "";
+let syncKey = "";
+
+function cleanKey(key) {
+    if (!key) return "USER_DEFAULT_12345";
+    return key.toLowerCase().trim().replace(/[^a-z0-9_@.-]/g, '_');
+}
+
+function getTargetKey() {
+    if (firebaseUid) return firebaseUid;
+    if (syncKey) return cleanKey(syncKey);
+    if (userEmail) return cleanKey(userEmail);
+    return "USER_DEFAULT_12345";
+}
 
 // Cargar sesión guardada
-chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail'], (res) => {
+chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey'], (res) => {
     if (res.firebaseUid) firebaseUid = res.firebaseUid;
     if (res.firebaseIdToken) firebaseIdToken = res.firebaseIdToken;
     if (res.firebaseRefreshToken) firebaseRefreshToken = res.firebaseRefreshToken;
     if (res.userEmail) userEmail = res.userEmail;
-    if (firebaseUid) {
-        pollFirebaseSync();
-    }
+    if (res.syncKey) syncKey = res.syncKey;
+    pollFirebaseSync();
 });
 
 /**
- * Inicia sesión con Google usando chrome.identity.launchWebAuthFlow()
- * Intercambia el código de autorización con Firebase Auth REST API
+ * Inicia sesión con Google usando chrome.identity API
+ * Con fallback a correo / PIN si no hay token de extensión
  */
 function signInWithGoogle() {
     return new Promise((resolve, reject) => {
-        const redirectUrl = chrome.identity.getRedirectURL();
-        const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
-            `client_id=${WEB_CLIENT_ID}` +
-            `&response_type=token id_token` +
-            `&redirect_uri=${encodeURIComponent(redirectUrl)}` +
-            `&scope=${encodeURIComponent('openid email profile')}` +
-            `&nonce=${Math.random().toString(36).substr(2)}`;
-
-        chrome.identity.launchWebAuthFlow(
-            { url: authUrl, interactive: true },
-            (responseUrl) => {
-                if (chrome.runtime.lastError || !responseUrl) {
-                    reject(chrome.runtime.lastError?.message || "Auth cancelada");
-                    return;
-                }
-
-                // Extraer id_token de la URL de respuesta
-                const hashParams = new URLSearchParams(responseUrl.split('#')[1]);
-                const idToken = hashParams.get('id_token');
-                const accessToken = hashParams.get('access_token');
-
-                if (!idToken) {
-                    reject("No se obtuvo id_token");
-                    return;
-                }
-
-                // Intercambiar con Firebase Auth REST API
-                fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${FIREBASE_API_KEY}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        postBody: `id_token=${idToken}&providerId=google.com`,
-                        requestUri: redirectUrl,
-                        returnIdpCredential: true,
-                        returnSecureToken: true
+        // 1. Intentar chrome.identity.getAuthToken primero
+        chrome.identity.getAuthToken({ interactive: true }, (token) => {
+            if (!chrome.runtime.lastError && token) {
+                // Intercambiar Google Access Token con UserInfo API
+                fetch(`https://www.googleapis.com/oauth2/v3/userinfo?access_token=${token}`)
+                    .then(res => res.json())
+                    .then(userInfo => {
+                        if (userInfo && userInfo.email) {
+                            userEmail = userInfo.email;
+                            syncKey = cleanKey(userEmail);
+                            firebaseUid = userInfo.sub || syncKey;
+                            chrome.storage.local.set({ userEmail, syncKey, firebaseUid });
+                            pushProfileToFirebase();
+                            pollFirebaseSync();
+                            resolve({ uid: firebaseUid, email: userEmail });
+                        } else {
+                            fallbackPromptLogin(resolve, reject);
+                        }
                     })
-                })
-                .then(res => res.json())
-                .then(data => {
-                    if (data.localId) {
-                        firebaseUid = data.localId;
-                        firebaseIdToken = data.idToken;
-                        firebaseRefreshToken = data.refreshToken;
-                        userEmail = data.email || "";
+                    .catch(() => fallbackPromptLogin(resolve, reject));
+            } else {
+                // 2. Fallback a WebAuthFlow o Login por Correo / PIN
+                const redirectUrl = chrome.identity.getRedirectURL();
+                const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
+                    `client_id=${WEB_CLIENT_ID}` +
+                    `&response_type=token id_token` +
+                    `&redirect_uri=${encodeURIComponent(redirectUrl)}` +
+                    `&scope=${encodeURIComponent('openid email profile')}` +
+                    `&nonce=${Math.random().toString(36).substr(2)}`;
 
-                        chrome.storage.local.set({
-                            firebaseUid,
-                            firebaseIdToken,
-                            firebaseRefreshToken,
-                            userEmail
-                        });
+                chrome.identity.launchWebAuthFlow(
+                    { url: authUrl, interactive: true },
+                    (responseUrl) => {
+                        if (chrome.runtime.lastError || !responseUrl) {
+                            // Fallback seguro por correo de Google o PIN
+                            fallbackPromptLogin(resolve, reject);
+                            return;
+                        }
 
-                        // Escribir perfil
-                        pushProfileToFirebase();
-                        pollFirebaseSync();
-                        resolve({ uid: firebaseUid, email: userEmail });
-                    } else {
-                        reject(data.error?.message || "Error Firebase Auth");
+                        const hashParams = new URLSearchParams(responseUrl.split('#')[1]);
+                        const idToken = hashParams.get('id_token');
+
+                        if (!idToken) {
+                            fallbackPromptLogin(resolve, reject);
+                            return;
+                        }
+
+                        fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${FIREBASE_API_KEY}`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                postBody: `id_token=${idToken}&providerId=google.com`,
+                                requestUri: redirectUrl,
+                                returnIdpCredential: true,
+                                returnSecureToken: true
+                            })
+                        })
+                        .then(res => res.json())
+                        .then(data => {
+                            if (data.localId) {
+                                firebaseUid = data.localId;
+                                firebaseIdToken = data.idToken;
+                                firebaseRefreshToken = data.refreshToken;
+                                userEmail = data.email || "";
+                                syncKey = cleanKey(userEmail || firebaseUid);
+
+                                chrome.storage.local.set({
+                                    firebaseUid,
+                                    firebaseIdToken,
+                                    firebaseRefreshToken,
+                                    userEmail,
+                                    syncKey
+                                });
+
+                                pushProfileToFirebase();
+                                pollFirebaseSync();
+                                resolve({ uid: firebaseUid, email: userEmail });
+                            } else {
+                                fallbackPromptLogin(resolve, reject);
+                            }
+                        })
+                        .catch(() => fallbackPromptLogin(resolve, reject));
                     }
-                })
-                .catch(err => reject(err.message));
+                );
             }
-        );
+        });
     });
+}
+
+function fallbackPromptLogin(resolve, reject) {
+    // Si falla el popup OAuth, devolver instrucción para ingresar correo o PIN
+    resolve({ fallbackRequired: true });
+}
+
+function setManualSyncKey(key) {
+    if (!key) return;
+    const clean = cleanKey(key);
+    syncKey = clean;
+    userEmail = key.includes('@') ? key : userEmail;
+    chrome.storage.local.set({ syncKey: clean, userEmail });
+    pollFirebaseSync();
 }
 
 /**
@@ -123,23 +172,21 @@ function refreshFirebaseToken() {
 }
 
 /**
- * Hace un fetch autenticado a Firebase RTDB, refrescando el token si es necesario
+ * Hace un fetch a Firebase RTDB
  */
-async function authFetch(url, options = {}) {
-    if (!firebaseIdToken) return null;
-
-    let fullUrl = `${url}?auth=${firebaseIdToken}`;
-    let res = await fetch(fullUrl, options);
-
-    // Si el token expiró (401), refrescar e intentar de nuevo
-    if (res.status === 401) {
+async function fetchDb(path, options = {}) {
+    let url = `${FIREBASE_DB_URL}${path}`;
+    if (firebaseIdToken) {
+        url += `?auth=${firebaseIdToken}`;
+    }
+    let res = await fetch(url, options);
+    if (res.status === 401 && firebaseRefreshToken) {
         const newToken = await refreshFirebaseToken();
         if (newToken) {
-            fullUrl = `${url}?auth=${newToken}`;
-            res = await fetch(fullUrl, options);
+            url = `${FIREBASE_DB_URL}${path}?auth=${newToken}`;
+            res = await fetch(url, options);
         }
     }
-
     return res;
 }
 
@@ -180,7 +227,6 @@ chrome.storage.local.get(['customDomains', 'parentalEnabled'], (res) => {
     updateNetRules();
 });
 
-// Obtener lista de dominios activos SEPARANDO enfoque y parental
 function getActiveRulesList() {
     let active = [];
     if (isLocked) {
@@ -240,13 +286,11 @@ function isUrlBlocked(url) {
     }
     const lowerUrl = url.toLowerCase();
 
-    // Verificar sitios personalizados SOLO si está en modo enfoque
     if (isLocked) {
         const focusKeywords = extractKeywords(customDomains);
         if (focusKeywords.some(kw => lowerUrl.includes(kw))) return true;
     }
 
-    // Verificar sitios adultos SOLO si control parental está activo
     if (parentalEnabled) {
         const parentalKeywords = extractKeywords(adultDomains);
         if (parentalKeywords.some(kw => lowerUrl.includes(kw))) return true;
@@ -255,7 +299,6 @@ function isUrlBlocked(url) {
     return false;
 }
 
-// Interceptor de Navegación
 chrome.webNavigation.onBeforeNavigate.addListener((details) => {
     if (details.frameId !== 0) return;
     if (isUrlBlocked(details.url)) {
@@ -263,7 +306,6 @@ chrome.webNavigation.onBeforeNavigate.addListener((details) => {
     }
 });
 
-// Fail-safe Tab Interceptor
 chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
     const targetUrl = changeInfo.url || (tab && tab.url);
     if (isUrlBlocked(targetUrl)) {
@@ -280,7 +322,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getState') {
         sendResponse({
             isLocked, remainingSeconds, customDomains, parentalEnabled,
-            connectedDeviceInfo, firebaseUid, userEmail
+            connectedDeviceInfo, firebaseUid, userEmail, syncKey
         });
     } else if (request.action === 'startTimer') {
         isLocked = true;
@@ -321,7 +363,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         signInWithGoogle()
             .then(result => sendResponse({ success: true, ...result }))
             .catch(err => sendResponse({ success: false, error: err }));
-        return true; // Keep message channel open for async response
+        return true;
+    } else if (request.action === 'setManualKey') {
+        setManualSyncKey(request.key);
+        sendResponse({ success: true, syncKey });
     }
     return true;
 });
@@ -341,20 +386,20 @@ function startBackgroundTimer() {
 }
 
 // ================================================================================
-// FIREBASE REALTIME DATABASE SYNC (CON AUTENTICACIÓN)
+// FIREBASE REALTIME DATABASE SYNC
 // ================================================================================
 
 function pushProfileToFirebase() {
-    if (!firebaseUid || !firebaseIdToken) return;
-    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/profile.json`, {
+    const target = getTargetKey();
+    fetchDb(`/users/${target}/profile.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: userEmail, role: "admin" })
+        body: JSON.stringify({ email: userEmail || target, role: "admin" })
     }).catch(() => {});
 }
 
 function pushLockStateToFirebase(locked, durationMinutes) {
-    if (!firebaseUid || !firebaseIdToken) return;
+    const target = getTargetKey();
     const expiresAt = locked ? (Date.now() + (durationMinutes * 60 * 1000)) : 0;
     const payload = {
         is_locked: locked,
@@ -363,7 +408,7 @@ function pushLockStateToFirebase(locked, durationMinutes) {
         source_device: "chrome_extension"
     };
 
-    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/lock_state.json`, {
+    fetchDb(`/users/${target}/lock_state.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
@@ -371,18 +416,18 @@ function pushLockStateToFirebase(locked, durationMinutes) {
 }
 
 function pollFirebaseSync() {
-    if (!firebaseUid || !firebaseIdToken) return;
+    const target = getTargetKey();
     const now = Date.now();
 
     // 1. Enviar latido de la Extensión (extension_last_ping)
-    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/device_info/extension_last_ping.json`, {
+    fetchDb(`/users/${target}/device_info/extension_last_ping.json`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(now)
     }).catch(() => {});
 
     // 2. Obtener información de dispositivo Android y comprobar latido
-    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/device_info.json`)
+    fetchDb(`/users/${target}/device_info.json`)
         .then(res => res ? res.json() : null)
         .then(deviceData => {
             if (deviceData && (deviceData.brand || deviceData.model)) {
@@ -399,7 +444,7 @@ function pollFirebaseSync() {
         .catch(() => { connectedDeviceInfo = null; });
 
     // 3. Obtener estado de bloqueo
-    authFetch(`${FIREBASE_DB_URL}/users/${firebaseUid}/lock_state.json`)
+    fetchDb(`/users/${target}/lock_state.json`)
         .then(res => res ? res.json() : null)
         .then(data => {
             if (data && typeof data.is_locked === 'boolean') {
