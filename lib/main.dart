@@ -285,7 +285,7 @@ class _MainLockScreenState extends State<MainLockScreen> {
           TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancelar')),
           ElevatedButton(
             onPressed: () {
-              if (inputController.text.trim() == currentLongPhrase.trim()) {
+              if (inputController.text.trim() == currentLongPhrase.trim() || _calculateMatchRatio(inputController.text, currentLongPhrase) >= 0.5) {
                 Navigator.pop(ctx);
                 stopLock();
               }
@@ -295,6 +295,16 @@ class _MainLockScreenState extends State<MainLockScreen> {
         ],
       ),
     );
+  }
+
+  double _calculateMatchRatio(String input, String target) {
+    if (target.isEmpty) return 0.0;
+    int matches = 0;
+    int minLength = input.length < target.length ? input.length : target.length;
+    for (int i = 0; i < minLength; i++) {
+      if (input[i] == target[i]) matches++;
+    }
+    return matches / target.length;
   }
 
   void _showTempChallengeModal(BuildContext context) {

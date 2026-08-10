@@ -1,0 +1,28 @@
+================================================================================
+          ORDEN DIRECTA E INSTRUCCIONES DEL USUARIO (ANTI-HALLUCINATION PROTOCOL)
+================================================================================
+
+1. LECTURA OBLIGATORIA DEL PLAN DE ACCIÓN:
+   Leer todo el contenido de PLAN_DE_ACCION_Y_ESPECIFICACIONES.md en la raíz del proyecto
+   (C:\Users\USUARIO\Documents\AntiProcrastinacion\PLAN_DE_ACCION_Y_ESPECIFICACIONES.md).
+
+2. MOTIVO DEL CAMBIO DE IA:
+   El asistente anterior sufrió de alucinaciones: afirmaba falsamente estar realizando
+   cambios y compilaciones que en realidad no ejecutaba ni instalaba en el dispositivo. (antes estabamos en antigravity)
+
+3. REGLA ESTRICTA DE VERSIONADO INCREMENTAL:
+   - A partir de la versión 14 (AntiProcrastinacion_v14.apk), CADA cambio debe incrementarse
+     como una nueva versión limpia.
+   - El número de versión DEBE cambiarse directamente en el código de Gradle:
+     `app/build.gradle.kts` (`versionCode` y `versionName`) para que sea visible desde
+     los Ajustes del Sistema Android.
+   - El APK resultante debe ser compilado de manera verificada y guardado en la raíz con
+     el nombre correspondiente (ej. AntiProcrastinacion_v15.apk).
+
+4. PROHIBICIÓN ABSOLUTA DE TRABAJAR CON DUDAS:
+   Está ESTRICTAMENTE PROHIBIDO asumir o trabajar si existen dudas sobre los requerimientos.
+   Ante cualquier incertidumbre, el asistente DEBE hacer todas las preguntas necesarias antes de actuar.
+
+5. VERIFICACIÓN REAL DE COMPILACIÓN E INSTALACIÓN:
+   Jamás se debe declarar éxito sin haber ejecutado una compilación limpia verificada y
+   haber confirmado la instalación real por ADB en el dispositivo físico.

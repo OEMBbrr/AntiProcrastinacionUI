@@ -4,11 +4,11 @@
 
 ESTIMADA IA:
 Este documento contiene la especificación completa, arquitectura, decisiones de diseño,
-flujos de código y estado actual del ecosistema "AntiProcrastinación". Léelo atentamente
+flujos de código y estado actual del ecosistema "AntiProcrastinación" (Versión v17.0.0). Léelo atentamente
 para comprender exactamente de qué trata la aplicación y cómo está construida.
 
 --------------------------------------------------------------------------------
-1. CONCEPTO Y FILOSOFÍA DE LA APLICACIÓN
+1. CONCEPTO Y FILOSOFÍA DE LA APLICACIÓN (VERSIÓN v17.0.0)
 --------------------------------------------------------------------------------
 "AntiProcrastinación" es un ecosistema multiplataforma (Android, iOS, Web y Extensión
 de Google Chrome) diseñado para imponer autodisciplina real y eliminar la tentación
@@ -28,8 +28,10 @@ AntiProcrastinación utiliza un enfoque psicopedagógico de resistencia cognitiv
   IMPORTANTE: Las webs personalizadas SOLO se bloquean con el Modo Enfoque activo, NUNCA con solo el Control Parental.
 - TREGUA TEMPORAL DE 5 MINUTOS:
   Para emergencias, exige resolver problemas matemáticos aleatorios o teclear frases medianas preparadas.
-- BOTONES DE EMERGENCIA:
-  Acceso directo permanente a llamadas de voz (📞 Teléfono) y mensajes de texto (💬 SMS).
+- INICIO DE SESIÓN OFICIAL GOOGLE (CHROME EXTENSION & ANDROID):
+  Chrome Extension usa chrome.identity.launchWebAuthFlow() con el URI autorizado de Google Cloud Console:
+  https://gecpnhjlelkcoiopicconbhkhdofigfi.chromiumapp.org/
+  Ambas plataformas alinean las claves al nodo unificado /users/correo_sanitizado (ej. /users/oembbrr_gmail_com).
 - ESTÉTICA WEB PRO ZEN:
   Diseñada con paleta Zen Verde Pizarra Pardo (#5A6E61), Gris Verdoso (#8C9B90), Carbón Oscuro (#2C302E), Crema (#F9F8F6) e iluminación neumórfica/glassmorphism.
 

@@ -11,35 +11,38 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            height: 100vh;
+            min-height: 100vh;
             margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
             text-align: center;
         }
         .container {
-            max-width: 500px;
-            padding: 40px;
+            max-width: 480px;
+            width: 100%;
+            padding: 32px 24px;
             background: rgba(255, 255, 255, 0.04);
             border: 1px solid rgba(255, 255, 255, 0.08);
             border-radius: 24px;
             box-shadow: 0 20px 40px rgba(0,0,0,0.5);
         }
         .logo {
-            width: 80px;
-            height: 80px;
+            width: 72px;
+            height: 72px;
             border-radius: 50%;
             border: 1px solid #5A6E61;
-            margin-bottom: 16px;
+            margin-bottom: 12px;
         }
         h1 {
-            font-size: 1.8rem;
+            font-size: 1.5rem;
             color: #F1F5F9;
-            margin-bottom: 12px;
+            margin-bottom: 8px;
         }
         p {
             color: #94A3B8;
-            font-size: 1rem;
+            font-size: 0.9rem;
             line-height: 1.5;
-            margin-bottom: 24px;
+            margin-bottom: 16px;
         }
         .badge {
             background: rgba(90, 110, 97, 0.25);
@@ -47,9 +50,67 @@
             padding: 6px 16px;
             border-radius: 20px;
             font-weight: 600;
-            font-size: 0.85rem;
+            font-size: 0.8rem;
             display: inline-block;
-            margin-bottom: 20px;
+            margin-bottom: 14px;
+        }
+        .notes-section {
+            margin-top: 16px;
+            background: rgba(255,255,255,0.03);
+            border: 1px solid rgba(255,255,255,0.08);
+            border-radius: 16px;
+            padding: 16px;
+            text-align: left;
+        }
+        .notes-section h3 {
+            font-size: 0.85rem;
+            color: #E2E8F0;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .notes-input-group {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+        .notes-input-group input {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 8px;
+            color: #fff;
+            font-size: 0.8rem;
+            outline: none;
+        }
+        .notes-input-group button {
+            padding: 8px 14px;
+            background: #5A6E61;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-weight: 700;
+            font-size: 0.8rem;
+            cursor: pointer;
+        }
+        .notes-list-blocked {
+            max-height: 130px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+        .note-item-b {
+            background: rgba(255,255,255,0.05);
+            border-radius: 8px;
+            padding: 8px 12px;
+            font-size: 0.78rem;
+            color: #CBD5E1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
         }
     </style>
 </head>
@@ -58,7 +119,18 @@
         <img src="app_logo.jpg" alt="Logo" class="logo">
         <div class="badge">SITIO BLOQUEADO EN MODO ENFOQUE</div>
         <h1>Mantén tu Concentración</h1>
-        <p>Este sitio web ha sido bloqueado por <strong>AntiProcrastinación</strong> para proteger tu tiempo de enfoque. Abre la extensión si necesitas realizar un desafío de verificación para desbloquear.</p>
+        <p>Este sitio ha sido bloqueado para proteger tu tiempo. Anota aquí lo que ibas a hacer para no olvidar tu idea.</p>
+
+        <!-- Bloc de Notas en Pantalla de Bloqueo -->
+        <div class="notes-section">
+            <h3><img src="emojis/memo_3d.png" style="width:20px;height:20px;vertical-align:middle;filter:drop-shadow(0 3px 5px rgba(0,0,0,0.3));"> Bloc de Notas Sincronizado</h3>
+            <div class="notes-input-group">
+                <input type="text" id="blocked-note-input" placeholder="Anota una idea o pendiente rápido...">
+                <button id="btn-blocked-add-note">Añadir</button>
+            </div>
+            <div class="notes-list-blocked" id="blocked-notes-list"></div>
+        </div>
     </div>
+    <script src="blocked.js"></script>
 </body>
 </html>

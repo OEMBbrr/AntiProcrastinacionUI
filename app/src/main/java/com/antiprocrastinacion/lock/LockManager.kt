@@ -7,19 +7,59 @@ import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
 import com.google.firebase.database.FirebaseDatabase
 import com.google.firebase.database.ValueEventListener
+import com.google.gson.Gson
+import com.google.gson.reflect.TypeToken
+import kotlinx.coroutines.*
+
+// V24: fase del Pomodoro sincronizado (trabajo o descanso) con tiempos absolutos
+data class PomodoroPhase(val type: String, val startTime: Long, val endTime: Long)
 
 class LockManager(context: Context) {
     private val prefs: SharedPreferences = context.getSharedPreferences("anti_procrastinacion_prefs", Context.MODE_PRIVATE)
+
+    // Servidor LAN para descubrimiento local por Wi-Fi
+    val lanServer = LanServer(context, this)
 
     private val firebaseAuth: FirebaseAuth by lazy { FirebaseAuth.getInstance() }
     private val firebaseDb: FirebaseDatabase by lazy { FirebaseDatabase.getInstance("https://antiprocrastinacion-26975-default-rtdb.firebaseio.com") }
 
     init {
+        // Inicializar clave de dispositivo única si no existe
+        if (prefs.getString("device_unique_pin", null) == null) {
+            val randomPin = "ZEN-" + (1000..9999).random()
+            prefs.edit().putString("device_unique_pin", randomPin).apply()
+        }
+        lanServer.start()
+
         try {
             pushDeviceHeartbeatToFirebase()
         } catch (e: Exception) {
             e.printStackTrace()
         }
+
+        // V24 (Bug 4 de la auditoría): Firebase Anonymous Auth como respaldo.
+        // Garantiza un token válido (auth != null) para las reglas de RTDB aunque
+        // el usuario aún no haya iniciado sesión con Google (modo PIN/sync key).
+        try {
+            ensureAnonymousAuth()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /**
+     * V24 (Bug 4): inicia sesión anónima en Firebase si no hay ningún usuario.
+     * El SDK adjunta automáticamente el token a todas las operaciones de RTDB.
+     */
+    fun ensureAnonymousAuth() {
+        if (firebaseAuth.currentUser != null) return
+        firebaseAuth.signInAnonymously()
+            .addOnSuccessListener { result ->
+                android.util.Log.d("ZEN_SYNC", "Firebase auth anónima activada (uid=${result.user?.uid})")
+            }
+            .addOnFailureListener { err ->
+                android.util.Log.e("ZEN_SYNC", "Fallo al crear auth anónima: ${err.message}")
+            }
     }
 
     companion object {
@@ -32,6 +72,19 @@ class LockManager(context: Context) {
         private const val KEY_TEMP_UNLOCK_END_TIME = "temp_unlock_end_time"
         private const val KEY_COOLDOWN_END_TIME = "cooldown_end_time"
         private const val KEY_ALLOWED_PACKAGES = "allowed_packages"
+
+        // V20: preferencias de ajustes
+        private const val KEY_DARK_MODE = "dark_mode_enabled"
+        private const val KEY_CROSS_DEVICE_LOCK = "cross_device_lock_enabled"
+
+        // V24 (Propuesta 1): Pomodoro sincronizado entre dispositivos
+        private const val KEY_POMODORO_ENABLED = "pomodoro_enabled"
+        private const val KEY_POMODORO_WORK_MINUTES = "pomodoro_work_minutes"
+        private const val KEY_POMODORO_REST_MINUTES = "pomodoro_rest_minutes"
+        private const val KEY_POMODORO_REST_COUNT = "pomodoro_rest_count"
+        private const val KEY_POMODORO_PHASES = "pomodoro_phases_json"
+        const val POMODORO_MAX_WORK_MINUTES = 60
+        const val POMODORO_MAX_REST_MINUTES = 30
         
         // 1. Frases MUY LARGAS (150 a 200 palabras) para "Ya terminé mi actividad"
         val LONG_FINISH_EARLY_PHRASES = listOf(
@@ -161,7 +214,16 @@ class LockManager(context: Context) {
     }
 
     var isLocked: Boolean
-        get() = prefs.getBoolean(KEY_IS_LOCKED, false)
+        get() {
+            val locked = prefs.getBoolean(KEY_IS_LOCKED, false)
+            if (!locked) return false
+            val end = prefs.getLong(KEY_LOCK_END_TIME, 0L)
+            if (end > 0 && System.currentTimeMillis() >= end) {
+                prefs.edit().putBoolean(KEY_IS_LOCKED, false).apply()
+                return false
+            }
+            return true
+        }
         set(value) = prefs.edit().putBoolean(KEY_IS_LOCKED, value).apply()
 
     var lockEndTime: Long
@@ -194,9 +256,174 @@ class LockManager(context: Context) {
         get() = prefs.getLong(KEY_COOLDOWN_END_TIME, 0L)
         set(value) = prefs.edit().putLong(KEY_COOLDOWN_END_TIME, value).apply()
 
+    // V24 (Propuesta 5): tiempo de fin de sesión remota detectada (PC -> teléfono)
+    private var remoteSessionEndTime: Long = 0L
+
+    /** V24 (Propuesta 5): true si hay una sesión de enfoque activa en CUALQUIER dispositivo.
+     * Protege ajustes: mientras haya sesión activa (local o remota), cambiar ajustes exige biometría/PIN. */
+    val isFocusSessionActive: Boolean
+        get() = isLocked || isTempUnlocked || System.currentTimeMillis() < remoteSessionEndTime
+
+    fun updateRemoteSessionEndTime(expiresAt: Long) {
+        if (expiresAt > 0) {
+            remoteSessionEndTime = maxOf(remoteSessionEndTime, expiresAt)
+        }
+    }
+
     var allowedPackages: Set<String>
         get() = prefs.getStringSet(KEY_ALLOWED_PACKAGES, emptySet()) ?: emptySet()
         set(value) = prefs.edit().putStringSet(KEY_ALLOWED_PACKAGES, value).apply()
+
+    // V20: Modo oscuro (claro por defecto)
+    // V24: el modo oscuro es INDEPENDIENTE por dispositivo (Bug 2 de la auditoría).
+    // Ya NO se publica en /config para no forzar el tema de la extensión de Chrome.
+    var darkModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_DARK_MODE, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_DARK_MODE, value).apply()
+        }
+
+    // V20: Bloqueo cruzado entre dispositivos (activo por defecto)
+    var crossDeviceLockEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CROSS_DEVICE_LOCK, true)
+        set(value) {
+            prefs.edit().putBoolean(KEY_CROSS_DEVICE_LOCK, value).apply()
+            // Publicar la preferencia en la nube para que la extensión la respete
+            try {
+                val ref = userRef()?.child("config")?.child("cross_device_lock_enabled") ?: return
+                ref.setValue(value)
+            } catch (e: Exception) {
+                android.util.Log.e("ZEN_SYNC", "Error publicando config cross_device: ${e.message}")
+            }
+            // V24 (Bug 1 de la auditoría): si se activa el bloqueo cruzado con una
+            // sesión de enfoque ya en curso, publicar el estado actual para que la
+            // extensión de Chrome lo aplique de inmediato (source_device: android).
+            if (value && isLocked) {
+                pushLockStateToFirebase(true, lockEndTime)
+            }
+        }
+
+    // V24 (Propuesta 1): Pomodoro sincronizado (trabajo/descanso) compartido
+    // con la extensión de Chrome a través de /config.
+    var pomodoroEnabled: Boolean
+        get() = prefs.getBoolean(KEY_POMODORO_ENABLED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_POMODORO_ENABLED, value).apply()
+            try {
+                userRef()?.child("config")?.child("pomodoro_enabled")?.setValue(value)
+            } catch (e: Exception) {
+                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_enabled: ${e.message}")
+            }
+        }
+
+    var pomodoroWorkMinutes: Int
+        get() = prefs.getInt(KEY_POMODORO_WORK_MINUTES, 25).coerceIn(1, POMODORO_MAX_WORK_MINUTES)
+        set(value) {
+            val clamped = value.coerceIn(1, POMODORO_MAX_WORK_MINUTES)
+            prefs.edit().putInt(KEY_POMODORO_WORK_MINUTES, clamped).apply()
+            try {
+                userRef()?.child("config")?.child("pomodoro_work_minutes")?.setValue(clamped)
+            } catch (e: Exception) {
+                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_work: ${e.message}")
+            }
+        }
+
+    var pomodoroRestMinutes: Int
+        get() = prefs.getInt(KEY_POMODORO_REST_MINUTES, 5).coerceIn(1, POMODORO_MAX_REST_MINUTES)
+        set(value) {
+            val clamped = value.coerceIn(1, POMODORO_MAX_REST_MINUTES)
+            prefs.edit().putInt(KEY_POMODORO_REST_MINUTES, clamped).apply()
+            try {
+                userRef()?.child("config")?.child("pomodoro_rest_minutes")?.setValue(clamped)
+            } catch (e: Exception) {
+                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_rest: ${e.message}")
+            }
+        }
+
+    // V24: número de descansos del Pomodoro (se configura según la duración del enfoque)
+    var pomodoroRestCount: Int
+        get() = prefs.getInt(KEY_POMODORO_REST_COUNT, 1).coerceIn(1, 6)
+        set(value) {
+            val clamped = value.coerceIn(1, 6)
+            prefs.edit().putInt(KEY_POMODORO_REST_COUNT, clamped).apply()
+            try {
+                userRef()?.child("config")?.child("pomodoro_rest_count")?.setValue(clamped)
+            } catch (e: Exception) {
+                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_rest_count: ${e.message}")
+            }
+        }
+
+    // ================================================================================
+    // V24: PROGRAMACIÓN POMODORO (fases de trabajo/descanso del enfoque en curso)
+    // Estructura: N descansos -> N+1 bloques de trabajo iguales. Empieza y termina en trabajo.
+    // ================================================================================
+    private val pomodoroGson = Gson()
+
+    var pomodoroPhases: List<PomodoroPhase>
+        get() {
+            val json = prefs.getString(KEY_POMODORO_PHASES, null) ?: return emptyList()
+            return try {
+                val type = object : TypeToken<List<PomodoroPhase>>() {}.type
+                pomodoroGson.fromJson<List<PomodoroPhase>>(json, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_POMODORO_PHASES, pomodoroGson.toJson(value)).apply()
+        }
+
+    /** Límites (maxRestDuration, maxRestCount) según la duración total y la selección actual.
+     * Retorna (maxRestDuration, maxRestCount) para la UI. */
+    fun computePomodoroLimits(totalMinutes: Int, currentRestCount: Int, currentRestDuration: Int): Pair<Int, Int> {
+        val maxTotalRest = totalMinutes / 4
+        if (maxTotalRest < 1) return 0 to 0
+        val maxCount = (maxTotalRest / currentRestDuration.coerceAtLeast(1)).coerceAtLeast(1)
+        val maxRest = minOf(30, maxTotalRest / currentRestCount.coerceAtLeast(1)).coerceAtLeast(1)
+        return maxRest to maxCount
+    }
+
+    /** Genera las fases (work/rest) de un enfoque Pomodoro desde startTime. */
+    fun buildPomodoroSchedule(startTime: Long, totalMinutes: Int, restCount: Int, restMinutes: Int): List<PomodoroPhase> {
+        val maxTotalRest = totalMinutes / 4
+        if (maxTotalRest < 1) return emptyList()
+        val rm = restMinutes.coerceIn(1, 30)
+        val rc = restCount.coerceAtLeast(1)
+        val actualTotalRest = (rc * rm).coerceAtMost(maxTotalRest)
+        val adjustedRestMs = (actualTotalRest * 60_000L) / rc
+        val totalMs = totalMinutes * 60_000L
+        val restMs = adjustedRestMs
+        val workBlocks = rc + 1
+        val workMs = (totalMs - rc * restMs) / workBlocks
+        val phases = mutableListOf<PomodoroPhase>()
+        var t = startTime
+        for (i in 0 until rc) {
+            phases.add(PomodoroPhase("work", t, t + workMs))
+            t += workMs
+            phases.add(PomodoroPhase("rest", t, t + restMs))
+            t += restMs
+        }
+        phases.add(PomodoroPhase("work", t, t + workMs))
+        return phases
+    }
+
+    /** Fase actual del Pomodoro en `now` (null si no hay Pomodoro activo). */
+    fun currentPomodoroPhase(now: Long): PomodoroPhase? =
+        pomodoroPhases.firstOrNull { now >= it.startTime && now < it.endTime }
+
+    /** True si ahora mismo estamos en una fase de DESCANSO del Pomodoro. */
+    val isPomodoroRestPhase: Boolean
+        get() = currentPomodoroPhase(System.currentTimeMillis())?.type == "rest"
+
+    /** Descanso libre: durante una fase de descanso se permite desbloqueo sin reto. */
+    fun unlockForRest() {
+        val phase = currentPomodoroPhase(System.currentTimeMillis()) ?: return
+        if (phase.type != "rest") return
+        val now = System.currentTimeMillis()
+        tempUnlockEndTime = phase.endTime.coerceAtMost(lockEndTime)
+        cooldownEndTime = 0L
+        android.util.Log.d("ZEN_POMODORO", "Descanso libre concedido hasta $tempUnlockEndTime")
+    }
 
     val isTempUnlocked: Boolean
         get() = System.currentTimeMillis() < tempUnlockEndTime
@@ -217,6 +444,12 @@ class LockManager(context: Context) {
         longPhrase = LONG_FINISH_EARLY_PHRASES.random()
         mediumPhrase = MEDIUM_TEMP_UNLOCK_PHRASES.random()
         shortPhrase = SHORT_FINISHED_PHRASES.random()
+        // V24: construir la programación Pomodoro (fases trabajo/descanso)
+        pomodoroPhases = if (pomodoroEnabled && durationMinutes >= 10) {
+            buildPomodoroSchedule(System.currentTimeMillis(), durationMinutes, pomodoroRestCount, pomodoroRestMinutes)
+        } else {
+            emptyList()
+        }
         isLocked = true
         tempUnlockEndTime = 0L
         cooldownEndTime = 0L
@@ -228,6 +461,7 @@ class LockManager(context: Context) {
         lockEndTime = 0L
         tempUnlockEndTime = 0L
         cooldownEndTime = 0L
+        pomodoroPhases = emptyList()
         pushLockStateToFirebase(false, 0L)
     }
 
@@ -235,6 +469,28 @@ class LockManager(context: Context) {
         val now = System.currentTimeMillis()
         tempUnlockEndTime = now + (5 * 60 * 1000)
         cooldownEndTime = now + (15 * 60 * 1000)
+    }
+
+    /** Termina el descanso Pomodoro en curso y adelanta el resto de fases para volver a trabajo ya. */
+    fun endPomodoroRestNow() {
+        val now = System.currentTimeMillis()
+        val phase = currentPomodoroPhase(now) ?: return
+        if (phase.type != "rest") return
+        val remainingRest = phase.endTime - now
+        val phases = pomodoroPhases.toMutableList()
+        val idx = phases.indexOfFirst { it.startTime == phase.startTime && it.endTime == phase.endTime }
+        if (idx < 0) return
+        phases.removeAt(idx)
+        val updated = phases.map { p ->
+            if (p.startTime >= phase.endTime) {
+                PomodoroPhase(p.type, p.startTime - remainingRest, p.endTime - remainingRest)
+            } else {
+                p
+            }
+        }
+        pomodoroPhases = updated
+        tempUnlockEndTime = 0L
+        android.util.Log.d("ZEN_POMODORO", "Descanso terminado anticipadamente; fases re-programadas")
     }
 
     val devicePin: String
@@ -265,17 +521,29 @@ class LockManager(context: Context) {
     var isExtensionConnected: Boolean = false
         private set
 
-    /** UID de Firebase Auth (null si no ha iniciado sesión) */
+    /** UID de Firebase Auth (puede ser de sesión anónima de respaldo) */
     val firebaseUid: String?
         get() = firebaseAuth.currentUser?.uid
+
+    /** V24 (Bug 4): true solo si hay sesión de Google real (no anónima) */
+    val isGoogleSignedIn: Boolean
+        get() = firebaseAuth.currentUser?.providerData?.any { it.providerId == "google.com" } == true
 
     /** Email de Google del usuario autenticado */
     val googleUserEmail: String
         get() = firebaseAuth.currentUser?.email ?: prefs.getString("google_user_email", "") ?: ""
 
-    /** Referencia base al nodo del usuario autenticado (o fallback a userSyncKey/devicePin) */
+    /**
+     * V24 (Bug 4): referencia base al nodo del usuario.
+     * Prioridad: correo de Google → sync key (ZEN-XXXX) → UID.
+     * Se antepone el sync key al UID para que una sesión anónima de respaldo
+     * NO cambie la ruta de datos de los usuarios que conectan por PIN.
+     */
     private fun userRef(): com.google.firebase.database.DatabaseReference {
-        val targetKey = firebaseUid ?: userSyncKey
+        val email = googleUserEmail
+        val rawKey = if (email.isNotEmpty()) email else userSyncKey
+        val targetKey = rawKey.lowercase().trim().replace(Regex("[^a-z0-9_]"), "_")
+        android.util.Log.d("ZEN_SYNC", "userRef path -> /users/${targetKey} (email='${email}', pin='${devicePin}')")
         return firebaseDb.getReference("users").child(targetKey)
     }
 
@@ -295,12 +563,232 @@ class LockManager(context: Context) {
             override fun onDataChange(snapshot: DataSnapshot) {
                 val extPing = snapshot.getValue(Long::class.java) ?: 0L
                 isExtensionConnected = (System.currentTimeMillis() - extPing) < 30000
+                android.util.Log.d("ZEN_SYNC", "Realtime extPing change: ${extPing}, active: ${isExtensionConnected}")
             }
             override fun onCancelled(error: DatabaseError) {
                 isExtensionConnected = false
+                android.util.Log.e("ZEN_SYNC", "Realtime listener cancelled: ${error.message}")
             }
         }
         ref.addValueEventListener(extensionPingListener!!)
+    }
+
+    private var lockStateListener: ValueEventListener? = null
+    private var remoteLockCallback: ((Boolean) -> Unit)? = null
+
+    /**
+     * V20: Inicia el listener en tiempo real de /users/<UID>/lock_state
+     * para propagar el bloqueo cruzado Chrome -> Android.
+     * Si otro dispositivo (extensión Chrome) inicia o termina un bloqueo,
+     * este teléfono reacciona igual (siempre que el bloqueo cruzado esté activado).
+     */
+    fun startLockStateListener(callback: ((Boolean) -> Unit)? = null) {
+        if (callback != null) remoteLockCallback = callback
+        val ref = userRef()?.child("lock_state") ?: return
+
+        lockStateListener?.let { ref.removeEventListener(it) }
+
+        lockStateListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val isLockedRemote = snapshot.child("is_locked").getValue(Boolean::class.java) ?: false
+                val expiresAtRemote = snapshot.child("expires_at").getValue(Long::class.java) ?: 0L
+                val sourceDevice = snapshot.child("source_device").getValue(String::class.java) ?: ""
+
+                // No reaccionar a nuestro propio estado (evitar eco infinito)
+                if (sourceDevice == "android") {
+                    // V24 (Propuesta 5): aun ignorando eco, actualizar timestamp de sesión remota
+                    updateRemoteSessionEndTime(expiresAtRemote)
+                    return
+                }
+                if (!crossDeviceLockEnabled) {
+                    // V24 (Propuesta 5): aunque el bloqueo cruzado esté OFF, seguimos
+                    // rastreando la sesión remota para proteger ajustes
+                    updateRemoteSessionEndTime(expiresAtRemote)
+                    return
+                }
+
+                val now = System.currentTimeMillis()
+                if (isLockedRemote && expiresAtRemote > now) {
+                    if (!isLocked) {
+                        // Aplicar bloqueo remoto (no re-enviar a Firebase para evitar eco)
+                        isLocked = true
+                        lockEndTime = expiresAtRemote
+                        tempUnlockEndTime = 0L
+                        cooldownEndTime = 0L
+                        // V24: aplicar las fases Pomodoro enviadas por el dispositivo remoto
+                        val remotePhases = mutableListOf<PomodoroPhase>()
+                        val phasesSnap = snapshot.child("phases")
+                        if (phasesSnap.exists()) {
+                            for (child in phasesSnap.children) {
+                                val type = child.child("type").getValue(String::class.java) ?: "work"
+                                val startMs = child.child("start_ms").getValue(Long::class.java) ?: 0L
+                                val endMs = child.child("end_ms").getValue(Long::class.java) ?: 0L
+                                if (endMs > startMs) remotePhases.add(PomodoroPhase(type, startMs, endMs))
+                            }
+                        }
+                        pomodoroPhases = remotePhases
+                        if (longPhrase.isBlank()) longPhrase = LONG_FINISH_EARLY_PHRASES.random()
+                        if (mediumPhrase.isBlank()) mediumPhrase = MEDIUM_TEMP_UNLOCK_PHRASES.random()
+                        if (shortPhrase.isBlank()) shortPhrase = SHORT_FINISHED_PHRASES.random()
+                        android.util.Log.d("ZEN_SYNC", "Bloqueo cruzado aplicado desde $sourceDevice (hasta $expiresAtRemote)")
+                        remoteLockCallback?.invoke(true)
+                    }
+                } else if (!isLockedRemote && isLocked) {
+                    // Desbloqueo remoto
+                    isLocked = false
+                    lockEndTime = 0L
+                    tempUnlockEndTime = 0L
+                    cooldownEndTime = 0L
+                    pomodoroPhases = emptyList()
+                    remoteSessionEndTime = 0L
+                    android.util.Log.d("ZEN_SYNC", "Desbloqueo cruzado aplicado desde $sourceDevice")
+                    remoteLockCallback?.invoke(false)
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("ZEN_SYNC", "Lock state listener cancelled: ${error.message}")
+            }
+        }
+        ref.addValueEventListener(lockStateListener!!)
+    }
+
+    private var configListener: ValueEventListener? = null
+    private var remoteConfigCallback: ((Boolean, Boolean) -> Unit)? = null
+    /**
+     * V20.2: Inicia el listener en tiempo real de /users/<UID>/config para que
+     * los ajustes cambiados desde la extensión de Chrome (bloqueo cruzado) se
+     * reflejen al instante en el teléfono, sin reiniciar la app.
+     * V24: el modo oscuro ya NO se sincroniza desde la extensión (Bug 2).
+     */
+    fun startConfigListener(callback: ((Boolean, Boolean) -> Unit)? = null) {
+        if (callback != null) remoteConfigCallback = callback
+        val ref = userRef()?.child("config") ?: return
+
+        configListener?.let { ref.removeEventListener(it) }
+
+        configListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val remoteCross = snapshot.child("cross_device_lock_enabled").getValue(Boolean::class.java)
+
+                if (remoteCross != null && remoteCross != crossDeviceLockEnabled) {
+                    prefs.edit().putBoolean(KEY_CROSS_DEVICE_LOCK, remoteCross).apply()
+                    android.util.Log.d("ZEN_SYNC", "Bloqueo cruzado remoto aplicado desde la extensión: $remoteCross")
+                }
+
+                // V24 (Propuesta 1): aplicar ajustes Pomodoro llegados desde la extensión
+                val remotePomodoroEnabled = snapshot.child("pomodoro_enabled").getValue(Boolean::class.java)
+                val remotePomodoroWork = snapshot.child("pomodoro_work_minutes").getValue(Int::class.java)
+                val remotePomodoroRest = snapshot.child("pomodoro_rest_minutes").getValue(Int::class.java)
+                val remotePomodoroRestCount = snapshot.child("pomodoro_rest_count").getValue(Int::class.java)
+
+                if (remotePomodoroEnabled != null) {
+                    prefs.edit().putBoolean(KEY_POMODORO_ENABLED, remotePomodoroEnabled).apply()
+                }
+                if (remotePomodoroWork != null) {
+                    prefs.edit().putInt(KEY_POMODORO_WORK_MINUTES, remotePomodoroWork.coerceIn(1, POMODORO_MAX_WORK_MINUTES)).apply()
+                }
+                if (remotePomodoroRest != null) {
+                    prefs.edit().putInt(KEY_POMODORO_REST_MINUTES, remotePomodoroRest.coerceIn(1, POMODORO_MAX_REST_MINUTES)).apply()
+                }
+                if (remotePomodoroRestCount != null) {
+                    prefs.edit().putInt(KEY_POMODORO_REST_COUNT, remotePomodoroRestCount.coerceIn(1, 6)).apply()
+                }
+
+                if (remoteCross != null) {
+                    remoteConfigCallback?.invoke(
+                        darkModeEnabled,
+                        crossDeviceLockEnabled
+                    )
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("ZEN_SYNC", "Config listener cancelled: ${error.message}")
+            }
+        }
+        ref.addValueEventListener(configListener!!)
+    }
+
+    // ================================================================================
+    // V24 (Propuesta 2): TREGUA DE EMERGENCIA VERIFICADA POR EL 2º DISPOSITIVO
+    // El PC escribe una solicitud en /users/<target>/tregua_request; el teléfono
+    // la aprueba o deniega y la extensión la procesa en su siguiente poll.
+    // ================================================================================
+    private val treguaRequestCallbacks = mutableListOf<(String, Long) -> Unit>()
+    private var treguaRequestListener: ValueEventListener? = null
+
+    fun startTreguaRequestListener(callback: ((String, Long) -> Unit)? = null) {
+        if (callback != null && !treguaRequestCallbacks.contains(callback)) {
+            treguaRequestCallbacks.add(callback)
+        }
+        if (treguaRequestListener != null) return // ya escuchando
+        val ref = userRef()?.child("tregua_request") ?: return
+
+        treguaRequestListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val reqId = snapshot.child("id").getValue(String::class.java) ?: return
+                val requester = snapshot.child("requester").getValue(String::class.java) ?: ""
+                val responded = snapshot.child("responded").getValue(Boolean::class.java) ?: false
+                val requestedAt = snapshot.child("requested_at").getValue(Long::class.java) ?: 0L
+                // Ignorar solicitudes propias o ya respondidas (evitar eco)
+                if (requester == "android" || responded) return
+                android.util.Log.d("ZEN_SYNC", "Solicitud de tregua desde $requester ($reqId)")
+                treguaRequestCallbacks.toList().forEach { cb -> cb.invoke(reqId, requestedAt) }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("ZEN_SYNC", "Listener de tregua cancelado: ${error.message}")
+            }
+        }
+        ref.addValueEventListener(treguaRequestListener!!)
+    }
+
+    /** Responde a la solicitud de tregua del otro dispositivo */
+    fun respondTreguaRequest(approved: Boolean) {
+        val ref = userRef()?.child("tregua_request") ?: return
+        val data = mapOf(
+            "approved" to approved,
+            "responded" to true,
+            "responded_by" to "android",
+            "responded_at" to System.currentTimeMillis()
+        )
+        ref.updateChildren(data)
+    }
+
+    // ================================================================================
+    // V24: AUTENTICACIÓN DE DOS PASOS DEL BLOQUEO CRUZADO (código del PC -> notificación)
+    // El PC genera un código, lo publica en /users/<target>/auth_request y el teléfono
+    // muestra una notificación con ese código para que el usuario lo escriba en el PC.
+    // ================================================================================
+    private val authRequestCallbacks = mutableListOf<(String, String) -> Unit>() // (reqId, code)
+    private var authRequestListener: ValueEventListener? = null
+    private var lastAuthRequestId = ""
+
+    fun startAuthRequestListener(callback: ((String, String) -> Unit)? = null) {
+        if (callback != null && !authRequestCallbacks.contains(callback)) {
+            authRequestCallbacks.add(callback)
+        }
+        if (authRequestListener != null) return // ya escuchando
+        val ref = userRef()?.child("auth_request") ?: return
+
+        authRequestListener = object : ValueEventListener {
+            override fun onDataChange(snapshot: DataSnapshot) {
+                val reqId = snapshot.child("id").getValue(String::class.java) ?: return
+                val requester = snapshot.child("requester").getValue(String::class.java) ?: ""
+                val status = snapshot.child("status").getValue(String::class.java) ?: ""
+                val code = snapshot.child("code").getValue(String::class.java) ?: ""
+                // Solo atender solicitudes del PC, nuevas y pendientes
+                if (requester != "chrome_extension") return
+                if (reqId == lastAuthRequestId) return
+                lastAuthRequestId = reqId
+                if (status == "pending" && code.isNotEmpty()) {
+                    android.util.Log.d("ZEN_2FA", "Código de verificación recibido desde el PC: $code")
+                    authRequestCallbacks.toList().forEach { cb -> cb.invoke(reqId, code) }
+                }
+            }
+            override fun onCancelled(error: DatabaseError) {
+                android.util.Log.e("ZEN_2FA", "Listener de auth_request cancelado: ${error.message}")
+            }
+        }
+        ref.addValueEventListener(authRequestListener!!)
     }
 
     /**
@@ -328,13 +816,17 @@ class LockManager(context: Context) {
                 // Leer extension_last_ping para verificar conexión
                 ref.child("extension_last_ping").get().addOnSuccessListener { snapshot ->
                     val extPing = snapshot.getValue(Long::class.java) ?: 0L
-                    isExtensionConnected = (now - extPing) < 30000
+                    val diff = now - extPing
+                    isExtensionConnected = diff < 30000
+                    android.util.Log.d("ZEN_SYNC", "Heartbeat SUCCESS! extPing=${extPing}, diff=${diff}ms, active=${isExtensionConnected}")
                     onResult?.invoke(isExtensionConnected)
-                }.addOnFailureListener {
+                }.addOnFailureListener { err ->
+                    android.util.Log.e("ZEN_SYNC", "Heartbeat read extPing FAILED: ${err.message}")
                     isExtensionConnected = false
                     onResult?.invoke(false)
                 }
             } else {
+                android.util.Log.e("ZEN_SYNC", "Heartbeat updateChildren FAILED: ${task.exception?.message}")
                 isExtensionConnected = false
                 onResult?.invoke(false)
             }
@@ -346,14 +838,26 @@ class LockManager(context: Context) {
      * Escribe en /users/<UID>/lock_state
      */
     fun pushLockStateToFirebase(locked: Boolean, expiresAt: Long) {
+        // V20: si el bloqueo cruzado está desactivado, este dispositivo no publica su estado
+        if (!crossDeviceLockEnabled) return
         pushDeviceHeartbeatToFirebase()
         val ref = userRef()?.child("lock_state") ?: return
+
+        val phasesData = pomodoroPhases.map { p ->
+            mapOf(
+                "type" to p.type,
+                "start_ms" to p.startTime,
+                "end_ms" to p.endTime
+            )
+        }
 
         val data = mapOf(
             "is_locked" to locked,
             "expires_at" to expiresAt,
             "updated_at" to System.currentTimeMillis(),
-            "source_device" to "android"
+            "source_device" to "android",
+            "pomodoro_enabled" to (locked && pomodoroPhases.isNotEmpty()),
+            "phases" to phasesData
         )
 
         ref.setValue(data)
@@ -373,5 +877,172 @@ class LockManager(context: Context) {
             ref.setValue(data)
         }
     }
+
+    // ================================================================================
+    // GESTIÓN DE NOTAS ZEN (HÍBRIDO: LOCAL DE RESPUESTA INSTANTÁNEA + NUBE FIREBASE)
+    // ================================================================================
+    private val gson = Gson()
+    private var notesListener: ValueEventListener? = null
+    private var activeNotesCallback: ((List<ZenNote>) -> Unit)? = null
+
+    fun loadLocalNotes(): List<ZenNote> {
+        val json = prefs.getString("zen_notes_local_json", null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<ZenNote>>() {}.type
+            gson.fromJson<List<ZenNote>>(json, type) ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun saveLocalNotes(notes: List<ZenNote>) {
+        try {
+            val json = gson.toJson(notes)
+            prefs.edit().putString("zen_notes_local_json", json).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private var heartbeatJob: Job? = null
+
+    /**
+     * Inicia un bucle periódico de latidos (ping) a Firebase cada 15 segundos
+     * para que la Extensión de Chrome reconozca la conexión activa VERDE sin desconectarse a los 30s.
+     */
+    fun startPeriodicHeartbeat(scope: CoroutineScope) {
+        heartbeatJob?.cancel()
+        heartbeatJob = scope.launch(Dispatchers.IO) {
+            while (isActive) {
+                try {
+                    pushDeviceHeartbeatToFirebase()
+                } catch (e: Exception) {
+                    android.util.Log.e("ZEN_SYNC", "Error en latido periódico: ${e.message}")
+                }
+                delay(15000) // Latido continuo cada 15 segundos
+            }
+        }
+    }
+
+    fun stopPeriodicHeartbeat() {
+        heartbeatJob?.cancel()
+        heartbeatJob = null
+    }
+
+    fun addNote(content: String, category: String = "General", onComplete: ((Boolean) -> Unit)? = null) {
+        if (content.isBlank()) return
+        val noteId = "note_${System.currentTimeMillis()}_${(1000..9999).random()}"
+        val newNote = ZenNote(
+            id = noteId,
+            content = content.trim(),
+            category = if (category.isBlank()) "General" else category,
+            timestamp = System.currentTimeMillis(),
+            deviceSource = "android"
+        )
+
+        // 1. Guardado local instantáneo (0.001s)
+        val currentLocal = loadLocalNotes().toMutableList()
+        currentLocal.removeAll { it.id == noteId }
+        currentLocal.add(0, newNote)
+        saveLocalNotes(currentLocal)
+        activeNotesCallback?.invoke(currentLocal)
+        onComplete?.invoke(true)
+
+        // 2. Sincronización en segundo plano con Firebase RTDB (sin bloquear la UI)
+        try {
+            val ref = userRef()?.child("notes")?.child(noteId)
+            if (ref != null) {
+                val data = mapOf(
+                    "id" to noteId,
+                    "content" to newNote.content,
+                    "category" to newNote.category,
+                    "timestamp" to newNote.timestamp,
+                    "deviceSource" to newNote.deviceSource
+                )
+                ref.setValue(data).addOnSuccessListener {
+                    android.util.Log.d("ZEN_NOTES", "Nota guardada con éxito en Firebase: $noteId")
+                }.addOnFailureListener { err ->
+                    android.util.Log.e("ZEN_NOTES", "Fallo guardando nota en Firebase: ${err.message}")
+                }
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ZEN_NOTES", "Error guardando en Firebase (guardado local preservado): ${e.message}")
+        }
+    }
+
+    fun deleteNote(noteId: String, onComplete: ((Boolean) -> Unit)? = null) {
+        // 1. Eliminación local instantánea
+        val currentLocal = loadLocalNotes().toMutableList()
+        currentLocal.removeAll { it.id == noteId }
+        saveLocalNotes(currentLocal)
+        activeNotesCallback?.invoke(currentLocal)
+        onComplete?.invoke(true)
+
+        // 2. Eliminación en Firebase RTDB
+        try {
+            userRef()?.child("notes")?.child(noteId)?.removeValue()?.addOnSuccessListener {
+                android.util.Log.d("ZEN_NOTES", "Nota eliminada con éxito en Firebase: $noteId")
+            }?.addOnFailureListener { err ->
+                android.util.Log.e("ZEN_NOTES", "Fallo eliminando nota en Firebase: ${err.message}")
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("ZEN_NOTES", "Error borrando en Firebase: ${e.message}")
+        }
+    }
+
+    fun observeNotes(onNotesUpdated: (List<ZenNote>) -> Unit) {
+        activeNotesCallback = onNotesUpdated
+        // Emitir inmediatamente las notas locales sin demoras
+        val localList = loadLocalNotes()
+        onNotesUpdated(localList)
+
+        // Escuchar cambios de Firebase RTDB para combinar notas remotas
+        try {
+            val ref = userRef()?.child("notes") ?: return
+            if (notesListener != null) {
+                ref.removeEventListener(notesListener!!)
+            }
+            notesListener = object : ValueEventListener {
+                override fun onDataChange(snapshot: DataSnapshot) {
+                    val remoteList = mutableListOf<ZenNote>()
+                    for (child in snapshot.children) {
+                        val id = child.child("id").getValue(String::class.java) ?: child.key ?: ""
+                        val content = child.child("content").getValue(String::class.java) ?: ""
+                        val category = child.child("category").getValue(String::class.java) ?: "General"
+                        val timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L
+                        val source = child.child("deviceSource").getValue(String::class.java) ?: "android"
+                        if (content.isNotEmpty()) {
+                            remoteList.add(ZenNote(id, content, category, timestamp, source))
+                        }
+                    }
+                    
+                    // Fusionar notas locales y remotas sin duplicados
+                    val mergedMap = LinkedHashMap<String, ZenNote>()
+                    loadLocalNotes().forEach { mergedMap[it.id] = it }
+                    remoteList.forEach { mergedMap[it.id] = it }
+                    
+                    val finalList = mergedMap.values.sortedByDescending { it.timestamp }
+                    saveLocalNotes(finalList)
+                    onNotesUpdated(finalList)
+                }
+
+                override fun onCancelled(error: DatabaseError) {
+                    android.util.Log.w("ZEN_NOTES", "Firebase listener cancelado: ${error.message}")
+                }
+            }
+            ref.addValueEventListener(notesListener!!)
+        } catch (e: Exception) {
+            android.util.Log.e("ZEN_NOTES", "Error iniciando observeNotes en Firebase: ${e.message}")
+        }
+    }
 }
+
+data class ZenNote(
+    val id: String = "",
+    val content: String = "",
+    val category: String = "General",
+    val timestamp: Long = 0L,
+    val deviceSource: String = "android"
+)
+
 

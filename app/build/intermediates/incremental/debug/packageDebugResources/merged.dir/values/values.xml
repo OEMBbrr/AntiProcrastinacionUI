@@ -1,5 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">VibePaper</string>
-    <string name="wallpaper_description">Fondo de pantalla animado ultraligero con Videos, GIFs y Fotos personalizable.</string>
+    <string name="app_name">AntiProcrastinación</string>
+    <string name="default_web_client_id" translatable="false">927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com</string>
+    <string name="gcm_defaultSenderId" translatable="false">927134130052</string>
+    <string name="google_api_key" translatable="false">AIzaSyBNw12V7mMCt76ZdP89NEYQwg_E2vshRto</string>
+    <string name="google_app_id" translatable="false">1:927134130052:android:1b6b6f22adf1493ea5c7d1</string>
+    <string name="google_crash_reporting_api_key" translatable="false">AIzaSyBNw12V7mMCt76ZdP89NEYQwg_E2vshRto</string>
+    <string name="google_storage_bucket" translatable="false">antiprocrastinacion-26975.firebasestorage.app</string>
+    <string name="project_id" translatable="false">antiprocrastinacion-26975</string>
+    <string name="wallpaper_description">Sistema de enfoque profundo y bloqueo contra distracciones.</string>
 </resources>

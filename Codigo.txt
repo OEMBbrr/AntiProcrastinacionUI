@@ -1,0 +1,131 @@
+si es dsl de kotlin: plugins {
+  // ...
+
+  // Add the dependency for the Google services Gradle plugin
+  id("com.google.gms.google-services") version "4.5.0" apply false
+
+}
+
+Luego, en el archivo build.gradle.kts del módulo (nivel de la app), agrega el complemento google-services y cualquier SDK de Firebase que quieras usar en tu app:
+
+Archivo de Gradle del módulo (nivel de app) (<project>/<app-module>/build.gradle.kts):
+
+plugins {
+  id("com.android.application")
+
+  // Add the Google services Gradle plugin
+  id("com.google.gms.google-services")
+
+  ...
+}
+
+dependencies {
+  // Import the Firebase BoM
+  implementation(platform("com.google.firebase:firebase-bom:34.17.0"))
+
+
+  // TODO: Add the dependencies for Firebase products you want to use
+  // When using the BoM, don't specify versions in Firebase dependencies
+  implementation("com.google.firebase:firebase-analytics")
+
+
+  // Add the dependencies for any other desired Firebase products
+  // https://firebase.google.com/docs/android/setup#available-libraries
+}
+si es groovy: plugins {
+  // ...
+
+  // Add the dependency for the Google services Gradle plugin
+  id 'com.google.gms.google-services' version '4.5.0' apply false
+
+}
+
+Luego, en el archivo build.gradle del módulo (nivel de la app), agrega el complemento google-services y cualquier SDK de Firebase que quieras usar en tu app:
+
+Archivo de Gradle del módulo (nivel de app) (<project>/<app-module>/build.gradle):
+
+plugins {
+  id 'com.android.application'
+
+  // Add the Google services Gradle plugin
+  id 'com.google.gms.google-services'
+
+  ...
+}
+
+dependencies {
+  // Import the Firebase BoM
+  implementation platform('com.google.firebase:firebase-bom:34.17.0')
+
+
+  // TODO: Add the dependencies for Firebase products you want to use
+  // When using the BoM, don't specify versions in Firebase dependencies
+  implementation 'com.google.firebase:firebase-analytics'
+
+
+  // Add the dependencies for any other desired Firebase products
+  // https://firebase.google.com/docs/android/setup#available-libraries
+}
+
+
+para la extencion
+
+
+Usar npm
+
+Usar una etiqueta <script>
+Si ya usas npm y un agrupador de módulos como Webpack o Rollup, puedes ejecutar el siguiente comando para instalar la versión más reciente del SDK (más información): npm install firebase
+Luego, inicializa Firebase y comienza a usar los SDK de los productos que quieres utilizar.
+
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+import { getAnalytics } from "firebase/analytics";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
+// For Firebase JS SDK v7.20.0 and later, measurementId is optional
+const firebaseConfig = {
+  apiKey: "AIzaSyAOEeuhliyVZrCGaqdzUytnBmMFQuhcY9Q",
+  authDomain: "antiprocrastinacion-26975.firebaseapp.com",
+  projectId: "antiprocrastinacion-26975",
+  storageBucket: "antiprocrastinacion-26975.firebasestorage.app",
+  messagingSenderId: "927134130052",
+  appId: "1:927134130052:web:b414696cdf9fa73ca5c7d1",
+  measurementId: "G-ZDW4D9CWCT"
+};
+
+// Initialize Firebase
+const app = initializeApp(firebaseConfig);
+const analytics = getAnalytics(app);
+Nota: Esta opción utiliza el SDK de JavaScript modular, que proporciona un tamaño reducido del SDK.
+
+Obtén más información sobre Firebase para la Web: primeros pasos, referencia de la API del SDK web y muestras
+
+Si no usas herramientas de compilación, utiliza esta opción para agregar y usar el SDK de Firebase JS. Utiliza esta opción a fin de comenzar, aunque no se recomienda para las apps en producción. Obtén más información.
+
+Copia y pega estas secuencias de comandos en la parte inferior de la etiqueta <body> antes de usar cualquier servicio de Firebase: <script type="module">
+  // Import the functions you need from the SDKs you need
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.17.1/firebase-analytics.js";
+  // TODO: Add SDKs for Firebase products that you want to use
+  // https://firebase.google.com/docs/web/setup#available-libraries
+
+  // Your web app's Firebase configuration
+  // For Firebase JS SDK v7.20.0 and later, measurementId is optional
+  const firebaseConfig = {
+    apiKey: "AIzaSyAOEeuhliyVZrCGaqdzUytnBmMFQuhcY9Q",
+    authDomain: "antiprocrastinacion-26975.firebaseapp.com",
+    projectId: "antiprocrastinacion-26975",
+    storageBucket: "antiprocrastinacion-26975.firebasestorage.app",
+    messagingSenderId: "927134130052",
+    appId: "1:927134130052:web:b414696cdf9fa73ca5c7d1",
+    measurementId: "G-ZDW4D9CWCT"
+  };
+
+  // Initialize Firebase
+  const app = initializeApp(firebaseConfig);
+  const analytics = getAnalytics(app);
+</script>
+
+npm install -g firebase-tools

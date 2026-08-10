@@ -1,10 +1,10 @@
 {
     "logs": [
         {
-            "outputFile": "com.antiprocrastinacion.lock.app-mergeDebugResources-45:/values-v30/values-v30.xml",
+            "outputFile": "com.antiprocrastinacion.lock.app-mergeDebugResources-60:/values-v30/values-v30.xml",
             "map": [
                 {
-                    "source": "C:\\Users\\USUARIO\\.gradle\\caches\\8.11.1\\transforms\\de8de35990547289319eedc5ed7ee1e0\\transformed\\material3-release\\res\\values-v30\\values-v30.xml",
+                    "source": "C:\\Users\\USUARIO\\.gradle\\caches\\8.11.1\\transforms\\d5fed5b0163e013256c147910f1c27d3\\transformed\\material3-release\\res\\values-v30\\values-v30.xml",
                     "from": {
                         "startLines": "2",
                         "startColumns": "4",

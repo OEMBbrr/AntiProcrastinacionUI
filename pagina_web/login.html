@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - AntiProcrastinación</title>
+    <style>
+        :root {
+            --zen-olive: #5A6E61;
+            --zen-sage: #8C9B90;
+            --zen-charcoal: #2C302E;
+            --zen-cream: #F9F8F6;
+            --zen-white: #FFFFFF;
+            --google-blue: #4285F4;
+            --google-green: #34A853;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--zen-cream);
+            color: var(--zen-charcoal);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--zen-white);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border: 1px solid rgba(140, 155, 144, 0.2);
+            width: 100%;
+            max-width: 440px;
+            padding: 36px 28px;
+            text-align: center;
+        }
+
+        .logo-img {
+            width: 72px;
+            height: 72px;
+            border-radius: 50%;
+            margin-bottom: 16px;
+            border: 2px solid var(--zen-sage);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            color: var(--zen-charcoal);
+        }
+
+        p.subtitle {
+            font-size: 13px;
+            color: var(--zen-sage);
+            margin-bottom: 28px;
+        }
+
+        .btn-google {
+            background-color: var(--google-blue);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            padding: 14px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 12px rgba(66, 133, 244, 0.25);
+        }
+
+        .btn-google:hover {
+            background-color: #3367D6;
+            transform: translateY(-1px);
+        }
+
+        .g-icon {
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .status-msg {
+            margin-top: 20px;
+            font-size: 13px;
+            min-height: 24px;
+            font-weight: 500;
+        }
+
+        .status-msg.success {
+            color: var(--google-green);
+        }
+
+        .status-msg.error {
+            color: #E53935;
+        }
+    </style>
+</head>
+<body>
+
+    <div class="login-card">
+        <img src="app_logo.jpg" alt="Logo" class="logo-img">
+        <h1>antiprocrastinación</h1>
+        <p class="subtitle">Iniciar Sesión con Google</p>
+
+        <button class="btn-google" id="btn-google-login">
+            <span class="g-icon">G</span> Iniciar Sesión con Google
+        </button>
+
+        <div class="status-msg" id="status-msg"></div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyBNw12V7mMCt76ZdP89NEYQwg_E2vshRto",
+            authDomain: "antiprocrastinacion-26975.firebaseapp.com",
+            databaseURL: "https://antiprocrastinacion-26975-default-rtdb.firebaseio.com",
+            projectId: "antiprocrastinacion-26975",
+            storageBucket: "antiprocrastinacion-26975.firebasestorage.app"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        document.getElementById('btn-google-login').addEventListener('click', () => {
+            const statusMsg = document.getElementById('status-msg');
+            statusMsg.textContent = "Abriendo Google Sign-In...";
+            statusMsg.className = "status-msg";
+
+            const provider = new firebase.auth.GoogleAuthProvider();
+
+            firebase.auth().signInWithPopup(provider)
+                .then(async (result) => {
+                    const user = result.user;
+                    const userEmail = user.email || "";
+                    const firebaseUid = user.uid;
+                    const cleanKey = userEmail.toLowerCase().trim().replace(/[^a-z0-9_@.-]/g, '_');
+
+                    statusMsg.textContent = `✅ ¡Sesión iniciada con éxito! Tu correo es: ${userEmail}`;
+                    statusMsg.className = "status-msg success";
+
+                    // Guardar en localStorage de la web
+                    localStorage.setItem('userEmail', userEmail);
+                    localStorage.setItem('firebaseUid', firebaseUid);
+                    localStorage.setItem('syncKey', cleanKey);
+                })
+                .catch((error) => {
+                    console.error("Error Web Popup:", error);
+                    statusMsg.textContent = "❌ " + (error.message || "Error al iniciar sesión.");
+                    statusMsg.className = "status-msg error";
+                });
+        });
+    </script>
+</body>
+</html>

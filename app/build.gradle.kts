@@ -13,8 +13,8 @@ android {
         applicationId = "com.antiprocrastinacion.lock"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "14.0.0"
+        versionCode = 24
+        versionName = "24.0.0"
     }
 
     buildTypes {
@@ -62,6 +62,9 @@ dependencies {
     implementation("androidx.credentials:credentials:1.3.0")
     implementation("androidx.credentials:credentials-play-services-auth:1.3.0")
     implementation("com.google.android.libraries.identity.googleid:googleid:1.1.1")
+
+    // V24 (Propuesta 4): biometría/PIN para proteger ajustes sensibles
+    implementation("androidx.biometric:biometric:1.1.0")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
 }

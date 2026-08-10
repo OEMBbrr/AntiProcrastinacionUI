@@ -1,16 +1,21 @@
 package com.antiprocrastinacion.lock
 
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.addCallback
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.*
 import androidx.credentials.CredentialManager
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.fragment.app.FragmentActivity
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.firebase.auth.FirebaseAuth
@@ -20,14 +25,23 @@ import com.antiprocrastinacion.lock.ui.screens.ZenScreen
 import com.antiprocrastinacion.lock.ui.theme.AntiProcrastinacionTheme
 import kotlinx.coroutines.launch
 
-class MainActivity : ComponentActivity() {
+// V24 (Propuesta 4): FragmentActivity para poder usar BiometricPrompt (biometría/PIN)
+class MainActivity : FragmentActivity() {
 
     private lateinit var lockManager: LockManager
     private var isLockedState by mutableStateOf(false)
     private var isTempUnlockedState by mutableStateOf(false)
+    private var darkTheme by mutableStateOf(false)
+    private var configVersion by mutableStateOf(0)
+    // V24 (Propuesta 2): solicitud de tregua entrante desde el PC (null = ninguna)
+    private var treguaRequest by mutableStateOf<String?>(null)
+    // V24: código 2FA que el PC solicita para el Bloqueo Cruzado (null = ninguno)
+    private var authCodeRequest by mutableStateOf<String?>(null)
 
-    // Web Client ID del google-services.json (client_type: 3)
-    private val webClientId = "927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com"
+    // Web Client ID del google-services.json (Encriptado en Runtime)
+    private val webClientId by lazy {
+        String(android.util.Base64.decode("OTI3MTM0MTMwMDUyLTNsbWVsdnZuZnVrMWRnOG83MXZvc2pka2Y4czhrM3A1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t", android.util.Base64.DEFAULT), Charsets.UTF_8).trim()
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -44,13 +58,48 @@ class MainActivity : ComponentActivity() {
 
         isLockedState = lockManager.isLocked
         isTempUnlockedState = lockManager.isTempUnlocked
+        darkTheme = lockManager.darkModeEnabled
 
-        if (isLockedState) {
-            LockMonitoringService.startService(this)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 101)
+            }
+        }
+
+        // V20: el servicio se arranca siempre (modo escucha) para recibir
+        // bloqueo cruzado desde la extensión de Chrome aunque la app esté
+        // en segundo plano o cerrada
+        LockMonitoringService.startService(this)
+
+        // V20: escuchar bloqueo cruzado desde la extensión de Chrome
+        lockManager.startLockStateListener { locked ->
+            isLockedState = lockManager.isLocked
+            isTempUnlockedState = lockManager.isTempUnlocked
+            if (locked) {
+                LockMonitoringService.startService(this)
+            } else {
+                finish()
+            }
+        }
+
+        // V20.2: escuchar cambios de configuración remotos (desde la extensión)
+        lockManager.startConfigListener { dark, _ ->
+            darkTheme = dark
+            configVersion++
+        }
+
+        // V24 (Propuesta 2): escuchar solicitudes de tregua desde la extensión de Chrome
+        lockManager.startTreguaRequestListener { reqId, _ ->
+            treguaRequest = reqId
+        }
+
+        // V24: escuchar el código 2FA que el PC solicita para el Bloqueo Cruzado
+        lockManager.startAuthRequestListener { _, code ->
+            authCodeRequest = code
         }
 
         setContent {
-            AntiProcrastinacionTheme {
+            AntiProcrastinacionTheme(darkTheme = darkTheme) {
                 var currentScreen by remember { mutableStateOf(if (isLockedState) "zen" else "config") }
                 val scope = rememberCoroutineScope()
 
@@ -62,6 +111,7 @@ class MainActivity : ComponentActivity() {
                     "config" -> {
                         ConfigScreen(
                             lockManager = lockManager,
+                            configVersion = configVersion,
                             onLockStarted = {
                                 isLockedState = true
                                 isTempUnlockedState = false
@@ -71,6 +121,11 @@ class MainActivity : ComponentActivity() {
                                 scope.launch {
                                     signInWithGoogle()
                                 }
+                            },
+                            darkTheme = darkTheme,
+                            onDarkThemeChange = { newValue ->
+                                darkTheme = newValue
+                                lockManager.darkModeEnabled = newValue
                             }
                         )
                     }
@@ -80,11 +135,49 @@ class MainActivity : ComponentActivity() {
                             onUnlocked = {
                                 isLockedState = false
                                 isTempUnlockedState = false
-                                LockMonitoringService.stopService(this@MainActivity)
+                                // V20: el servicio sigue en modo escucha para bloqueos cruzados
                                 finish()
                             }
                         )
                     }
+                }
+
+                // V24: diálogo con el código de verificación que el PC debe introducir
+                authCodeRequest?.let { code ->
+                    AlertDialog(
+                        onDismissRequest = { authCodeRequest = null },
+                        title = { Text("Código de verificación") },
+                        text = { Text("La extensión de Chrome solicita confirmación para el Bloqueo Cruzado.\n\nIntroduce este código en el PC:") },
+                        confirmButton = {
+                            Button(onClick = { authCodeRequest = null }) {
+                                Text(code, style = androidx.compose.ui.text.TextStyle(fontWeight = androidx.compose.ui.text.font.FontWeight.Bold))
+                            }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = { authCodeRequest = null }) { Text("Entendido") }
+                        }
+                    )
+                }
+
+                // V24 (Propuesta 2): diálogo de aprobación de tregua solicitada desde el PC
+                treguaRequest?.let { _ ->
+                    AlertDialog(
+                        onDismissRequest = { treguaRequest = null },
+                        title = { Text("Solicitud de tregua") },
+                        text = { Text("El PC solicita 5 minutos de tregua. ¿Aprobar desde este teléfono?") },
+                        confirmButton = {
+                            Button(onClick = {
+                                lockManager.respondTreguaRequest(true)
+                                treguaRequest = null
+                            }) { Text("Aprobar") }
+                        },
+                        dismissButton = {
+                            TextButton(onClick = {
+                                lockManager.respondTreguaRequest(false)
+                                treguaRequest = null
+                            }) { Text("Denegar") }
+                        }
+                    )
                 }
             }
         }
@@ -119,7 +212,12 @@ class MainActivity : ComponentActivity() {
             FirebaseAuth.getInstance().signInWithCredential(firebaseCredential)
                 .addOnCompleteListener(this) { task ->
                     if (task.isSuccessful) {
-                        Log.d("Auth", "Firebase sign-in exitoso: ${FirebaseAuth.getInstance().currentUser?.email}")
+                        val email = FirebaseAuth.getInstance().currentUser?.email ?: ""
+                        Log.d("Auth", "Firebase sign-in exitoso: $email")
+                        if (email.isNotEmpty()) {
+                            getSharedPreferences("anti_procrastinacion_prefs", MODE_PRIVATE)
+                                .edit().putString("google_user_email", email).apply()
+                        }
                         // Escribir perfil y arrancar listener de extensión
                         lockManager.pushUserProfile()
                         lockManager.pushDeviceHeartbeatToFirebase()
@@ -140,13 +238,40 @@ class MainActivity : ComponentActivity() {
         isLockedState = lockManager.isLocked
         isTempUnlockedState = lockManager.isTempUnlocked
         if (isLockedState) {
-            LockMonitoringService.startService(this)
+            enforceImmersiveLock()
         }
 
-        // Si ya hay sesión activa, arrancar listener y heartbeat
-        if (lockManager.firebaseUid != null) {
-            lockManager.startExtensionPingListener()
-            lockManager.pushDeviceHeartbeatToFirebase()
+        // Arrancar siempre el servicio (modo escucha), el latido y el listener
+        LockMonitoringService.startService(this)
+        lockManager.startExtensionPingListener()
+        lockManager.pushDeviceHeartbeatToFirebase()
+    }
+
+    override fun onWindowFocusChanged(hasFocus: Boolean) {
+        super.onWindowFocusChanged(hasFocus)
+        if (!hasFocus && lockManager.isLocked && !lockManager.isTempUnlocked) {
+            try {
+                @Suppress("DEPRECATION")
+                val closeDialogs = Intent(Intent.ACTION_CLOSE_SYSTEM_DIALOGS)
+                sendBroadcast(closeDialogs)
+            } catch (e: Exception) {
+                Log.w("ZEN_LOCK", "Acción ACTION_CLOSE_SYSTEM_DIALOGS omitida por restricciones del sistema: ${e.message}")
+            }
+            enforceImmersiveLock()
+        }
+    }
+
+    private fun enforceImmersiveLock() {
+        if (lockManager.isLocked && !lockManager.isTempUnlocked) {
+            @Suppress("DEPRECATION")
+            window.decorView.systemUiVisibility = (
+                android.view.View.SYSTEM_UI_FLAG_LAYOUT_STABLE
+                or android.view.View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+                or android.view.View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+                or android.view.View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+                or android.view.View.SYSTEM_UI_FLAG_FULLSCREEN
+                or android.view.View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY
+            )
         }
     }
 }

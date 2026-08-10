@@ -11,24 +11,44 @@
         <img src="app_logo.jpg" alt="Logo" class="logo-img">
         <h2>antiprocrastinación</h2>
         <span class="status-pill" id="status-pill">MODO LIBRE</span>
+        <span class="conn-dot" id="conn-dot" title="Estado de conexión con tu teléfono"></span>
     </div>
 
-    <!-- Account Sync Box with Google Sign-In -->
-    <div class="account-box">
-        <div class="account-header">
-            <span class="account-title">👤 Cuenta de Google</span>
-            <span class="sync-badge disconnected" id="sync-status-badge">🔴 Desvinculado</span>
+    <!-- V20.3: Menú de Perfil y Ajustes (Mi Cuenta / Ajustes) como las apps -->
+    <div class="account-box profile-menu-wrap">
+        <button class="profile-trigger" id="btn-profile-menu">
+            <span class="profile-avatar"><img src="emojis/account_icon.svg" alt="Perfil" class="menu-icon-white"></span>
+            <span class="profile-text" id="profile-title">Mi Cuenta</span>
+            <span class="profile-chevron">▾</span>
+        </button>
+        <div class="profile-dropdown hidden" id="profile-dropdown">
+            <button class="dropdown-item" data-open-modal="account-modal"><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</button>
+            <button class="dropdown-item" data-open-modal="settings-modal"><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</button>
         </div>
-        <div class="account-actions">
-            <button class="btn-google-login" id="btn-google-login">
-                <span class="google-icon">G</span> Iniciar Sesión con Google
-            </button>
+    </div>
+
+    <!-- Notes Panel Sincronizado -->
+    <div class="notes-box hidden" id="notes-box">
+        <div class="notes-header">
+            <span>📝 Apuntes Sincronizados</span>
+        </div>
+        <div class="notes-input-row">
+            <input type="text" id="note-input" placeholder="Anota una idea o tarea rápida...">
+            <button id="btn-add-note">Guardar</button>
+        </div>
+        <div class="notes-sync-hint hidden" id="notes-sync-hint">⚠️ Sin sincronizar con la nube.</div>
+        <div class="notes-list" id="notes-list">
+            <!-- Dynamic notes injected here -->
         </div>
     </div>
 
     <div class="timer-box">
         <span class="timer-digits" id="timer-text">00:10:00</span>
         <span class="timer-label">Tiempo de Enfoque Restante</span>
+        <!-- V24: banner de descanso DESCANSOS (tregua libre) -->
+        <div class="hidden pomodoro-rest-banner" id="pomodoro-rest-banner">
+            ⏱️ DESCANSO - Tregua libre activa
+        </div>
 
         <!-- Stepper de Horas y Minutos idéntico a Android -->
         <div class="time-picker-zen" id="setup-controls">
@@ -47,6 +67,34 @@
                     <button class="btn-step" id="btn-mins-minus">-</button>
                     <span class="step-num" id="mins-text">10</span>
                     <button class="btn-step" id="btn-mins-plus">+</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- V24: Configuración DESCANSOS en la pantalla de inicio del enfoque -->
+        <div class="hidden" id="pomodoro-setup">
+            <div class="pomodoro-setup-header" id="pomodoro-setup-toggle">
+                <span class="pomodoro-setup-title"><img src="emojis/timer_icon.svg" alt="" class="menu-icon"> DESCANSOS</span>
+                <span class="pomodoro-setup-arrow" id="pomodoro-setup-arrow">▾</span>
+            </div>
+            <div id="pomodoro-setup-body">
+                <div class="pomodoro-hint" id="pomodoro-setup-warning"></div>
+                <div class="hidden" id="pomodoro-setup-config">
+                    <div class="setting-row">
+                        <span class="setting-label">Descansos: <b id="pomodoro-restcount-text">1</b></span>
+                        <div class="pomodoro-stepper">
+                            <button class="btn-step" id="pomodoro-restcount-minus">-</button>
+                            <button class="btn-step" id="pomodoro-restcount-plus">+</button>
+                        </div>
+                    </div>
+                    <div class="setting-row">
+                        <span class="setting-label">Descanso (máx <span id="pomodoro-rest-max">30</span>): <b id="pomodoro-rest-setup-text">5 min</b></span>
+                        <div class="pomodoro-stepper">
+                            <button class="btn-step" id="pomodoro-rest-setup-minus">-</button>
+                            <button class="btn-step" id="pomodoro-rest-setup-plus">+</button>
+                        </div>
+                    </div>
+                    <div class="pomodoro-preview" id="pomodoro-setup-preview"></div>
                 </div>
             </div>
         </div>
@@ -82,7 +130,7 @@
         <div class="modal-card">
             <h4>Verificación de Finalización (150 palabras)</h4>
             <p>Escribe el texto exacto para finalizar el enfoque antes de tiempo (<strong>Pegado desactivado por seguridad</strong>):</p>
-            <div class="modal-text" id="phrase-target-text" oncopy="return false;" oncontextmenu="return false;"></div>
+            <div class="modal-text" id="phrase-target-text" draggable="false" onselectstart="return false;" ondragstart="return false;" oncopy="return false;" oncut="return false;" oncontextmenu="return false;"></div>
             <textarea id="phrase-input" placeholder="Comienza a escribir aquí..." onpaste="return false;" oncopy="return false;" oncontextmenu="return false;"></textarea>
             <div class="modal-actions">
                 <button class="btn-sm btn-cancel" id="btn-close-phrase">Cancelar</button>
@@ -97,10 +145,77 @@
             <h4>Desafío de Tregua (5 Minutos)</h4>
             <p>Resuelve la siguiente operación matemática para obtener 5 minutos de acceso:</p>
             <div class="modal-text" id="math-problem-text"></div>
-            <textarea id="math-input" placeholder="Respuesta numérica..."></textarea>
+            <!-- V24 (Propuesta 2): estado de tregua verificada por el 2º dispositivo -->
+            <div class="tregua-pending hidden" id="tregua-pending">📱 Confirmación enviada a tu teléfono. Esperando aprobación...</div>
+            <div id="math-challenge">
+                <textarea id="math-input" placeholder="Respuesta numérica..."></textarea>
+                <div class="modal-actions">
+                    <button class="btn-sm btn-cancel" id="btn-close-math">Cancelar</button>
+                    <button class="btn-sm btn-confirm" id="btn-verify-math">Activar Tregua</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- V20.3: Modal Mi Cuenta (iniciar sesión con Google / notas) -->
+    <div class="modal-overlay hidden" id="account-modal">
+        <div class="modal-card">
+            <h4><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</h4>
+            <button class="btn-google-login" id="btn-google-login">
+                <span class="google-icon">G</span> Iniciar Sesión con Google
+            </button>
+            <button class="btn-notes-toggle" id="btn-notes-toggle" style="width:100%; margin-top:8px; justify-content:center;">
+                <img src="emojis/memo_3d.png" style="width:16px;height:16px;vertical-align:middle;filter:drop-shadow(0 2px 4px rgba(0,0,0,0.15));"> Mis Notas
+            </button>
             <div class="modal-actions">
-                <button class="btn-sm btn-cancel" id="btn-close-math">Cancelar</button>
-                <button class="btn-sm btn-confirm" id="btn-verify-math">Activar Tregua</button>
+                <button class="btn-sm btn-cancel" data-close-modal="account-modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V20.3: Modal Ajustes (Modo Oscuro + Bloqueo Cruzado) -->
+    <div class="modal-overlay hidden" id="settings-modal">
+        <div class="modal-card">
+            <h4><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</h4>
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/dark_mode_icon.svg" alt="" class="menu-icon"> Modo Oscuro</span>
+                <label class="zen-switch setting-switch">
+                    <input type="checkbox" id="dark-mode-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/sync_icon.svg" alt="" class="menu-icon"> Bloqueo Cruzado</span>
+                <label class="zen-switch setting-switch">
+                    <input type="checkbox" id="cross-lock-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <!-- V24 (Propuesta 1): Descansos (se configura en el inicio del enfoque) -->
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/timer_icon.svg" alt="" class="menu-icon"> Descansos</span>
+                <label class="zen-switch setting-switch">
+                    <input type="checkbox" id="pomodoro-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" data-close-modal="settings-modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V24: Modal de verificación 2FA del Bloqueo Cruzado (código que llega por notificación al teléfono) -->
+    <div class="modal-overlay hidden" id="auth-code-modal">
+        <div class="modal-card">
+            <h4><img src="emojis/sync_icon.svg" alt="" class="menu-icon"> Confirmar Bloqueo Cruzado</h4>
+            <p>Se ha enviado un código de verificación a la notificación de tu teléfono. Escríbelo aquí para continuar:</p>
+            <div class="auth-pending hidden" id="auth-pending">📱 Revisa la notificación de AntiProcrastinación en tu teléfono...</div>
+            <input type="text" id="auth-code-input" maxlength="4" inputmode="numeric" placeholder="0000">
+            <div class="auth-error hidden" id="auth-error">Código incorrecto o expirado. Intenta de nuevo.</div>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" id="btn-cancel-auth">Cancelar</button>
+                <button class="btn-sm btn-confirm" id="btn-confirm-auth">Verificar y Confirmar</button>
             </div>
         </div>
     </div>

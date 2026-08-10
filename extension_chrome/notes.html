@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <title>Notas - AntiProcrastinación</title>
+    <link rel="stylesheet" href="notes.css">
+</head>
+<body>
+
+    <div class="app-container">
+        <!-- Header Workspace -->
+        <header class="workspace-header">
+            <div class="brand">
+                <img src="app_logo.jpg" alt="Logo" class="logo">
+                <div>
+                    <h1><img src="emojis/memo_3d.png" alt="Notas" class="emoji-3d-lg"> Bloc de Notas</h1>
+                    <p class="subtitle">Sincronizado en tiempo real con tu Cuenta de Google</p>
+                </div>
+            </div>
+            
+            <div class="header-controls">
+                <!-- Control de Tamaño de Texto -->
+                <div class="font-size-control">
+                    <span class="ctrl-label">Tamaño de Texto:</span>
+                    <button class="btn-font-size" id="btn-font-sub" title="Disminuir texto">A-</button>
+                    <span class="font-size-value" id="font-size-display">14px</span>
+                    <button class="btn-font-size" id="btn-font-add" title="Aumentar texto">A+</button>
+                </div>
+
+                <div class="profile-menu-wrap">
+                    <button class="profile-trigger" id="btn-profile-menu">
+                        <span class="profile-avatar"><img src="emojis/account_icon.svg" alt="Perfil" class="menu-icon-white"></span>
+                        <span class="profile-text" id="user-email-text">Cargando cuenta...</span>
+                        <span class="profile-chevron">▾</span>
+                    </button>
+                    <div class="profile-dropdown hidden" id="profile-dropdown">
+                        <button class="dropdown-item" data-open-modal="account-modal"><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</button>
+                        <button class="dropdown-item" data-open-modal="settings-modal"><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Banner Motivacional e Invitación a Anotar Ideas con Emoji 3D -->
+        <div class="reflection-banner">
+            <img src="emojis/sparkles_3d.png" alt="Reflexión" class="emoji-3d">
+            <span class="reflection-text" id="reflection-text">Tu mente es para tener ideas, no para guardarlas. Anótalas aquí para liberar tu concentración.</span>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="workspace-main">
+            <!-- Sidebar / Creator Section -->
+            <section class="editor-section">
+                <div class="card">
+                    <h2><img src="emojis/memo_3d.png" alt="Nueva Nota" class="emoji-3d"> Nueva Nota de Enfoque</h2>
+                    
+                    <div class="form-group">
+                        <label>Categoría</label>
+                        <div class="category-selector">
+                            <button class="cat-chip active" data-cat="general"><img src="emojis/light_bulb_3d.png" class="emoji-3d-sm"> General</button>
+                            <button class="cat-chip" data-cat="tarea"><img src="emojis/pushpin_3d.png" class="emoji-3d-sm"> Tarea</button>
+                            <button class="cat-chip" data-cat="idea"><img src="emojis/rocket_3d.png" class="emoji-3d-sm"> Idea</button>
+                            <button class="cat-chip" data-cat="reflexion"><img src="emojis/brain_3d.png" class="emoji-3d-sm"> Reflexión</button>
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Contenido de la Nota</label>
+                        <textarea id="note-text-input" placeholder="Escribe aquí cualquier pensamiento, idea o pendiente para liberar tu mente..."></textarea>
+                    </div>
+
+                    <button class="btn-save-note" id="btn-save-note"><img src="emojis/sparkles_3d.png" class="emoji-3d-sm"> Guardar Nota</button>
+
+                    <div class="save-status" id="save-status"></div>
+                </div>
+            </section>
+
+            <!-- Notes List Section -->
+            <section class="notes-feed-section">
+                <div class="feed-header">
+                    <div class="search-box">
+                        <input type="text" id="search-input" placeholder="🔍 Buscar notas por texto...">
+                    </div>
+                    <div class="filter-chips">
+                        <button class="filter-chip active" data-filter="all">Todas</button>
+                        <button class="filter-chip" data-filter="general"><img src="emojis/light_bulb_3d.png" class="emoji-3d-sm"> General</button>
+                        <button class="filter-chip" data-filter="tarea"><img src="emojis/pushpin_3d.png" class="emoji-3d-sm"> Tareas</button>
+                        <button class="filter-chip" data-filter="idea"><img src="emojis/rocket_3d.png" class="emoji-3d-sm"> Ideas</button>
+                        <button class="filter-chip" data-filter="reflexion"><img src="emojis/brain_3d.png" class="emoji-3d-sm"> Reflexiones</button>
+                    </div>
+                </div>
+
+                <div class="notes-grid" id="notes-grid">
+                    <!-- Dynamic Notes Loaded Here -->
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- V23: Modal Mi Cuenta -->
+    <div class="modal-overlay hidden" id="account-modal">
+        <div class="modal-card">
+            <h4><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</h4>
+            <p class="modal-sub">La misma cuenta de Google sincroniza la app Android, el popup y este bloc de notas.</p>
+            <button class="btn-google-login" id="btn-google-login">
+                <span class="google-icon">G</span> Iniciar Sesión con Google
+            </button>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" data-close-modal="account-modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- V23: Modal Ajustes (Modo Oscuro + Bloqueo Cruzado, sincronizados) -->
+    <div class="modal-overlay hidden" id="settings-modal">
+        <div class="modal-card">
+            <h4><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</h4>
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/dark_mode_icon.svg" alt="" class="menu-icon"> Modo Oscuro</span>
+                <label class="zen-switch setting-switch">
+                    <input type="checkbox" id="dark-mode-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/sync_icon.svg" alt="" class="menu-icon"> Bloqueo Cruzado</span>
+                <label class="zen-switch setting-switch">
+                    <input type="checkbox" id="cross-lock-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" data-close-modal="settings-modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="notes.js"></script>
+</body>
+</html>

@@ -8,8 +8,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
@@ -18,8 +20,12 @@ import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.DarkMode
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Sync
 import androidx.compose.ui.window.Dialog
 import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material3.*
@@ -34,25 +40,48 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.biometric.BiometricManager
+import androidx.biometric.BiometricPrompt
+import androidx.core.content.ContextCompat
 import com.antiprocrastinacion.lock.AppInfo
 import com.antiprocrastinacion.lock.LauncherUtils
 import com.antiprocrastinacion.lock.LockManager
 import com.antiprocrastinacion.lock.ui.theme.*
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeoutOrNull
+import java.util.concurrent.Executor
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ConfigScreen(
     lockManager: LockManager,
     onLockStarted: () -> Unit,
-    onGoogleSignIn: () -> Unit = {}
+    onGoogleSignIn: () -> Unit = {},
+    darkTheme: Boolean = false,
+    onDarkThemeChange: (Boolean) -> Unit = {},
+    configVersion: Int = 0
 ) {
     val context = LocalContext.current
     
     // Selectores de tiempo personalizados (horas y minutos)
     var hours by remember { mutableIntStateOf(0) }
     var minutes by remember { mutableIntStateOf(10) } // 10 minutos por defecto
+    
+    // V24 (Propuesta 1): Ajustes Pomodoro sincronizados
+    var pomodoroEnabled by remember { mutableStateOf(false) }
+    var pomodoroWorkMinutes by remember { mutableIntStateOf(25) }
+    var pomodoroRestMinutes by remember { mutableIntStateOf(5) }
+    var pomodoroRestCount by remember { mutableIntStateOf(1) }
+    // Cargar desde prefs al iniciar
+    LaunchedEffect(Unit) {
+        pomodoroEnabled = lockManager.pomodoroEnabled
+        pomodoroWorkMinutes = lockManager.pomodoroWorkMinutes
+        pomodoroRestMinutes = lockManager.pomodoroRestMinutes
+        pomodoroRestCount = lockManager.pomodoroRestCount
+    }
     
     // Estados de permisos
     var hasUsageStats by remember { mutableStateOf(LauncherUtils.hasUsageStatsPermission(context)) }
@@ -64,6 +93,59 @@ fun ConfigScreen(
     
     // Mensaje de advertencia si intenta seleccionar más de 4
     var showAppLimitWarning by remember { mutableStateOf(false) }
+
+    // V20: estado local del toggle de bloqueo cruzado (para recomponer la UI)
+    var crossDeviceLockEnabled by remember { mutableStateOf(lockManager.crossDeviceLockEnabled) }
+
+    // V20.2: si la configuración cambió desde la extensión (modo oscuro/bloqueo cruzado),
+    // refrescar el estado local para reflejar el valor remoto en la UI
+    LaunchedEffect(configVersion) {
+        crossDeviceLockEnabled = lockManager.crossDeviceLockEnabled
+        // V24 (Propuesta 1): refrescar ajustes Pomodoro llegados desde la extensión
+        pomodoroEnabled = lockManager.pomodoroEnabled
+        pomodoroWorkMinutes = lockManager.pomodoroWorkMinutes
+        pomodoroRestMinutes = lockManager.pomodoroRestMinutes
+        pomodoroRestCount = lockManager.pomodoroRestCount
+    }
+
+    // V24 (Propuesta 5): proteger TODOS los ajustes durante sesión activa (local o remota)
+    // usando biometría o PIN del dispositivo.
+    fun requireBiometricAuth(onSuccess: () -> Unit) {
+        val fragmentActivity = context as? androidx.fragment.app.FragmentActivity ?: return
+        val executor: Executor = ContextCompat.getMainExecutor(fragmentActivity)
+        val prompt = BiometricPrompt(
+            fragmentActivity,
+            executor,
+            object : BiometricPrompt.AuthenticationCallback() {
+                override fun onAuthenticationSucceeded(result: BiometricPrompt.AuthenticationResult) {
+                    super.onAuthenticationSucceeded(result)
+                    onSuccess()
+                }
+                override fun onAuthenticationError(errorCode: Int, errString: CharSequence) {
+                    super.onAuthenticationError(errorCode, errString)
+                    android.util.Log.w("ZEN_SECURITY", "Autenticación cancelada/fallida: $errString")
+                }
+            }
+        )
+        val promptInfo = BiometricPrompt.PromptInfo.Builder()
+            .setTitle("Confirmar seguridad")
+            .setSubtitle("Verifica tu identidad (biometría o PIN) para modificar ajustes durante el enfoque")
+            .setAllowedAuthenticators(
+                BiometricManager.Authenticators.BIOMETRIC_STRONG or
+                BiometricManager.Authenticators.DEVICE_CREDENTIAL
+            )
+            .build()
+        prompt.authenticate(promptInfo)
+    }
+
+    // Helper: ejecutar acción con biometría si hay sesión activa, sino directa
+    fun executeWithAuthIfNeeded(action: () -> Unit) {
+        if (lockManager.isFocusSessionActive) {
+            requireBiometricAuth(action)
+        } else {
+            action()
+        }
+    }
 
     // Carga de aplicaciones instaladas en hilo de background
     LaunchedEffect(Unit) {
@@ -89,11 +171,17 @@ fun ConfigScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .padding(24.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             var showSyncModal by remember { mutableStateOf(false) }
+            var showSettingsModal by remember { mutableStateOf(false) }
+            var showAccountMenu by remember { mutableStateOf(false) }
+            val syncTestScope = rememberCoroutineScope()
+            var isTestingSync by remember { mutableStateOf(false) }
+            var syncTestResult by remember { mutableStateOf<String?>(null) }
 
             // Dialogo Modal de Sincronización de Cuenta Estilo Web Pro
             if (showSyncModal) {
@@ -136,8 +224,8 @@ fun ConfigScreen(
                                         )
                                     }
                                     Text(
-                                        text = "Cuenta & Sincronización",
-                                        fontSize = 16.sp,
+                                        text = "Mi Cuenta",
+                                        fontSize = 17.sp,
                                         fontWeight = FontWeight.Bold,
                                         color = ZenCharcoal
                                     )
@@ -147,7 +235,7 @@ fun ConfigScreen(
                                 }
                             }
 
-                            Divider(color = ZenSage.copy(alpha = 0.15f))
+                            HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
 
                             // CÓDIGO ÚNICO DEL TELÉFONO
                             Column(
@@ -185,7 +273,9 @@ fun ConfigScreen(
 
                             // BOTÓN DE INICIO DE SESIÓN CON GOOGLE
                             val currentEmail = lockManager.googleUserEmail
-                            val isSignedIn = lockManager.firebaseUid != null
+                            // V24 (Bug 4): solo se considera "sesión activa" con cuenta de
+                            // Google real (la auth anónima es solo respaldo para RTDB)
+                            val isSignedIn = lockManager.isGoogleSignedIn
                             
                             Button(
                                 onClick = {
@@ -214,6 +304,91 @@ fun ConfigScreen(
                                     )
                                 }
                             }
+                            
+                            // BOTÓN DE PRUEBA DE CONEXIÓN (LAN + NUBE + EXTENSIÓN)
+                            Button(
+                                onClick = {
+                                    isTestingSync = true
+                                    syncTestResult = null
+                                    syncTestScope.launch {
+                                        val lanActive = lockManager.lanServer.isLanActive
+                                        val heartbeatDone = CompletableDeferred<Boolean>()
+                                        lockManager.pushDeviceHeartbeatToFirebase { extConnected ->
+                                            heartbeatDone.complete(extConnected)
+                                        }
+                                        // Timeout de 8s: si Firebase no responde, no dejar el botón colgado
+                                        val extConnected = withTimeoutOrNull(8000) {
+                                            heartbeatDone.await()
+                                        }
+                                        isTestingSync = false
+                                        syncTestResult = buildString {
+                                            append(if (lanActive) "✅ LAN local: ACTIVA (Wi-Fi)" else "❌ LAN local: sin dispositivo")
+                                            append("\n")
+                                            if (extConnected == null) {
+                                                append("⚠️ Nube Firebase: sin respuesta en 8s (revisa el internet del teléfono)")
+                                            } else {
+                                                append(if (extConnected) "✅ Extensión Chrome: CONECTADA" else "❌ Extensión Chrome: sin ping reciente")
+                                            }
+                                        }
+                                    }
+                                },
+                                enabled = !isTestingSync,
+                                colors = ButtonDefaults.buttonColors(
+                                    containerColor = ZenSage,
+                                    disabledContainerColor = ZenSage.copy(alpha = 0.4f)
+                                ),
+                                shape = RoundedCornerShape(12.dp),
+                                modifier = Modifier.fillMaxWidth().height(44.dp),
+                                elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                            ) {
+                                Text(
+                                    text = if (isTestingSync) "Probando conexión..." else "🔍 Probar Conexión",
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                            }
+
+                            if (syncTestResult != null) {
+                                Text(
+                                    text = syncTestResult.orEmpty(),
+                                    fontSize = 11.sp,
+                                    color = ZenCharcoal,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .background(CreamBackground, RoundedCornerShape(10.dp))
+                                        .padding(10.dp)
+                                )
+                            }
+
+                            // VINCULACIÓN DE CLAVE O CORREO
+                            var manualKeyInput by remember { mutableStateOf(lockManager.userSyncKey) }
+                            OutlinedTextField(
+                                value = manualKeyInput,
+                                onValueChange = { manualKeyInput = it },
+                                label = { Text("Clave o Correo de Sincronización", fontSize = 11.sp) },
+                                modifier = Modifier.fillMaxWidth(),
+                                shape = RoundedCornerShape(12.dp),
+                                singleLine = true,
+                                trailingIcon = {
+                                    Button(
+                                        onClick = {
+                                            if (manualKeyInput.isNotBlank()) {
+                                                lockManager.userSyncKey = manualKeyInput.trim()
+                                                lockManager.pushDeviceHeartbeatToFirebase()
+                                                lockManager.startExtensionPingListener()
+                                                lockManager.startLockStateListener()
+                                            }
+                                        },
+                                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp),
+                                        shape = RoundedCornerShape(8.dp),
+                                        colors = ButtonDefaults.buttonColors(containerColor = ZenOlive)
+                                    ) {
+                                        Text("Guardar", fontSize = 10.sp, color = Color.White)
+                                    }
+                                }
+                            )
 
                             // VINCULACIÓN: mostrar UID de Firebase si está autenticado
                             if (isSignedIn) {
@@ -246,18 +421,7 @@ fun ConfigScreen(
                 }
             }
 
-            // Indicador de Conexión en la esquina superior izquierda (ROJO por defecto hasta verificar apretón de manos real)
-            var isConnected by remember { mutableStateOf(lockManager.isExtensionConnected) }
-            
-            // Enviar latido (heartbeat) a Firebase y comprobar si la extensión está activa
-            LaunchedEffect(Unit) {
-                while(true) {
-                    lockManager.pushDeviceHeartbeatToFirebase { active ->
-                        isConnected = active
-                    }
-                    kotlinx.coroutines.delay(3000)
-                }
-            }
+            var showNotesModal by remember { mutableStateOf(false) }
 
             // Cabecera Minimalista
             Box(
@@ -265,47 +429,295 @@ fun ConfigScreen(
                     .fillMaxWidth()
                     .padding(top = 4.dp)
             ) {
-                // Punto de Conexión Verde/Rojo en la esquina superior izquierda
+                // Botón de NOTAS ZEN en la esquina superior izquierda
                 Box(
                     modifier = Modifier.align(Alignment.TopStart)
                 ) {
                     Surface(
-                        onClick = { showSyncModal = true },
-                        shape = CircleShape,
-                        color = if (isConnected) Color(0xFFDCFCE7) else Color(0xFFFEE2E2),
-                        border = BorderStroke(1.dp, if (isConnected) Color(0xFF22C55E) else Color(0xFFEF4444)),
-                        modifier = Modifier.size(42.dp)
+                        onClick = { showNotesModal = true },
+                        shape = RoundedCornerShape(16.dp),
+                        color = ZenSoftBlue,
+                        border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f)),
+                        modifier = Modifier.height(36.dp)
                     ) {
-                        Box(contentAlignment = Alignment.Center) {
-                            Box(
-                                modifier = Modifier
-                                    .size(12.dp)
-                                    .clip(CircleShape)
-                                    .background(if (isConnected) Color(0xFF22C55E) else Color(0xFFEF4444))
+                        Row(
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(6.dp)
+                        ) {
+                            Text(text = "📝", fontSize = 14.sp)
+                            Text(
+                                text = "Notas",
+                                fontSize = 12.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = ZenOlive
                             )
                         }
                     }
                 }
 
-                // Icono de Cuenta en la esquina superior derecha
+                // Dialogo Modal de Notas Zen Sincronizadas
+                if (showNotesModal) {
+                    ZenNotesModal(
+                        lockManager = lockManager,
+                        onDismiss = { showNotesModal = false }
+                    )
+                }
+
+                // Dialogo Modal de Ajustes (Modo Oscuro & Bloqueo Cruzado)
+                if (showSettingsModal) {
+                    Dialog(onDismissRequest = { showSettingsModal = false }) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            shape = RoundedCornerShape(24.dp),
+                            colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                            border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier
+                                    .padding(20.dp)
+                                    .verticalScroll(rememberScrollState()),
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                verticalArrangement = Arrangement.spacedBy(16.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                    ) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(36.dp)
+                                                .clip(CircleShape)
+                                                .background(ZenOlive.copy(alpha = 0.12f)),
+                                            contentAlignment = Alignment.Center
+                                        ) {
+                                            Icon(
+                                                imageVector = Icons.Default.Settings,
+                                                contentDescription = null,
+                                                tint = ZenOlive,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                        }
+                                        Column {
+                                            Text(
+                                                text = "Ajustes",
+                                                fontSize = 17.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ZenCharcoal
+                                            )
+                                            Text(
+                                                text = "Personalización de la aplicación",
+                                                fontSize = 11.sp,
+                                                color = ZenSage
+                                            )
+                                        }
+                                    }
+                                    IconButton(onClick = { showSettingsModal = false }) {
+                                        Icon(imageVector = Icons.Default.Close, contentDescription = "Cerrar", tint = ZenSage)
+                                    }
+                                }
+
+                                HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+
+                                // Toggle Modo Oscuro
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.DarkMode, contentDescription = null, tint = ZenOlive)
+                                        Column {
+                                            Text(
+                                                text = "Modo Oscuro",
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = ZenCharcoal)
+                                            )
+                                            Text(
+                                                text = if (darkTheme) "Oscuro" else "Claro",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                                color = ZenSage
+                                            )
+                                        }
+                                    }
+                                    Switch(
+                                        checked = darkTheme,
+                                        onCheckedChange = { newValue ->
+                                            executeWithAuthIfNeeded {
+                                                onDarkThemeChange(newValue)
+                                            }
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedTrackColor = ZenOlive,
+                                            uncheckedTrackColor = ZenSage.copy(alpha = 0.3f),
+                                            checkedThumbColor = ZenWhite
+                                        )
+                                    )
+                                }
+
+                                HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+
+                                // Toggle Bloqueo Cruzado
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Sync, contentDescription = null, tint = ZenOlive)
+                                        Column {
+                                            Text(
+                                                text = "Bloqueo Cruzado",
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = ZenCharcoal)
+                                            )
+                                            Text(
+                                                text = "Sincroniza el bloqueo en tiempo real entre PC y teléfono.",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                                color = ZenSage
+                                            )
+                                        }
+                                    }
+                                    Switch(
+                                        checked = crossDeviceLockEnabled,
+                                        onCheckedChange = { newValue ->
+                                            requireBiometricAuth {
+                                                crossDeviceLockEnabled = newValue
+                                                lockManager.crossDeviceLockEnabled = newValue
+                                            }
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedTrackColor = ZenOlive,
+                                            uncheckedTrackColor = ZenSage.copy(alpha = 0.3f),
+                                            checkedThumbColor = ZenWhite
+                                        )
+                                    )
+                                }
+
+                                HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+
+                                // V24 (Propuesta 1): Pomodoro sincronizado (trabajo/descanso)
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.SpaceBetween
+                                ) {
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                        modifier = Modifier.weight(1f)
+                                    ) {
+                                        Icon(Icons.Default.Timer, contentDescription = null, tint = ZenOlive)
+                                        Column {
+                                            Text(
+                                                text = "Descansos",
+                                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = ZenCharcoal)
+                                            )
+                                            Text(
+                                                text = "Configura ciclos de trabajo y descansos.",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                                color = ZenSage
+                                            )
+                                        }
+                                    }
+                                    Switch(
+                                        checked = pomodoroEnabled,
+                                        onCheckedChange = { newValue ->
+                                            executeWithAuthIfNeeded {
+                                                pomodoroEnabled = newValue
+                                                lockManager.pomodoroEnabled = newValue
+                                            }
+                                        },
+                                        colors = SwitchDefaults.colors(
+                                            checkedTrackColor = ZenOlive,
+                                            uncheckedTrackColor = ZenSage.copy(alpha = 0.3f),
+                                            checkedThumbColor = ZenWhite
+                                        )
+                                    )
+                                }
+
+                                // Selectores de duración Pomodoro (trabajo y descanso) se configuran
+                                // en la pantalla de inicio del enfoque (no aquí).
+                            }
+                        }
+                    }
+                }
+
+                // Menú desplegable de Perfil y Ajustes en la esquina superior derecha
                 Box(
                     modifier = Modifier.align(Alignment.TopEnd)
                 ) {
                     Surface(
-                        onClick = { showSyncModal = true },
+                        onClick = { showAccountMenu = true },
                         shape = CircleShape,
                         color = ZenOlive.copy(alpha = 0.12f),
                         border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f)),
-                        modifier = Modifier.size(42.dp)
+                        modifier = Modifier.size(44.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
                             Icon(
                                 imageVector = Icons.Default.Person,
-                                contentDescription = "Vinculación",
+                                contentDescription = "Menú de Perfil y Ajustes",
                                 tint = ZenOlive,
-                                modifier = Modifier.size(22.dp)
+                                modifier = Modifier.size(24.dp)
                             )
                         }
+                    }
+
+                    DropdownMenu(
+                        expanded = showAccountMenu,
+                        onDismissRequest = { showAccountMenu = false },
+                        modifier = Modifier
+                            .background(ZenWhite)
+                            .border(1.dp, ZenSage.copy(alpha = 0.2f), RoundedCornerShape(12.dp))
+                    ) {
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Person, contentDescription = null, tint = ZenOlive, modifier = Modifier.size(18.dp))
+                                    Text("Mi Cuenta", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = ZenCharcoal)
+                                }
+                            },
+                            onClick = {
+                                showAccountMenu = false
+                                showSyncModal = true
+                            }
+                        )
+
+                        HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+
+                        DropdownMenuItem(
+                            text = {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.Settings, contentDescription = null, tint = ZenOlive, modifier = Modifier.size(18.dp))
+                                    Text("Ajustes", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = ZenCharcoal)
+                                }
+                            },
+                            onClick = {
+                                showAccountMenu = false
+                                showSettingsModal = true
+                            }
+                        )
                     }
                 }
 
@@ -354,7 +766,7 @@ fun ConfigScreen(
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = Color(0xFFFDF5F2)),
+                        colors = CardDefaults.cardColors(containerColor = ZenSoftCoral),
                         border = BorderStroke(1.dp, ZenCoral.copy(alpha = 0.4f)),
                         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
                     ) {
@@ -408,7 +820,7 @@ fun ConfigScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
-                    colors = CardDefaults.cardColors(containerColor = Color(0xFFF0F4F8)),
+                    colors = CardDefaults.cardColors(containerColor = ZenSoftBlue),
                     border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.3f)),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
                 ) {
@@ -443,6 +855,8 @@ fun ConfigScreen(
                         }
                     }
                 }
+
+
 
                 // Selector de tiempo estilo Reloj (Horas y Minutos)
                 Column(
@@ -536,6 +950,177 @@ fun ConfigScreen(
                                         colors = IconButtonDefaults.iconButtonColors(contentColor = ZenCharcoal)
                                     ) {
                                         Icon(Icons.Default.Add, contentDescription = "Subir minuto")
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+
+                // V24: Configuración Pomodoro en la pantalla de inicio del enfoque
+                if (pomodoroEnabled) {
+                    val focusTotalMinutes = hours * 60 + minutes
+                    val (pomodoroMaxRest, pomodoroMaxRestCount) = lockManager.computePomodoroLimits(focusTotalMinutes, pomodoroRestCount, pomodoroRestMinutes)
+                    var showPomodoroConfig by remember { mutableStateOf(true) }
+
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(16.dp),
+                        colors = CardDefaults.cardColors(containerColor = ZenSoftGreen),
+                        border = BorderStroke(1.dp, ZenGreen.copy(alpha = 0.35f)),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(14.dp)) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .clickable { showPomodoroConfig = !showPomodoroConfig },
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.weight(1f)
+                                ) {
+                                    Icon(Icons.Default.Timer, contentDescription = null, tint = ZenGreen)
+                                    Column {
+                                        Text(
+                                            text = "DESCANSOS",
+                                            style = MaterialTheme.typography.labelLarge,
+                                            color = ZenGreen,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "Comparte ciclos de trabajo y descanso con la extensión.",
+                                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                            color = ZenSage
+                                        )
+                                    }
+                                }
+                                Icon(
+                                    imageVector = if (showPomodoroConfig) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                                    contentDescription = null,
+                                    tint = ZenGreen
+                                )
+                            }
+
+                            if (showPomodoroConfig) {
+                                Spacer(modifier = Modifier.height(10.dp))
+                                HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+                                Spacer(modifier = Modifier.height(10.dp))
+
+                                if (focusTotalMinutes < 10) {
+                                    Text(
+                                        text = "Los descansos solo están disponibles para enfoques de 10 minutos o más. Aumenta el tiempo para configurar los descansos.",
+                                        fontSize = 12.sp,
+                                        color = ZenCoral,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                } else {
+                                    // Número de descansos
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "Descansos",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = ZenSage)
+                                            )
+                                            Text(
+                                                text = "$pomodoroRestCount ${if (pomodoroRestCount == 1) "descanso" else "descansos"}",
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ZenCharcoal)
+                                            )
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            IconButton(
+                                                onClick = {
+                                                    pomodoroRestCount = (pomodoroRestCount - 1).coerceAtLeast(1)
+                                                    lockManager.pomodoroRestCount = pomodoroRestCount
+                                                },
+                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                enabled = pomodoroRestCount > 1
+                                            ) {
+                                                Icon(Icons.Default.Remove, contentDescription = "Reducir descansos", tint = ZenGreen)
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    pomodoroRestCount = (pomodoroRestCount + 1).coerceAtMost(pomodoroMaxRestCount)
+                                                    lockManager.pomodoroRestCount = pomodoroRestCount
+                                                },
+                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                enabled = pomodoroRestCount < pomodoroMaxRestCount
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Aumentar descansos", tint = ZenGreen)
+                                            }
+                                        }
+                                    }
+
+                                    HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+
+                                    // Duración de cada descanso
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.SpaceBetween
+                                    ) {
+                                        Column {
+                                            Text(
+                                                text = "Duración del descanso (máx $pomodoroMaxRest)",
+                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = ZenSage)
+                                            )
+                                            Text(
+                                                text = "$pomodoroRestMinutes min",
+                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ZenCharcoal)
+                                            )
+                                        }
+                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                            IconButton(
+                                                onClick = {
+                                                    pomodoroRestMinutes = (pomodoroRestMinutes - 1).coerceAtLeast(1)
+                                                    lockManager.pomodoroRestMinutes = pomodoroRestMinutes
+                                                },
+                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                enabled = pomodoroRestMinutes > 1
+                                            ) {
+                                                Icon(Icons.Default.Remove, contentDescription = "Reducir descanso", tint = ZenGreen)
+                                            }
+                                            IconButton(
+                                                onClick = {
+                                                    pomodoroRestMinutes = (pomodoroRestMinutes + 1).coerceAtMost(pomodoroMaxRest)
+                                                    lockManager.pomodoroRestMinutes = pomodoroRestMinutes
+                                                },
+                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                enabled = pomodoroRestMinutes < pomodoroMaxRest
+                                            ) {
+                                                Icon(Icons.Default.Add, contentDescription = "Aumentar descanso", tint = ZenGreen)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(8.dp))
+
+                                    // Vista previa del reparto de bloques
+                                    val workPerBlockMin = (focusTotalMinutes - pomodoroRestCount * pomodoroRestMinutes) / (pomodoroRestCount + 1)
+                                    Text(
+                                        text = "Tu enfoque de $focusTotalMinutes min se repartirá en ${pomodoroRestCount + 1} bloques de trabajo de ~${workPerBlockMin.coerceAtLeast(1)} min con $pomodoroRestCount descansos de $pomodoroRestMinutes min.",
+                                        fontSize = 11.sp,
+                                        color = ZenSage,
+                                        textAlign = TextAlign.Center,
+                                        modifier = Modifier.fillMaxWidth()
+                                    )
+                                    if (workPerBlockMin < 10) {
+                                        Spacer(modifier = Modifier.height(4.dp))
+                                        Text(
+                                            text = "Con esta configuración los bloques de trabajo quedan muy cortos. Reduce los descansos o su duración.",
+                                            fontSize = 11.sp,
+                                            color = ZenCoral,
+                                            textAlign = TextAlign.Center,
+                                            modifier = Modifier.fillMaxWidth()
+                                        )
                                     }
                                 }
                             }
@@ -686,7 +1271,7 @@ fun ConfigScreen(
                                 tint = ZenOlive
                             )
                             Text(
-                                text = "Al iniciar el bloqueo se elegirá automáticamente una frase motivacional aleatoria de la colección (55+ frases con acentos y puntuación completa) que deberás escribir si deseas desbloquear.",
+                                text = "Al iniciar el bloqueo se elegirá automáticamente una frase motivacional aleatoria de la colección (150 frases de reflexión y motivación) que podrás revisar durante tu sesión de enfoque.",
                                 style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
                                 color = ZenCharcoal
                             )
@@ -736,6 +1321,13 @@ fun ConfigScreen(
                     )
                 }
             }
+
+            Text(
+                text = "Versión v24.0.0",
+                fontSize = 11.sp,
+                color = ZenSage.copy(alpha = 0.7f),
+                modifier = Modifier.padding(top = 6.dp)
+            )
         }
     }
 }

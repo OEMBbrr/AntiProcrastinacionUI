@@ -1,7 +1,20 @@
 R_DEF: Internal format may change without notice
 local
 drawable app_logo
+drawable brain_3d
 drawable ic_launcher_foreground
+drawable light_bulb_3d
+drawable memo_3d
+drawable pushpin_3d
+drawable rocket_3d
+drawable sparkles_3d
 string app_name
+string default_web_client_id
+string gcm_defaultSenderId
+string google_api_key
+string google_app_id
+string google_crash_reporting_api_key
+string google_storage_bucket
+string project_id
 string wallpaper_description
 xml wallpaper

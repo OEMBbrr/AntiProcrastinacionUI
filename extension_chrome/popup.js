@@ -37,12 +37,426 @@ document.addEventListener('DOMContentLoaded', () => {
     const mathInput = document.getElementById('math-input');
     const btnCloseMath = document.getElementById('btn-close-math');
     const btnVerifyMath = document.getElementById('btn-verify-math');
+    const btnNotesToggle = document.getElementById('btn-notes-toggle');
+    const notesBox = document.getElementById('notes-box');
+    const noteInput = document.getElementById('note-input');
+    const btnAddNote = document.getElementById('btn-add-note');
+    const notesList = document.getElementById('notes-list');
 
-    // Desactivar pegar por código JS y eventos
+    const btnGoogleLogin = document.getElementById('btn-google-login');
+    const syncKeyInput = document.getElementById('sync-key-input');
+    const btnSaveSync = document.getElementById('btn-save-sync');
+
+    // V20.3: menú de perfil y ajustes (Mi Cuenta / Ajustes) en menú desplegable
+    const btnProfileMenu = document.getElementById('btn-profile-menu');
+    const profileDropdown = document.getElementById('profile-dropdown');
+    const profileTitle = document.getElementById('profile-title');
+
+    // Abrir/cerrar el menú desplegable de perfil
+    if (btnProfileMenu && profileDropdown) {
+        btnProfileMenu.addEventListener('click', (e) => {
+            e.stopPropagation();
+            profileDropdown.classList.toggle('hidden');
+        });
+    }
+
+    // Cerrar el menú al hacer clic fuera de él
+    document.addEventListener('click', (e) => {
+        if (profileDropdown && !profileDropdown.classList.contains('hidden') && !e.target.closest('.profile-menu-wrap')) {
+            profileDropdown.classList.add('hidden');
+        }
+    });
+
+    // Items del menú: abren su modal y cierran el desplegable
+    document.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const modal = document.getElementById(item.getAttribute('data-open-modal'));
+            if (modal) modal.classList.remove('hidden');
+            if (profileDropdown) profileDropdown.classList.add('hidden');
+        });
+    });
+
+    // Cerrar modales (botón "Cerrar" o clic fuera de la tarjeta)
+    document.querySelectorAll('[data-close-modal]').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const modal = document.getElementById(btn.getAttribute('data-close-modal'));
+            if (modal) modal.classList.add('hidden');
+        });
+    });
+    document.querySelectorAll('.modal-overlay').forEach(overlay => {
+        overlay.addEventListener('click', (e) => {
+            if (e.target === overlay) overlay.classList.add('hidden');
+        });
+    });
+
+    // V20: toggles de configuración compartida (Modo Oscuro + Bloqueo Cruzado)
+    const darkModeSwitch = document.getElementById('dark-mode-switch');
+    const crossLockSwitch = document.getElementById('cross-lock-switch');
+
+    // V24 (Propuesta 1): Pomodoro sincronizado. Se activa en Ajustes pero se
+    // CONFIGURA en la pantalla de inicio del enfoque (nº descansos + duración).
+    const pomodoroSwitch = document.getElementById('pomodoro-switch');
+    const pomodoroSetup = document.getElementById('pomodoro-setup');
+    const pomodoroSetupToggle = document.getElementById('pomodoro-setup-toggle');
+    const pomodoroSetupBody = document.getElementById('pomodoro-setup-body');
+    const pomodoroSetupConfig = document.getElementById('pomodoro-setup-config');
+    const pomodoroSetupWarning = document.getElementById('pomodoro-setup-warning');
+    const pomodoroSetupPreview = document.getElementById('pomodoro-setup-preview');
+    const pomodoroRestCountText = document.getElementById('pomodoro-restcount-text');
+    const pomodoroRestMaxText = document.getElementById('pomodoro-rest-max');
+    const pomodoroRestSetupText = document.getElementById('pomodoro-rest-setup-text');
+    const pomodoroRestCountMinus = document.getElementById('pomodoro-restcount-minus');
+    const pomodoroRestCountPlus = document.getElementById('pomodoro-restcount-plus');
+    const pomodoroRestSetupMinus = document.getElementById('pomodoro-rest-setup-minus');
+    const pomodoroRestSetupPlus = document.getElementById('pomodoro-rest-setup-plus');
+    let pomodoroWork = 25;
+    let pomodoroRest = 5;
+    let pomodoroRestCount = 1;
+    let pomodoroSetupOpen = true;
+
+    function getFocusTotalMinutes() {
+        return (targetHours * 60) + targetMinutes;
+    }
+
+    function computePomodoroLimits(totalMinutes) {
+        const maxTotalRest = Math.floor(totalMinutes / 4);
+        if (maxTotalRest < 1) return { maxRest: 0, maxRestCount: 0 };
+        const maxCount = Math.max(1, Math.floor(maxTotalRest / Math.max(1, pomodoroRest)));
+        const maxRest = Math.max(1, Math.min(30, Math.floor(maxTotalRest / Math.max(1, pomodoroRestCount))));
+        return { maxRest, maxRestCount: maxCount };
+    }
+
+    function renderPomodoro() {
+        const active = !!(pomodoroSwitch && pomodoroSwitch.checked);
+        if (pomodoroSetup) pomodoroSetup.classList.toggle('hidden', !active);
+        renderPomodoroSetup();
+    }
+
+    function renderPomodoroSetup() {
+        const total = getFocusTotalMinutes();
+        const { maxRest, maxRestCount } = computePomodoroLimits(total);
+        pomodoroRestCount = Math.min(Math.max(pomodoroRestCount, 1), Math.max(maxRestCount, 1));
+        pomodoroRest = Math.min(Math.max(pomodoroRest, 1), Math.max(maxRest, 1));
+        if (pomodoroRestCountText) pomodoroRestCountText.textContent = pomodoroRestCount;
+        if (pomodoroRestMaxText) pomodoroRestMaxText.textContent = maxRest > 0 ? maxRest : 30;
+        if (pomodoroRestSetupText) pomodoroRestSetupText.textContent = pomodoroRest + ' min';
+        if (pomodoroSetupWarning && pomodoroSetupConfig) {
+            if (total < 10) {
+                pomodoroSetupWarning.classList.remove('hidden');
+                pomodoroSetupWarning.textContent = 'Los descansos solo están disponibles para enfoques de 10 minutos o más. Aumenta el tiempo para configurar los descansos.';
+                pomodoroSetupConfig.classList.add('hidden');
+            } else {
+                pomodoroSetupWarning.classList.add('hidden');
+                pomodoroSetupConfig.classList.remove('hidden');
+                const workPerBlockMin = Math.floor((total - pomodoroRestCount * pomodoroRest) / (pomodoroRestCount + 1));
+                if (pomodoroSetupPreview) {
+                    pomodoroSetupPreview.textContent = `${pomodoroRestCount + 1} bloques de trabajo de ~${Math.max(workPerBlockMin, 1)} min con ${pomodoroRestCount} descanso(s) de ${pomodoroRest} min`;
+                }
+            }
+        }
+    }
+
+    function setPomodoro(setting, value) {
+        if (setting === 'pomodoroRest') pomodoroRest = value;
+        if (setting === 'pomodoroRestCount') pomodoroRestCount = value;
+        renderPomodoroSetup();
+        chrome.storage.local.set(setting === 'pomodoroRest' ? { pomodoroRestMinutes: value } : { pomodoroRestCount: value });
+        chrome.runtime.sendMessage({ action: 'setSetting', setting, value });
+    }
+
+    if (pomodoroSetupToggle) {
+        pomodoroSetupToggle.addEventListener('click', () => {
+            pomodoroSetupOpen = !pomodoroSetupOpen;
+            if (pomodoroSetupBody) pomodoroSetupBody.classList.toggle('hidden', !pomodoroSetupOpen);
+            const arrow = document.getElementById('pomodoro-setup-arrow');
+            if (arrow) arrow.textContent = pomodoroSetupOpen ? '▾' : '▸';
+        });
+    }
+    if (pomodoroRestCountMinus) {
+        pomodoroRestCountMinus.addEventListener('click', () => setPomodoro('pomodoroRestCount', Math.max(1, pomodoroRestCount - 1)));
+    }
+    if (pomodoroRestCountPlus) {
+        pomodoroRestCountPlus.addEventListener('click', () => {
+            const { maxRestCount } = computePomodoroLimits(getFocusTotalMinutes());
+            setPomodoro('pomodoroRestCount', Math.min(Math.max(maxRestCount, 1), pomodoroRestCount + 1));
+        });
+    }
+    if (pomodoroRestSetupMinus) {
+        pomodoroRestSetupMinus.addEventListener('click', () => setPomodoro('pomodoroRest', Math.max(1, pomodoroRest - 1)));
+    }
+    if (pomodoroRestSetupPlus) {
+        pomodoroRestSetupPlus.addEventListener('click', () => {
+            const { maxRest } = computePomodoroLimits(getFocusTotalMinutes());
+            setPomodoro('pomodoroRest', Math.min(Math.max(maxRest, 1), pomodoroRest + 1));
+        });
+    }
+
+    // V24: verificación en 2 pasos del Bloqueo Cruzado. El código llega por
+    // notificación al teléfono y se escribe aquí en el PC para confirmar.
+    const authCodeModal = document.getElementById('auth-code-modal');
+    const authCodeInput = document.getElementById('auth-code-input');
+    const authPending = document.getElementById('auth-pending');
+    const authError = document.getElementById('auth-error');
+    const btnCancelAuth = document.getElementById('btn-cancel-auth');
+    const btnConfirmAuth = document.getElementById('btn-confirm-auth');
+    let pendingCrossLockValue = null;
+
+    function requestAuthForToggle(value) {
+        pendingCrossLockValue = value;
+        if (authCodeInput) authCodeInput.value = '';
+        if (authError) authError.classList.add('hidden');
+        if (authPending) authPending.classList.remove('hidden');
+        if (authCodeModal) authCodeModal.classList.remove('hidden');
+        chrome.runtime.sendMessage({ action: 'requestAuthCode' }, (res) => {
+            if (authPending) authPending.classList.add('hidden');
+            if (res && res.success) {
+                if (authCodeInput) authCodeInput.focus();
+            } else {
+                if (authError) {
+                    authError.textContent = 'No se pudo enviar el código al teléfono. Revisa la conexión.';
+                    authError.classList.remove('hidden');
+                }
+            }
+        });
+    }
+
+    if (crossLockSwitch) {
+        crossLockSwitch.addEventListener('change', () => {
+            const value = crossLockSwitch.checked;
+            requestAuthForToggle(value);
+        });
+    }
+
+    if (btnCancelAuth) {
+        btnCancelAuth.addEventListener('click', () => {
+            if (authCodeModal) authCodeModal.classList.add('hidden');
+            if (crossLockSwitch && pendingCrossLockValue !== null) crossLockSwitch.checked = !pendingCrossLockValue;
+            pendingCrossLockValue = null;
+        });
+    }
+    if (btnConfirmAuth) {
+        btnConfirmAuth.addEventListener('click', () => {
+            const code = authCodeInput ? authCodeInput.value.trim() : '';
+            if (!code) return;
+            chrome.runtime.sendMessage({ action: 'verifyAuthCode', code }, (res) => {
+                if (res && res.success) {
+                    if (authCodeModal) authCodeModal.classList.add('hidden');
+                    chrome.storage.local.set({ crossDeviceLockEnabled: pendingCrossLockValue });
+                    chrome.runtime.sendMessage({ action: 'setSetting', setting: 'crossDeviceLock', value: pendingCrossLockValue });
+                    pendingCrossLockValue = null;
+                } else {
+                    if (authError) authError.classList.remove('hidden');
+                    if (authCodeInput) { authCodeInput.value = ''; authCodeInput.focus(); }
+                }
+            });
+        });
+    }
+    if (authCodeInput) {
+        authCodeInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && btnConfirmAuth) btnConfirmAuth.click();
+        });
+    }
+
+    // V20: aplicar modo oscuro a toda la interfaz del popup
+    function applyTheme(dark) {
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+    }
+
+    function loadSettings() {
+        chrome.runtime.sendMessage({ action: 'getSettings' }, (res) => {
+            if (!res) return;
+            if (darkModeSwitch) darkModeSwitch.checked = !!res.darkModeEnabled;
+            if (crossLockSwitch) crossLockSwitch.checked = !!res.crossDeviceLockEnabled;
+            if (pomodoroSwitch) pomodoroSwitch.checked = !!res.pomodoroEnabled;
+            if (typeof res.pomodoroWorkMinutes === 'number') pomodoroWork = res.pomodoroWorkMinutes;
+            if (typeof res.pomodoroRestMinutes === 'number') pomodoroRest = res.pomodoroRestMinutes;
+            if (typeof res.pomodoroRestCount === 'number') pomodoroRestCount = res.pomodoroRestCount;
+            renderPomodoro();
+            applyTheme(!!res.darkModeEnabled);
+        });
+        // V24: leer los ajustes persistidos directamente para aplicarlos aunque el
+        // service worker aún no haya cargado sus variables en memoria (arranque en frío).
+        chrome.storage.local.get(['darkModeEnabled', 'crossDeviceLockEnabled', 'pomodoroEnabled', 'pomodoroWorkMinutes', 'pomodoroRestMinutes', 'pomodoroRestCount'], (res) => {
+            if (typeof res.darkModeEnabled !== 'boolean' && typeof res.crossDeviceLockEnabled !== 'boolean') return;
+            const dark = typeof res.darkModeEnabled === 'boolean' ? res.darkModeEnabled : false;
+            const lock = typeof res.crossDeviceLockEnabled === 'boolean' ? res.crossDeviceLockEnabled : true;
+            if (darkModeSwitch) darkModeSwitch.checked = dark;
+            if (crossLockSwitch) crossLockSwitch.checked = lock;
+            if (pomodoroSwitch) pomodoroSwitch.checked = !!res.pomodoroEnabled;
+            if (typeof res.pomodoroWorkMinutes === 'number') pomodoroWork = res.pomodoroWorkMinutes;
+            if (typeof res.pomodoroRestMinutes === 'number') pomodoroRest = res.pomodoroRestMinutes;
+            if (typeof res.pomodoroRestCount === 'number') pomodoroRestCount = res.pomodoroRestCount;
+            renderPomodoro();
+            applyTheme(dark);
+        });
+    }
+
+    if (darkModeSwitch) {
+        darkModeSwitch.addEventListener('change', () => {
+            const value = darkModeSwitch.checked;
+            chrome.storage.local.set({ darkModeEnabled: value });
+            chrome.runtime.sendMessage({ action: 'setSetting', setting: 'darkMode', value });
+            applyTheme(value);
+        });
+    }
+
+    // V24 (Propuesta 1): activación del Pomodoro (la configuración vive en el setup)
+    if (pomodoroSwitch) {
+        pomodoroSwitch.addEventListener('change', () => {
+            const value = pomodoroSwitch.checked;
+            chrome.storage.local.set({ pomodoroEnabled: value });
+            chrome.runtime.sendMessage({ action: 'setSetting', setting: 'pomodoroEnabled', value });
+            renderPomodoro();
+        });
+    }
+
+    if (btnNotesToggle) {
+        btnNotesToggle.addEventListener('click', () => {
+            chrome.tabs.create({ url: chrome.runtime.getURL('notes.html') });
+        });
+    }
+
+    if (btnAddNote && noteInput) {
+        btnAddNote.addEventListener('click', () => {
+            const content = noteInput.value.trim();
+            if (content) {
+                chrome.runtime.sendMessage({ action: 'addNote', content }, (res) => {
+                    if (res && res.success) {
+                        noteInput.value = '';
+                        loadAndRenderNotes();
+                        showNotesSyncHint(false);
+                    } else {
+                        showNotesSyncHint(true, 'No se pudo guardar la nota. Revisa la extensión.');
+                    }
+                });
+            }
+        });
+
+        noteInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                btnAddNote.click();
+            }
+        });
+    }
+
+    const notesSyncHint = document.getElementById('notes-sync-hint');
+
+    function showNotesSyncHint(show, text) {
+        if (!notesSyncHint) return;
+        if (show) {
+            notesSyncHint.textContent = text || '⚠️ Nota guardada localmente (sin sincronizar). Inicia sesión con Google.';
+            notesSyncHint.classList.remove('hidden');
+        } else {
+            notesSyncHint.classList.add('hidden');
+        }
+    }
+
+    // Escuchar el resultado real de la sincronización en la nube
+    chrome.runtime.onMessage.addListener((request) => {
+        if (request && request.action === 'noteCloudStatus') {
+            if (!request.ok) {
+                showNotesSyncHint(true, '⚠️ Nota guardada localmente (sin sincronizar): ' + (request.error || 'inicia sesión con Google.'));
+            } else {
+                showNotesSyncHint(false);
+            }
+        } else if (request && request.action === 'settingsChanged' && request.settings) {
+            // V20: la configuración cambió (desde este popup o desde el teléfono)
+            if (darkModeSwitch) darkModeSwitch.checked = !!request.settings.darkModeEnabled;
+            if (crossLockSwitch) crossLockSwitch.checked = !!request.settings.crossDeviceLockEnabled;
+            if (pomodoroSwitch) pomodoroSwitch.checked = !!request.settings.pomodoroEnabled;
+            if (typeof request.settings.pomodoroWorkMinutes === 'number') pomodoroWork = request.settings.pomodoroWorkMinutes;
+            if (typeof request.settings.pomodoroRestMinutes === 'number') pomodoroRest = request.settings.pomodoroRestMinutes;
+            if (typeof request.settings.pomodoroRestCount === 'number') pomodoroRestCount = request.settings.pomodoroRestCount;
+            renderPomodoro();
+            applyTheme(!!request.settings.darkModeEnabled);
+        } else if (request && request.action === 'lockStateChanged') {
+            // V24: bloqueo iniciado desde el teléfono → refrescar la UI al instante
+            updateUI();
+        } else if (request && request.action === 'pomodoroPhaseChanged') {
+            // V24: cambio de fase trabajo/descanso del Pomodoro
+            updateUI();
+        } else if (request && request.action === 'treguaApproved') {
+            // V24 (Propuesta 2): el teléfono aprobó la tregua
+            if (mathModal) mathModal.classList.add('hidden');
+            updateUI();
+        }
+    });
+
+    function loadAndRenderNotes() {
+        if (!notesList) return;
+        chrome.runtime.sendMessage({ action: 'getNotes' }, (res) => {
+            if (res && res.notes && res.notes.length > 0) {
+                notesList.innerHTML = res.notes.map(note => {
+                    const dateStr = note.timestamp ? new Date(note.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '';
+                    const srcStr = note.deviceSource === 'android' ? '📱 Android' : '🌐 Chrome';
+                    return `
+                        <div class="note-item">
+                            <div class="note-info">
+                                <div class="note-content">${escapeHtml(note.content)}</div>
+                                <div class="note-meta">${dateStr} • ${srcStr}</div>
+                            </div>
+                            <button class="btn-del-note" data-id="${note.id}">🗑️</button>
+                        </div>
+                    `;
+                }).join('');
+
+                notesList.querySelectorAll('.btn-del-note').forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const noteId = e.target.getAttribute('data-id');
+                        chrome.runtime.sendMessage({ action: 'deleteNote', noteId }, () => {
+                            loadAndRenderNotes();
+                        });
+                    });
+                });
+            } else {
+                notesList.innerHTML = '<div style="font-size:0.72rem; color:#64748B; text-align:center; padding:10px;">Sin notas aún. ¡Anota tus ideas!</div>';
+            }
+        });
+    }
+
+    function escapeHtml(text) {
+        return text.replace(/[&<>"']/g, function(m) {
+            return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[m];
+        });
+    }
+
     if (phraseInput) {
         phraseInput.addEventListener('paste', (e) => e.preventDefault());
         phraseInput.addEventListener('copy', (e) => e.preventDefault());
         phraseInput.addEventListener('contextmenu', (e) => e.preventDefault());
+    }
+
+    // V20: anti-copy reforzado sobre el texto objetivo (no se puede seleccionar ni arrastrar)
+    if (phraseTargetText) {
+        phraseTargetText.addEventListener('selectstart', (e) => e.preventDefault());
+        phraseTargetText.addEventListener('dragstart', (e) => e.preventDefault());
+        phraseTargetText.addEventListener('copy', (e) => e.preventDefault());
+        phraseTargetText.addEventListener('cut', (e) => e.preventDefault());
+    }
+
+    // V20.3: resaltar en vivo la frase objetivo (verde = correcto, rojo = error,
+    // gris = aún sin escribir), igual que en la app Android
+    function renderHighlightedPhrase() {
+        if (!phraseTargetText || !phraseInput) return;
+        const typedChars = Array.from(phraseInput.value);
+        const targetChars = Array.from(longPhrase);
+        let html = '';
+        targetChars.forEach((ch, i) => {
+            if (i < typedChars.length) {
+                if (typedChars[i] === ch) {
+                    html += `<span class="phrase-correct">${escapeHtml(ch)}</span>`;
+                } else {
+                    html += `<span class="phrase-wrong">${escapeHtml(ch)}</span>`;
+                }
+            } else {
+                html += `<span class="phrase-pending">${escapeHtml(ch)}</span>`;
+            }
+        });
+        phraseTargetText.innerHTML = html;
+    }
+
+    if (phraseInput) {
+        phraseInput.addEventListener('input', renderHighlightedPhrase);
     }
 
     function formatTime(totalSecs) {
@@ -116,41 +530,46 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const syncStatusBadge = document.getElementById('sync-status-badge');
-
     function updateUI() {
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
-            const { isLocked, remainingSeconds, customDomains, parentalEnabled, connectedDeviceInfo, firebaseUid, userEmail } = response;
+            const { isLocked, remainingSeconds, customDomains, parentalEnabled, firebaseUid, userEmail, syncKey, connectedDeviceInfo, phaseType } = response;
+
+            // V24: banner de descanso Pomodoro (tregua libre)
+            const restBanner = document.getElementById('pomodoro-rest-banner');
+            if (restBanner) {
+                restBanner.classList.toggle('hidden', !(isLocked && phaseType === 'rest'));
+            }
+
+            // V20: puntico de conexión (verde = teléfono conectado, rojo = sin conexión)
+            const connDot = document.getElementById('conn-dot');
+            if (connDot) {
+                if (connectedDeviceInfo) {
+                    connDot.classList.add('connected');
+                } else {
+                    connDot.classList.remove('connected');
+                }
+            }
 
             if (parentalSwitch) parentalSwitch.checked = !!parentalEnabled;
             if (customDomains) renderSiteTags(customDomains);
 
-            // Actualizar Badge de Detección Real de Dispositivo
-            if (syncStatusBadge) {
-                if (connectedDeviceInfo && connectedDeviceInfo.brand) {
-                    const devName = `${connectedDeviceInfo.brand} ${connectedDeviceInfo.model || ''}`.trim();
-                    syncStatusBadge.textContent = `🟢 Conectado: ${devName}`;
-                    syncStatusBadge.classList.add("connected");
-                    syncStatusBadge.classList.remove("disconnected");
-                } else {
-                    syncStatusBadge.textContent = "🔴 Desvinculado";
-                    syncStatusBadge.classList.remove("connected");
-                    syncStatusBadge.classList.add("disconnected");
+            // Fallback para leer clave local si faltara en la respuesta
+            chrome.storage.local.get(['userEmail', 'syncKey', 'firebaseUid'], (localRes) => {
+                const activeAccount = userEmail || syncKey || localRes.userEmail || localRes.syncKey || localRes.firebaseUid;
+                if (profileTitle) {
+                    profileTitle.textContent = activeAccount ? activeAccount : 'Mi Cuenta';
                 }
-            }
-
-            // Actualizar botón de Google con email o clave activa
-            if (btnGoogleLogin) {
-                const activeAccount = userEmail || syncKey;
-                if (activeAccount) {
-                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${activeAccount}`;
-                    btnGoogleLogin.style.backgroundColor = '#34A853';
-                } else {
-                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Iniciar Sesión con Google`;
-                    btnGoogleLogin.style.backgroundColor = '#4285F4';
+                if (btnGoogleLogin) {
+                    if (activeAccount) {
+                        btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${activeAccount}`;
+                        btnGoogleLogin.style.backgroundColor = '#34A853';
+                    } else {
+                        btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Iniciar Sesión con Google`;
+                        btnGoogleLogin.style.backgroundColor = '#4285F4';
+                    }
                 }
-            }
+            });
 
             if (isLocked) {
                 statusPill.textContent = "MODO ENFOQUE ACTIVO";
@@ -170,34 +589,9 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    const btnGoogleLogin = document.getElementById('btn-google-login');
-
     if (btnGoogleLogin) {
         btnGoogleLogin.addEventListener('click', () => {
-            btnGoogleLogin.disabled = true;
-            btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> Conectando...`;
-            
-            chrome.runtime.sendMessage({ action: 'googleSignIn' }, (result) => {
-                btnGoogleLogin.disabled = false;
-                if (result && result.success && result.email) {
-                    btnGoogleLogin.innerHTML = `<span class="google-icon">G</span> ${result.email}`;
-                    btnGoogleLogin.style.backgroundColor = '#34A853';
-                    updateUI();
-                } else {
-                    // Fallback directo a Prompt de correo de Google o Código PIN (ej. ZEN-1234)
-                    const inputKey = prompt(
-                        "🔒 VINCULACIÓN CON TELÉFONO:\n\nIngresa tu correo de Google o el Código PIN de tu teléfono (ej. ZEN-1234):",
-                        "mi_cuenta_google@gmail.com"
-                    );
-                    if (inputKey && inputKey.trim()) {
-                        chrome.runtime.sendMessage({ action: 'setManualKey', key: inputKey.trim() }, () => {
-                            updateUI();
-                        });
-                    } else {
-                        updateUI();
-                    }
-                }
-            });
+            chrome.tabs.create({ url: chrome.runtime.getURL('login.html') });
         });
     }
 
@@ -226,9 +620,10 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     btnFinishEarly.addEventListener('click', () => {
-        phraseTargetText.textContent = longPhrase;
+        phraseTargetText.textContent = "";
         phraseInput.value = "";
         phraseStartTime = Date.now();
+        renderHighlightedPhrase();
         phraseModal.classList.remove('hidden');
     });
 
@@ -246,23 +641,67 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (phraseInput.value.trim() === longPhrase.trim()) {
+        // V20: comparar la cantidad de caracteres carácter por carácter.
+        // La persona debe escribir a mano al menos la mitad (50%) del texto.
+        const target = longPhrase.trim();
+        const typed = phraseInput.value.trim();
+        const targetChars = Array.from(target);
+        const typedChars = Array.from(typed);
+        const compareCount = Math.min(targetChars.length, typedChars.length);
+        let matches = 0;
+        for (let i = 0; i < compareCount; i++) {
+            if (typedChars[i] === targetChars[i]) matches++;
+        }
+        const matchRatio = targetChars.length > 0 ? matches / targetChars.length : 0;
+
+        if (matchRatio >= 0.5) {
             chrome.runtime.sendMessage({ action: 'stopTimer' }, () => {
                 phraseModal.classList.add('hidden');
                 updateUI();
             });
         } else {
-            alert("El texto no coincide exactamente. Verifica acentos y signos de puntuación.");
+            alert("Todavía no has escrito a mano al menos la mitad del texto correctamente. Sigue escribiendo con calma.");
         }
     });
 
-    btnTregua.addEventListener('click', () => {
+    // V24 (Propuesta 2): reto matemático local (fallback sin teléfono conectado)
+    function openMathTregua() {
         const numA = Math.floor(Math.random() * 89) + 10;
         const numB = Math.floor(Math.random() * 89) + 10;
         expectedMath = numA + numB;
         mathProblemText.textContent = `¿Cuánto es ${numA} + ${numB}?`;
         mathInput.value = "";
+        const pendingEl = document.getElementById('tregua-pending');
+        const challengeEl = document.getElementById('math-challenge');
+        if (pendingEl) pendingEl.classList.add('hidden');
+        if (challengeEl) challengeEl.classList.remove('hidden');
         mathModal.classList.remove('hidden');
+    }
+
+    // V24 (Propuesta 2): estado "esperando confirmación en el teléfono"
+    function showTreguaPending() {
+        const pendingEl = document.getElementById('tregua-pending');
+        const challengeEl = document.getElementById('math-challenge');
+        if (pendingEl) pendingEl.classList.remove('hidden');
+        if (challengeEl) challengeEl.classList.add('hidden');
+        mathModal.classList.remove('hidden');
+    }
+
+    btnTregua.addEventListener('click', () => {
+        // V24 (Propuesta 2): si el teléfono está conectado, la tregua se verifica ahí
+        chrome.runtime.sendMessage({ action: 'getState' }, (res) => {
+            if (res && res.connectedDeviceInfo) {
+                chrome.runtime.sendMessage({ action: 'requestTregua' }, (req) => {
+                    if (req && req.success && req.pending) {
+                        showTreguaPending();
+                    } else {
+                        openMathTregua();
+                    }
+                });
+            } else {
+                openMathTregua();
+            }
+        });
     });
 
     btnCloseMath.addEventListener('click', () => {
@@ -282,4 +721,5 @@ document.addEventListener('DOMContentLoaded', () => {
 
     setInterval(updateUI, 1000);
     updateUI();
+    loadSettings();
 });

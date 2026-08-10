@@ -28,7 +28,7 @@ goto fail
 
 :execute
 @rem Execute Gradle
-"%DIRNAME%gradle/wrapper/gradle-wrapper.jar" %*
+"%JAVA_EXE%" -classpath "%DIRNAME%gradle/wrapper/gradle-wrapper.jar" org.gradle.wrapper.GradleWrapperMain %*
 
 :fail
 exit /b 1

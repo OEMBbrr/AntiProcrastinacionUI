@@ -1,14 +1,38 @@
 [
     {
-        "merged": "com.antiprocrastinacion.lock.app-debug-47:/xml_wallpaper.xml.flat",
-        "source": "com.antiprocrastinacion.lock.app-main-49:/xml/wallpaper.xml"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_memo_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/memo_3d.png"
     },
     {
-        "merged": "com.antiprocrastinacion.lock.app-debug-47:/drawable_ic_launcher_foreground.xml.flat",
-        "source": "com.antiprocrastinacion.lock.app-main-49:/drawable/ic_launcher_foreground.xml"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_light_bulb_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/light_bulb_3d.png"
     },
     {
-        "merged": "com.antiprocrastinacion.lock.app-debug-47:/drawable_app_logo.jpg.flat",
-        "source": "com.antiprocrastinacion.lock.app-main-49:/drawable/app_logo.jpg"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_sparkles_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/sparkles_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_brain_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/brain_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_pushpin_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/pushpin_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/xml_wallpaper.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/xml/wallpaper.xml"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/ic_launcher_foreground.xml"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_app_logo.jpg.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/app_logo.jpg"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_rocket_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/rocket_3d.png"
     }
 ]

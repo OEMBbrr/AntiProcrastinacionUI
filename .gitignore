@@ -1,6 +1,7 @@
 *.iml
 .gradle
 /local.properties
+local.properties
 /.idea
 .DS_Store
 /build
@@ -8,4 +9,11 @@
 /captures
 .externalNativeBuild
 .cxx
-local.properties
+google-services.json
+app/google-services.json
+url_google_cloud.txt
+SHA1_DEBUG.txt
+CONFIGURACION_ENTORNO_IA.txt
+*.apk
+*.ipa
+

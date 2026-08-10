@@ -1,0 +1,14 @@
+ORDEN DIRECTA E INSTRUCCIÓN DEL USUARIO:
+------------------------------------------
+"puedes mover los ajustes a la sección donde está lo de iniciar sesion y que sea como un menú de perfil y ajustes como de las aplicaciones, aparte del feed inicial en un menú desplegable, y agregas el apartado Iniciar Sesión o Mi cuenta (mi cuenta mejor xd) y el apartado Ajustes"
+
+FECHA DE REGISTRO: 9 de Agosto de 2026
+VERSIÓN DE IMPLEMENTACIÓN: v21.0.0 (versionCode = 21)
+
+DETALLES DE LA SOLUCIÓN APLICADA:
+1. Se ubicó el menú desplegable en el icono de perfil/usuario en la esquina superior derecha (Top Bar).
+2. Al presionar el icono se abre un DropdownMenu con los apartados:
+   - "👤 Mi Cuenta" (abre el modal de inicio de sesión de Google, clave de vinculación y diagnóstico "Probar Conexión").
+   - "⚙️ Ajustes" (abre el modal flotante exclusivo de Ajustes: Modo Oscuro y Bloqueo Cruzado).
+   - "📝 Mis Notas Zen" (acceso directo al espacio de notas).
+3. El feed central se limpió por completo dejando solo la configuración del temporizador, aplicaciones permitidas y el botón de inicio de enfoque.

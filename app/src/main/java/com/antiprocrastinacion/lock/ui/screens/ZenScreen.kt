@@ -35,6 +35,8 @@ import com.antiprocrastinacion.lock.LockManager
 import com.antiprocrastinacion.lock.ui.theme.*
 import kotlinx.coroutines.delay
 
+import com.antiprocrastinacion.lock.MotivationalPhrases
+
 @Composable
 fun ZenScreen(
     lockManager: LockManager,
@@ -44,6 +46,19 @@ fun ZenScreen(
     var timeRemaining by remember { mutableStateOf(lockManager.timeRemaining) }
     var tempUnlockTimeRemaining by remember { mutableStateOf(if (lockManager.isTempUnlocked) lockManager.tempUnlockEndTime - System.currentTimeMillis() else 0L) }
     var cooldownTimeRemaining by remember { mutableStateOf(lockManager.cooldownTimeRemaining) }
+    // V24: cuenta regresiva de la fase de descanso Pomodoro (tregua libre)
+    var restTimeRemaining by remember { mutableStateOf(0L) }
+    var isRestPhase by remember { mutableStateOf(lockManager.isPomodoroRestPhase) }
+
+    // Índice para carrusel de 150 frases motivacionales y de reflexión (60 segundos por frase)
+    var phraseIndex by remember { mutableIntStateOf((0..149).random()) }
+
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(60000) // 60 segundos por cada frase
+            phraseIndex = (phraseIndex + 1) % MotivationalPhrases.PHRASES.size
+        }
+    }
 
     // Modal para "Ya terminé mi actividad" (Frase LARGA 150-200 palabras)
     var showLongChallengeModal by remember { mutableStateOf(false) }
@@ -76,6 +91,21 @@ fun ZenScreen(
                 lockManager.tempUnlockEndTime - System.currentTimeMillis()
             } else {
                 0L
+            }
+            // V24: fase de descanso Pomodoro = tregua libre automática
+            val now = System.currentTimeMillis()
+            val phase = lockManager.currentPomodoroPhase(now)
+            isRestPhase = phase?.type == "rest"
+            if (isRestPhase) {
+                restTimeRemaining = phase?.endTime?.minus(now) ?: 0L
+                lockManager.unlockForRest()
+            } else {
+                restTimeRemaining = 0L
+            }
+            if (timeRemaining <= 0) {
+                lockManager.stopLock()
+                onUnlocked()
+                break
             }
             delay(1000)
         }
@@ -155,6 +185,8 @@ fun ZenScreen(
         }
     }
 
+    var showNotesModal by remember { mutableStateOf(false) }
+
     Scaffold(
         containerColor = CreamBackground
     ) { innerPadding ->
@@ -162,24 +194,24 @@ fun ZenScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(24.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Cabecera Zen
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 16.dp)
+                modifier = Modifier.padding(top = 12.dp)
             ) {
                 Image(
                     painter = painterResource(id = com.antiprocrastinacion.lock.R.drawable.app_logo),
                     contentDescription = "Logo",
                     modifier = Modifier
-                        .size(80.dp)
+                        .size(64.dp)
                         .clip(CircleShape)
                         .border(BorderStroke(1.dp, ZenSage.copy(alpha = 0.4f)), CircleShape)
                 )
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(6.dp))
                 Text(
                     text = if (timeRemaining > 0) "MODO ENFOQUE" else "¡TIEMPO COMPLETADO!",
                     style = MaterialTheme.typography.labelLarge.copy(
@@ -187,6 +219,53 @@ fun ZenScreen(
                         color = if (timeRemaining > 0) ZenSage else ZenGreen,
                         fontWeight = FontWeight.Bold
                     )
+                )
+                
+                // Carrusel Animado de 150 Frases de Reflexión y Motivación (Duración 60s, Intocable)
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(top = 12.dp),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                    border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.18f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 12.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        AnimatedContent(
+                            targetState = phraseIndex,
+                            transitionSpec = {
+                                (slideInHorizontally(animationSpec = androidx.compose.animation.core.tween(800)) { fullWidth -> fullWidth } + fadeIn(animationSpec = androidx.compose.animation.core.tween(800)))
+                                    .togetherWith(slideOutHorizontally(animationSpec = androidx.compose.animation.core.tween(800)) { fullWidth -> -fullWidth } + fadeOut(animationSpec = androidx.compose.animation.core.tween(800)))
+                            },
+                            label = "MotivationalPhraseCarousel"
+                        ) { targetIdx ->
+                            val currentPhrase = MotivationalPhrases.PHRASES[targetIdx % MotivationalPhrases.PHRASES.size]
+                            Text(
+                                text = currentPhrase,
+                                style = MaterialTheme.typography.bodyMedium.copy(
+                                    fontSize = 12.sp,
+                                    lineHeight = 18.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    color = ZenCharcoal,
+                                    textAlign = TextAlign.Center
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            )
+                        }
+                    }
+                }
+            }
+
+            if (showNotesModal) {
+                ZenNotesModal(
+                    lockManager = lockManager,
+                    onDismiss = { showNotesModal = false }
                 )
             }
 
@@ -196,6 +275,71 @@ fun ZenScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (timeRemaining > 0) {
+                    // V24: Banner de Descanso Pomodoro (Tregua libre durante la fase de descanso)
+                    if (isRestPhase) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp),
+                            shape = RoundedCornerShape(16.dp),
+                            colors = CardDefaults.cardColors(containerColor = ZenSoftGreen),
+                            border = BorderStroke(1.dp, ZenGreen.copy(alpha = 0.5f)),
+                            elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(14.dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Icon(Icons.Default.FreeBreakfast, contentDescription = null, tint = ZenGreen)
+                                    Text(
+                                        text = "DESCANSO POMODORO",
+                                        style = MaterialTheme.typography.titleSmall.copy(
+                                            color = ZenGreen,
+                                            fontWeight = FontWeight.Bold,
+                                            letterSpacing = 1.sp
+                                        )
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Text(
+                                    text = "Tregua libre activa: ${formatDuration(restTimeRemaining)}",
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                    color = ZenCharcoal
+                                )
+                                Spacer(modifier = Modifier.height(4.dp))
+                                Text(
+                                    text = "Accede a tus aplicaciones permitidas sin escribir nada. Al terminar el descanso volverás a estar bloqueado.",
+                                    fontSize = 12.sp,
+                                    color = ZenSage,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(10.dp))
+                                Text(
+                                    text = "Puedes terminar el descanso anticipadamente con \"Comenzar bloqueo\".",
+                                    fontSize = 11.sp,
+                                    color = ZenSage,
+                                    textAlign = TextAlign.Center
+                                )
+                                Spacer(modifier = Modifier.height(8.dp))
+                                Button(
+                                    onClick = {
+                                        lockManager.endPomodoroRestNow()
+                                        isRestPhase = false
+                                    },
+                                    colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
+                                    shape = RoundedCornerShape(10.dp)
+                                ) {
+                                    Text("Terminar descanso (volver a trabajo)", color = Color.White, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
                     // Temporizador Gigante en Tiempo Real
                     Text(
                         text = formatDuration(timeRemaining),
@@ -205,7 +349,7 @@ fun ZenScreen(
                             color = ZenCharcoal
                         )
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(4.dp))
                     Text(
                         text = "Mantén tu mente centrada en tu actividad actual.",
                         style = MaterialTheme.typography.bodyMedium,
@@ -213,11 +357,40 @@ fun ZenScreen(
                         textAlign = TextAlign.Center
                     )
 
+                    Spacer(modifier = Modifier.height(14.dp))
+                    // Botón Único de Notas Zen (Diseño sobrio y elegante alineado a la paleta Zen)
+                    Button(
+                        onClick = { showNotesModal = true },
+                        modifier = Modifier
+                            .fillMaxWidth(0.9f)
+                            .height(46.dp),
+                        shape = RoundedCornerShape(14.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
+                        elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Image(
+                                painter = painterResource(id = com.antiprocrastinacion.lock.R.drawable.memo_3d),
+                                contentDescription = "Notas 3D",
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Mis Notas (Anotar idea o pendiente)",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White
+                            )
+                        }
+                    }
+
                     // Estado y Launcher de Apps Permitidas durante Tregua Temporal
                     if (lockManager.isTempUnlocked) {
                         Spacer(modifier = Modifier.height(16.dp))
                         Card(
-                            colors = CardDefaults.cardColors(containerColor = Color(0xFFE8F5E9)),
+                            colors = CardDefaults.cardColors(containerColor = ZenSoftGreen),
                             shape = RoundedCornerShape(16.dp),
                             border = BorderStroke(1.dp, ZenGreen.copy(alpha = 0.4f)),
                             modifier = Modifier.fillMaxWidth()
@@ -295,7 +468,7 @@ fun ZenScreen(
                         }
                     }
                 } else {
-                    // TIEMPO FINALIZADO (Frase corta de 1 oración)
+                    // TIEMPO FINALIZADO (Desbloqueo inmediato sin escribir nada)
                     Card(
                         modifier = Modifier.fillMaxWidth(),
                         shape = RoundedCornerShape(20.dp),
@@ -317,45 +490,20 @@ fun ZenScreen(
                                     style = MaterialTheme.typography.titleLarge.copy(fontSize = 16.sp, color = ZenGreen)
                                 )
                             }
-                            Spacer(modifier = Modifier.height(12.dp))
-                            Text(
-                                text = "Escribe la siguiente oración corta para finalizar:",
-                                style = MaterialTheme.typography.bodyMedium.copy(fontSize = 12.sp),
-                                color = ZenSage
-                            )
-                            Spacer(modifier = Modifier.height(12.dp))
-
-                            Text(
-                                text = buildHighlightedText(shortUserInput, targetShortPhrase),
-                                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 14.sp, lineHeight = 20.sp),
-                                textAlign = TextAlign.Center
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
-
-                            OutlinedTextField(
-                                value = shortUserInput,
-                                onValueChange = { shortUserInput = it },
-                                placeholder = { Text("Escribe la oración aquí...", fontSize = 13.sp) },
-                                modifier = Modifier.fillMaxWidth(),
-                                shape = RoundedCornerShape(12.dp)
-                            )
-
-                            Spacer(modifier = Modifier.height(14.dp))
+                            Spacer(modifier = Modifier.height(16.dp))
 
                             Button(
                                 onClick = {
-                                    if (shortUserInput == targetShortPhrase) {
-                                        lockManager.stopLock()
-                                        onUnlocked()
-                                    }
+                                    lockManager.stopLock()
+                                    onUnlocked()
                                 },
-                                enabled = shortUserInput == targetShortPhrase,
                                 colors = ButtonDefaults.buttonColors(containerColor = ZenGreen),
                                 shape = RoundedCornerShape(12.dp),
-                                modifier = Modifier.fillMaxWidth().height(48.dp)
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(48.dp)
                             ) {
-                                Text("Finalizar y Desbloquear", color = Color.White, fontWeight = FontWeight.Bold)
+                                Text("🔓 Finalizar y Volver a Inicio", color = Color.White, fontWeight = FontWeight.Bold)
                             }
                         }
                     }

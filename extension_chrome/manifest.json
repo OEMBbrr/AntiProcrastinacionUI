@@ -15,6 +15,14 @@
   "host_permissions": [
     "<all_urls>"
   ],
+  "oauth2": {
+    "client_id": "927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com",
+    "scopes": [
+      "openid",
+      "email",
+      "profile"
+    ]
+  },
   "icons": {
     "16": "icons/icon16.png",
     "32": "icons/icon32.png",

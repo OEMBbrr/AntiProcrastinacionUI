@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Iniciar Sesión - AntiProcrastinación</title>
+    <style>
+        :root {
+            --zen-olive: #5A6E61;
+            --zen-sage: #8C9B90;
+            --zen-charcoal: #2C302E;
+            --zen-cream: #F9F8F6;
+            --zen-white: #FFFFFF;
+            --google-blue: #4285F4;
+            --google-green: #34A853;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        }
+
+        body {
+            background-color: var(--zen-cream);
+            color: var(--zen-charcoal);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+
+        .login-card {
+            background: var(--zen-white);
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.08);
+            border: 1px solid rgba(140, 155, 144, 0.2);
+            width: 100%;
+            max-width: 420px;
+            padding: 40px 32px;
+            text-align: center;
+        }
+
+        .logo-img {
+            width: 76px;
+            height: 76px;
+            border-radius: 50%;
+            margin-bottom: 16px;
+            border: 2px solid var(--zen-sage);
+        }
+
+        h1 {
+            font-size: 24px;
+            font-weight: 300;
+            letter-spacing: 1px;
+            margin-bottom: 6px;
+            color: var(--zen-charcoal);
+        }
+
+        p.subtitle {
+            font-size: 13px;
+            color: var(--zen-sage);
+            margin-bottom: 32px;
+        }
+
+        .btn-google {
+            background-color: var(--google-blue);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            padding: 16px 20px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 12px;
+            transition: transform 0.2s, background-color 0.2s, box-shadow 0.2s;
+            box-shadow: 0 4px 14px rgba(66, 133, 244, 0.3);
+        }
+
+        .btn-google:hover {
+            background-color: #3367D6;
+            transform: translateY(-1px);
+        }
+
+        .btn-google:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+        }
+
+        .g-icon {
+            font-size: 20px;
+            font-weight: 900;
+        }
+
+        .status-msg {
+            margin-top: 24px;
+            font-size: 13px;
+            min-height: 24px;
+            font-weight: 500;
+            line-height: 1.4;
+        }
+
+        .status-msg.success {
+            color: var(--google-green);
+        }
+
+        .status-msg.error {
+            color: #E53935;
+        }
+
+        /* V23: Menú de perfil y ajustes + modales + modo oscuro sincronizado */
+        .hidden {
+            display: none !important;
+        }
+
+        .menu-icon {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            flex-shrink: 0;
+        }
+
+        .menu-icon-white {
+            width: 16px;
+            height: 16px;
+            vertical-align: middle;
+            filter: brightness(0) invert(1);
+        }
+
+        .login-menu {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 60;
+        }
+
+        .profile-trigger {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 6px 14px;
+            background: var(--zen-white);
+            border: 1px solid rgba(140, 155, 144, 0.3);
+            border-radius: 20px;
+            cursor: pointer;
+            color: var(--zen-charcoal);
+            font-weight: 600;
+            font-size: 0.82rem;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+            transition: background 0.2s ease;
+        }
+
+        .profile-trigger:hover {
+            background: #F1F5F3;
+        }
+
+        .profile-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: var(--zen-olive);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .profile-text {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            max-width: 180px;
+        }
+
+        .profile-chevron {
+            font-size: 0.7rem;
+            color: var(--zen-sage);
+        }
+
+        .profile-dropdown {
+            position: absolute;
+            top: calc(100% + 8px);
+            right: 0;
+            width: 220px;
+            background: var(--zen-white);
+            border: 1px solid rgba(140, 155, 144, 0.25);
+            border-radius: 14px;
+            box-shadow: 0 10px 28px rgba(0, 0, 0, 0.15);
+            overflow: hidden;
+        }
+
+        .dropdown-item {
+            width: 100%;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 11px 14px;
+            background: transparent;
+            border: none;
+            border-bottom: 1px solid rgba(140, 155, 144, 0.2);
+            color: var(--zen-charcoal);
+            font-size: 0.84rem;
+            font-weight: 600;
+            text-align: left;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .dropdown-item:last-child {
+            border-bottom: none;
+        }
+
+        .dropdown-item:hover {
+            background: #F1F5F3;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            z-index: 100;
+        }
+
+        .modal-card {
+            background: var(--zen-white);
+            border-radius: 18px;
+            padding: 20px;
+            width: 100%;
+            max-width: 400px;
+            color: var(--zen-charcoal);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.2);
+        }
+
+        .modal-card h4 {
+            font-size: 1rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 12px;
+        }
+
+        .setting-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 2px;
+        }
+
+        .setting-row + .setting-row {
+            border-top: 1px solid rgba(140, 155, 144, 0.2);
+        }
+
+        .setting-label {
+            font-size: 0.84rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .zen-switch {
+            position: relative;
+            display: inline-block;
+            width: 40px;
+            height: 22px;
+            flex-shrink: 0;
+        }
+
+        .zen-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .zen-slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #CBD5E1;
+            transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-radius: 20px;
+        }
+
+        .zen-slider:before {
+            content: "";
+            position: absolute;
+            height: 16px;
+            width: 16px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #fff;
+            transition: 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            border-radius: 50%;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+        }
+
+        .zen-switch input:checked + .zen-slider {
+            background-color: var(--zen-olive);
+        }
+
+        .zen-switch input:checked + .zen-slider:before {
+            transform: translateX(18px);
+        }
+
+        .modal-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .btn-sm {
+            font-size: 0.8rem;
+            font-weight: 700;
+            padding: 9px 18px;
+            border-radius: 10px;
+            border: none;
+            cursor: pointer;
+        }
+
+        .btn-cancel {
+            background: transparent;
+            border: 1px solid #CBD5E1;
+            color: var(--zen-sage);
+        }
+
+        /* Modo oscuro (sincronizado con la app, el popup y las notas) */
+        html[data-theme="dark"] body {
+            background-color: #0F171E;
+            color: #F1F5F9;
+        }
+
+        html[data-theme="dark"] .login-card {
+            background: #1B252E;
+            border-color: rgba(148, 163, 184, 0.25);
+            box-shadow: 0 12px 34px rgba(0, 0, 0, 0.5);
+        }
+
+        html[data-theme="dark"] h1,
+        html[data-theme="dark"] .profile-trigger {
+            color: #F1F5F9;
+        }
+
+        html[data-theme="dark"] .profile-trigger {
+            background: #16202A;
+            border-color: rgba(148, 163, 184, 0.3);
+        }
+
+        html[data-theme="dark"] .profile-trigger:hover {
+            background: #2A343E;
+        }
+
+        html[data-theme="dark"] .profile-dropdown,
+        html[data-theme="dark"] .modal-card {
+            background: #1B252E;
+            border-color: rgba(148, 163, 184, 0.25);
+        }
+
+        html[data-theme="dark"] .dropdown-item {
+            color: #F1F5F9;
+            border-color: rgba(148, 163, 184, 0.15);
+        }
+
+        html[data-theme="dark"] .dropdown-item:hover {
+            background: #2A343E;
+        }
+
+        html[data-theme="dark"] .zen-slider {
+            background-color: #334155;
+        }
+
+        html[data-theme="dark"] .zen-slider:before {
+            background-color: #F1F5F9;
+        }
+
+        html[data-theme="dark"] .btn-cancel {
+            border-color: #334155;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- V23: Menú de Perfil y Ajustes (Mi Cuenta / Ajustes) -->
+    <div class="login-menu">
+        <button class="profile-trigger" id="btn-profile-menu">
+            <span class="profile-avatar"><img src="emojis/account_icon.svg" alt="Perfil" class="menu-icon-white"></span>
+            <span class="profile-text" id="profile-title">Mi Cuenta</span>
+            <span class="profile-chevron">▾</span>
+        </button>
+        <div class="profile-dropdown hidden" id="profile-dropdown">
+            <button class="dropdown-item" data-action="account"><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</button>
+            <button class="dropdown-item" data-open-modal="settings-modal"><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</button>
+        </div>
+    </div>
+
+    <div class="login-card">
+        <img src="app_logo.jpg" alt="Logo" class="logo-img">
+        <h1>antiprocrastinación</h1>
+        <p class="subtitle">Autenticación Oficial con Google</p>
+
+        <button class="btn-google" id="btn-google-login">
+            <span class="g-icon">G</span> Iniciar Sesión con Google
+        </button>
+
+        <div class="status-msg" id="status-msg"></div>
+    </div>
+
+    <!-- V23: Modal Ajustes (Modo Oscuro + Bloqueo Cruzado, sincronizados) -->
+    <div class="modal-overlay hidden" id="settings-modal">
+        <div class="modal-card">
+            <h4><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</h4>
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/dark_mode_icon.svg" alt="" class="menu-icon"> Modo Oscuro</span>
+                <label class="zen-switch">
+                    <input type="checkbox" id="dark-mode-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <div class="setting-row">
+                <span class="setting-label"><img src="emojis/sync_icon.svg" alt="" class="menu-icon"> Bloqueo Cruzado</span>
+                <label class="zen-switch">
+                    <input type="checkbox" id="cross-lock-switch">
+                    <span class="zen-slider"></span>
+                </label>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-sm btn-cancel" data-close-modal="settings-modal">Cerrar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="login.js"></script>
+</body>
+</html>
