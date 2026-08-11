@@ -135,116 +135,123 @@ class _MainLockScreenState extends State<MainLockScreen> {
                   ),
                 ],
               ),
-              const Spacer(),
-              // Central Block
+              // Hub Minimalista o Temporizador
               if (!isLocked)
-                Column(
-                  children: [
-                    const Text('TEMPORIZADOR DE ENFOQUE', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.grey)),
-                    const SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        IconButton(
-                          onPressed: () {
-                            if (targetDurationMinutes > 5) {
-                              setState(() => targetDurationMinutes -= 5);
-                            }
-                          },
-                          icon: const Icon(Icons.remove_circle_outline),
-                        ),
-                        Text('$targetDurationMinutes min', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w200)),
-                        IconButton(
-                          onPressed: () {
-                            setState(() => targetDurationMinutes += 5);
-                          },
-                          icon: const Icon(Icons.add_circle_outline),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 32),
-                    ElevatedButton(
-                      onPressed: startLock,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF556B2F),
-                        foregroundColor: Colors.white,
-                        minimumSize: const Size.fromHeight(54),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      // Top Bar (Apps propias)
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildPropiaApp(Icons.edit_note, "Notas"),
+                          _buildPropiaApp(Icons.bedtime, "Sueño"),
+                          _buildPropiaApp(Icons.task_alt, "Tareas"),
+                        ],
                       ),
-                      child: const Text('Iniciar Enfoque', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                    ),
-                  ],
+                      const SizedBox(height: 24),
+                      // Frase
+                      Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.grey.shade300),
+                        ),
+                        child: const Text(
+                          '"La disciplina es el puente entre metas y logros."',
+                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.black54),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Cajón de apps esenciales (simuladas)
+                      Expanded(
+                        child: ListView(
+                          children: [
+                            _buildAppItem(Icons.camera_alt_outlined, "Cámara"),
+                            _buildAppItem(Icons.chat_bubble_outline, "Mensajes"),
+                            _buildAppItem(Icons.map_outlined, "Mapas"),
+                            _buildAppItem(Icons.phone_outlined, "Llamadas"),
+                            _buildAppItem(Icons.chat_outlined, "WhatsApp"),
+                          ],
+                        ),
+                      ),
+                      // Modos
+                      const Divider(),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ElevatedButton.icon(
+                              onPressed: () => _showFocusSetupModal(context),
+                              icon: const Icon(Icons.lock_clock),
+                              label: const Text('Modo Enfoque'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFF556B2F),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                              ),
+                            ),
+                          ),
+                        ],
+                      )
+                    ],
+                  ),
                 )
               else
-                Column(
-                  children: [
-                    Text(
-                      formatDuration(remainingSeconds),
-                      style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w200, color: Color(0xFF2C3539)),
-                    ),
-                    const SizedBox(height: 8),
-                    const Text(
-                      'Mantén tu mente centrada en tu actividad actual.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.grey, fontSize: 13),
-                    ),
-                    const SizedBox(height: 32),
-                    if (remainingSeconds > 0) ...[
-                      OutlinedButton(
-                        onPressed: () => _showLongChallengeModal(context),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          side: const BorderSide(color: Color(0xFF556B2F)),
-                        ),
-                        child: const Text('Ya terminé mi actividad', style: TextStyle(color: Color(0xFF556B2F))),
+                Expanded(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        formatDuration(remainingSeconds),
+                        style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w200, color: Color(0xFF2C3539)),
                       ),
-                      const SizedBox(height: 12),
-                      ElevatedButton(
-                        onPressed: () => _showTempChallengeModal(context),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: const Color(0xFFE57373),
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                        ),
-                        child: const Text('Tregua temporal (5 min)'),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Mantén tu mente centrada en tu actividad actual.',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
                       ),
-                    ] else ...[
-                      ElevatedButton(
-                        onPressed: stopLock,
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.green,
-                          foregroundColor: Colors.white,
-                          minimumSize: const Size.fromHeight(50),
-                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                      const SizedBox(height: 48),
+                      if (remainingSeconds > 0) ...[
+                        OutlinedButton(
+                          onPressed: () => _showLongChallengeModal(context),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                            side: const BorderSide(color: Color(0xFF556B2F)),
+                          ),
+                          child: const Text('Ya terminé mi actividad', style: TextStyle(color: Color(0xFF556B2F))),
                         ),
-                        child: const Text('Finalizar y Desbloquear'),
-                      ),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => _showTempChallengeModal(context),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFFE57373),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Tregua temporal (5 min)'),
+                        ),
+                      ] else ...[
+                        ElevatedButton(
+                          onPressed: stopLock,
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green,
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size.fromHeight(50),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                          ),
+                          child: const Text('Finalizar y Desbloquear'),
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              const Spacer(),
-              // Emergency Footer
-              Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.call, color: Colors.green, size: 18),
-                      label: const Text('Teléfono', style: TextStyle(fontSize: 12, color: Colors.black87)),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () {},
-                      icon: const Icon(Icons.message, color: Color(0xFF556B2F), size: 18),
-                      label: const Text('Mensajes', style: TextStyle(fontSize: 12, color: Colors.black87)),
-                    ),
-                  ),
-                ],
-              ),
             ],
           ),
         ),
@@ -336,6 +343,85 @@ class _MainLockScreenState extends State<MainLockScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildPropiaApp(IconData icon, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: const Color(0xFF556B2F), size: 28),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+      ],
+    );
+  }
+
+  Widget _buildAppItem(IconData icon, String name) {
+    return ListTile(
+      leading: Icon(icon, color: Colors.grey.shade600),
+      title: Text(name, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w400)),
+      onTap: () {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+      },
+    );
+  }
+
+  void _showFocusSetupModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFFFDFBF7),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Text('CONFIGURAR MODO ENFOQUE', style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey)),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    IconButton(
+                      onPressed: () {
+                        if (targetDurationMinutes > 5) {
+                          setModalState(() => targetDurationMinutes -= 5);
+                          setState(() => targetDurationMinutes = targetDurationMinutes);
+                        }
+                      },
+                      icon: const Icon(Icons.remove_circle_outline),
+                    ),
+                    Text('$targetDurationMinutes min', style: const TextStyle(fontSize: 36, fontWeight: FontWeight.w200)),
+                    IconButton(
+                      onPressed: () {
+                        setModalState(() => targetDurationMinutes += 5);
+                        setState(() => targetDurationMinutes = targetDurationMinutes);
+                      },
+                      icon: const Icon(Icons.add_circle_outline),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 32),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.pop(ctx);
+                    startLock();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF556B2F),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(54),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                  child: const Text('Iniciar Enfoque', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                ),
+                const SizedBox(height: 24),
+              ],
+            ),
+          );
+        }
       ),
     );
   }
