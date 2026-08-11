@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
 
@@ -122,23 +123,14 @@ class _MainLockScreenState extends State<MainLockScreen> {
   Widget _buildHeader() {
     return Column(
       children: [
-        Container(
-          width: 70,
-          height: 70,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: const Color(0xFF556B2F).withOpacity(0.1),
-            border: Border.all(color: const Color(0xFF556B2F), width: 1),
-          ),
-          child: const Icon(Icons.self_improvement, size: 36, color: Color(0xFF556B2F)),
-        ),
+        const Icon(CupertinoIcons.leaf_arrow_circlepath, size: 42, color: Color(0xFF556B2F)),
         const SizedBox(height: 12),
         Text(
-          isLocked ? 'MODO ENFOQUE (iOS)' : 'antiprocrastinación',
+          isLocked ? 'Modo Enfoque' : 'Zen Hub',
           style: const TextStyle(
-            fontSize: 24,
-            fontWeight: FontWeight.w300,
-            letterSpacing: 1.2,
+            fontSize: 22,
+            fontWeight: FontWeight.w500,
+            letterSpacing: -0.5,
             color: Color(0xFF2C3539),
           ),
         ),
@@ -149,63 +141,98 @@ class _MainLockScreenState extends State<MainLockScreen> {
   Widget _buildLauncherUI() {
     return Expanded(
       child: Column(
-        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-            children: [
-              _buildPropiaApp(Icons.edit_note, "Notas", _showNotasModal),
-              _buildPropiaApp(Icons.bedtime, "Sueño", _showSleepCycleModal),
-              _buildPropiaApp(Icons.task_alt, "Tareas", _showTaskOrganizerModal),
-            ],
-          ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 16),
+          // Quote Card (Apple Style)
           Container(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 20),
             decoration: BoxDecoration(
               color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 10, offset: const Offset(0, 4)),
+              ],
             ),
-            child: const Text(
-              '"La disciplina es el puente entre metas y logros."',
-              style: TextStyle(fontStyle: FontStyle.italic, color: Colors.black54),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 24),
-          Expanded(
-            child: ListView(
+            child: const Column(
               children: [
-                _buildAppItem(Icons.camera_alt_outlined, "Cámara"),
-                _buildAppItem(Icons.chat_bubble_outline, "Mensajes"),
-                _buildAppItem(Icons.map_outlined, "Mapas"),
-                _buildAppItem(Icons.phone_outlined, "Llamadas"),
-                _buildAppItem(Icons.chat_outlined, "WhatsApp"),
-                _buildAppItem(Icons.camera_alt, "Instagram", isDopamine: true),
-                _buildAppItem(Icons.videogame_asset, "Casino Slot", isDopamine: true),
-                _buildAppItem(Icons.public, "Navegador Web", isDopamine: true),
+                Icon(CupertinoIcons.quote_bubble, color: Color(0xFF556B2F), size: 24),
+                SizedBox(height: 12),
+                Text(
+                  '"La disciplina es el puente entre metas y logros."',
+                  style: TextStyle(fontSize: 15, fontWeight: FontWeight.w400, color: Color(0xFF333333), letterSpacing: -0.3, height: 1.4),
+                  textAlign: TextAlign.center,
+                ),
               ],
             ),
           ),
-          const Divider(),
+          const SizedBox(height: 24),
+          
+          // Native Apps Row
           Row(
             children: [
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: () => _showFocusSetupModal(context),
-                  icon: const Icon(Icons.lock_clock),
-                  label: const Text('Modo Enfoque'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF556B2F),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
+              Expanded(child: _buildAppleStyleTile(CupertinoIcons.pencil_outline, "Notas", _showNotasModal)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildAppleStyleTile(CupertinoIcons.moon_stars, "Sueño", _showSleepCycleModal)),
+              const SizedBox(width: 12),
+              Expanded(child: _buildAppleStyleTile(CupertinoIcons.checkmark_circle, "Tareas", _showTaskOrganizerModal)),
+            ],
+          ),
+          const SizedBox(height: 24),
+
+          // App List (iOS Settings style)
+          const Padding(
+            padding: EdgeInsets.only(left: 8, bottom: 8),
+            child: Text('APLICACIONES PERMITIDAS', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Colors.black45, letterSpacing: 0.5)),
+          ),
+          Expanded(
+            child: Container(
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(24),
+                boxShadow: [
+                  BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(24),
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    _buildAppleAppRow(CupertinoIcons.camera, "Cámara", isFirst: true),
+                    _buildAppleAppRow(CupertinoIcons.chat_bubble_text, "Mensajes"),
+                    _buildAppleAppRow(CupertinoIcons.map, "Mapas"),
+                    _buildAppleAppRow(CupertinoIcons.phone, "Llamadas"),
+                    _buildAppleAppRow(CupertinoIcons.bubble_left_bubble_right, "WhatsApp"),
+                    _buildAppleAppRow(CupertinoIcons.photo, "Instagram", isDopamine: true),
+                    _buildAppleAppRow(CupertinoIcons.gamecontroller, "Casino Slot", isDopamine: true),
+                    _buildAppleAppRow(CupertinoIcons.globe, "Navegador Web", isDopamine: true, isLast: true),
+                  ],
                 ),
               ),
-            ],
-          )
+            ),
+          ),
+          const SizedBox(height: 24),
+
+          // Focus Button
+          ElevatedButton(
+            onPressed: () => _showFocusSetupModal(context),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: const Color(0xFF2C3539),
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(vertical: 20),
+              elevation: 0,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+            ),
+            child: const Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(CupertinoIcons.lock_shield, size: 20),
+                SizedBox(width: 8),
+                Text('Iniciar Modo Enfoque', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
+              ],
+            ),
+          ),
         ],
       ),
     );
@@ -216,48 +243,72 @@ class _MainLockScreenState extends State<MainLockScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Text(
-            formatDuration(remainingSeconds),
-            style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w200, color: Color(0xFF2C3539)),
+          Container(
+            padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 40),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(color: const Color(0xFF556B2F).withOpacity(0.15), blurRadius: 40, spreadRadius: 10),
+              ],
+            ),
+            child: Text(
+              formatDuration(remainingSeconds),
+              style: const TextStyle(
+                fontSize: 64,
+                fontWeight: FontWeight.w200,
+                color: Color(0xFF2C3539),
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
+            ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: 32),
           const Text(
-            'Mantén tu mente centrada en tu actividad actual.',
+            'Concéntrate en tu actividad.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.grey, fontSize: 13),
+            style: TextStyle(color: Colors.grey, fontSize: 16, fontWeight: FontWeight.w400, letterSpacing: -0.2),
           ),
           const SizedBox(height: 48),
           if (remainingSeconds > 0) ...[
             OutlinedButton(
               onPressed: () => _showLongChallengeModal(context),
               style: OutlinedButton.styleFrom(
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                side: const BorderSide(color: Color(0xFF556B2F)),
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                side: const BorderSide(color: Color(0xFF556B2F), width: 1.5),
               ),
-              child: const Text('Ya terminé mi actividad', style: TextStyle(color: Color(0xFF556B2F))),
+              child: const Text('Ya terminé mi actividad', style: TextStyle(color: Color(0xFF556B2F), fontSize: 16, fontWeight: FontWeight.w600)),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 16),
             ElevatedButton(
               onPressed: () => _showTempChallengeModal(context),
               style: ElevatedButton.styleFrom(
                 backgroundColor: const Color(0xFFE57373),
                 foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
-              child: const Text('Tregua temporal (5 min)'),
+              child: const Text('Tregua temporal (5 min)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             ),
           ] else ...[
             ElevatedButton(
               onPressed: stopLock,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.green,
+                backgroundColor: const Color(0xFF556B2F),
                 foregroundColor: Colors.white,
-                minimumSize: const Size.fromHeight(50),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                elevation: 0,
+                minimumSize: const Size.fromHeight(56),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
               ),
-              child: const Text('Finalizar y Desbloquear'),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(CupertinoIcons.unlock, size: 20),
+                  SizedBox(width: 8),
+                  Text('Desbloquear Dispositivo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+                ],
+              ),
             ),
           ],
         ],
@@ -353,27 +404,31 @@ class _MainLockScreenState extends State<MainLockScreen> {
     );
   }
 
-  Widget _buildPropiaApp(IconData icon, String label, VoidCallback onTap) {
-    return InkWell(
+  Widget _buildAppleStyleTile(IconData icon, String label, VoidCallback onTap) {
+    return GestureDetector(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          boxShadow: [
+            BoxShadow(color: Colors.black.withOpacity(0.02), blurRadius: 8, offset: const Offset(0, 2)),
+          ],
+        ),
         child: Column(
           children: [
-            Icon(icon, color: const Color(0xFF556B2F), size: 28),
-            const SizedBox(height: 4),
-            Text(label, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+            Icon(icon, color: const Color(0xFF556B2F), size: 26),
+            const SizedBox(height: 8),
+            Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w500, color: Color(0xFF333333))),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildAppItem(IconData icon, String name, {bool isDopamine = false}) {
-    return ListTile(
-      leading: Icon(icon, color: Colors.grey.shade600),
-      title: Text(name, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w400)),
+  Widget _buildAppleAppRow(IconData icon, String name, {bool isDopamine = false, bool isFirst = false, bool isLast = false}) {
+    return InkWell(
       onTap: () {
         if (isDopamine) {
           _showIntentionalityDialog(name);
@@ -381,6 +436,32 @@ class _MainLockScreenState extends State<MainLockScreen> {
           ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
         }
       },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+        decoration: BoxDecoration(
+          border: isLast ? null : Border(bottom: BorderSide(color: Colors.black.withOpacity(0.05), width: 1)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(8),
+              decoration: BoxDecoration(
+                color: isDopamine ? Colors.red.withOpacity(0.1) : const Color(0xFF556B2F).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: isDopamine ? Colors.red.shade400 : const Color(0xFF556B2F), size: 20),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Text(
+                name,
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w400, color: Color(0xFF2C3539), letterSpacing: -0.3),
+              ),
+            ),
+            Icon(CupertinoIcons.chevron_right, color: Colors.black.withOpacity(0.2), size: 16),
+          ],
+        ),
+      ),
     );
   }
 
