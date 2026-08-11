@@ -984,26 +984,28 @@ html[data-theme="dark"] .phrase-wrong {
 
 /* ================= V20: Modo Oscuro (replica la web y el teléfono) ================= */
 html[data-theme="dark"] {
-    --bg-main: #0F171E;
-    --card-bg: #1B252E;
-    --card-border: rgba(148, 163, 184, 0.22);
-    --text-main: #F1F5F9;
+    --bg-main: #181C1A;
+    --card-bg: #232926;
+    --card-border: rgba(90, 110, 97, 0.3);
+    --text-main: #E2E8F0;
     --text-muted: #94A3B8;
     --zen-olive: #5F7564;
     --zen-sage: #94A3B8;
     --zen-coral: #E57373;
-    --surface: #16202A;
-    --bg-soft: #16231A;
+    --surface: #1E2421;
+    --bg-soft: #1B211E;
     --pill-bg: #2A343E;
     --pill-text: #CBD5E1;
     --border: #334155;
     --warn-bg: #3A2E20;
     --warn-text: #FDE68A;
-    --border-soft: rgba(255, 255, 255, 0.08);
+    --hover-bg: rgba(255, 255, 255, 0.06);
+    --shadow-sm: inset 0 0 0 1px rgba(90, 110, 97, 0.2);
+    --shadow-md: 0 4px 12px rgba(0,0,0,0.3);
 }
 
 html[data-theme="dark"] .logo-img {
-    border-color: rgba(148, 163, 184, 0.4);
+    border-color: rgba(90, 110, 97, 0.4);
 }
 
 html[data-theme="dark"] .btn-notes-toggle {
@@ -1024,11 +1026,11 @@ html[data-theme="dark"] .add-site-form input {
 }
 
 html[data-theme="dark"] .zen-slider:before {
-    background-color: #F1F5F9;
+    background-color: #E2E8F0;
 }
 
 html[data-theme="dark"] .btn-step {
     background: var(--surface);
     color: var(--text-main);
-    border-color: rgba(148, 163, 184, 0.35);
+    border-color: rgba(90, 110, 97, 0.35);
 }
