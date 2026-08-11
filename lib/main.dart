@@ -110,154 +110,157 @@ class _MainLockScreenState extends State<MainLockScreen> {
           child: Column(
             children: [
               const SizedBox(height: 20),
-              // Header
-              Column(
-                children: [
-                  Container(
-                    width: 70,
-                    height: 70,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: const Color(0xFF556B2F).withOpacity(0.1),
-                      border: Border.all(color: const Color(0xFF556B2F), width: 1),
-                    ),
-                    child: const Icon(Icons.self_improvement, size: 36, color: Color(0xFF556B2F)),
-                  ),
-                  const SizedBox(height: 12),
-                  Text(
-                    isLocked ? 'MODO ENFOQUE (iOS)' : 'antiprocrastinación',
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.w300,
-                      letterSpacing: 1.2,
-                      color: Color(0xFF2C3539),
-                    ),
-                  ),
-                ],
-              ),
-              // Hub Minimalista o Temporizador
-              if (!isLocked)
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      // Top Bar (Apps propias)
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildPropiaApp(Icons.edit_note, "Notas", _showNotasModal),
-                          _buildPropiaApp(Icons.bedtime, "Sueño", _showSleepCycleModal),
-                          _buildPropiaApp(Icons.task_alt, "Tareas", _showTaskOrganizerModal),
-                        ],
-                      ),
-                      const SizedBox(height: 24),
-                      // Frase
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade300),
-                        ),
-                        child: const Text(
-                          '"La disciplina es el puente entre metas y logros."',
-                          style: TextStyle(fontStyle: FontStyle.italic, color: Colors.black54),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      // Cajón de apps esenciales (simuladas)
-                      Expanded(
-                        child: ListView(
-                          children: [
-                            _buildAppItem(Icons.camera_alt_outlined, "Cámara"),
-                            _buildAppItem(Icons.chat_bubble_outline, "Mensajes"),
-                            _buildAppItem(Icons.map_outlined, "Mapas"),
-                            _buildAppItem(Icons.phone_outlined, "Llamadas"),
-                            _buildAppItem(Icons.chat_outlined, "WhatsApp"),
-                            _buildAppItem(Icons.camera_alt, "Instagram", isDopamine: true),
-                            _buildAppItem(Icons.videogame_asset, "Casino Slot", isDopamine: true),
-                            _buildAppItem(Icons.public, "Navegador Web", isDopamine: true),
-                          ],
-                        ),
-                      ),
-                      // Modos
-                      const Divider(),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: ElevatedButton.icon(
-                              onPressed: () => _showFocusSetupModal(context),
-                              icon: const Icon(Icons.lock_clock),
-                              label: const Text('Modo Enfoque'),
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: const Color(0xFF556B2F),
-                                foregroundColor: Colors.white,
-                                padding: const EdgeInsets.symmetric(vertical: 16),
-                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                              ),
-                            ),
-                          ),
-                        ],
-                      )
-                    ],
-                  ),
-                )
-              else
-                Expanded(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        formatDuration(remainingSeconds),
-                        style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w200, color: Color(0xFF2C3539)),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Mantén tu mente centrada en tu actividad actual.',
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
-                      ),
-                      const SizedBox(height: 48),
-                      if (remainingSeconds > 0) ...[
-                        OutlinedButton(
-                          onPressed: () => _showLongChallengeModal(context),
-                          style: OutlinedButton.styleFrom(
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                            side: const BorderSide(color: Color(0xFF556B2F)),
-                          ),
-                          child: const Text('Ya terminé mi actividad', style: TextStyle(color: Color(0xFF556B2F))),
-                        ),
-                        const SizedBox(height: 12),
-                        ElevatedButton(
-                          onPressed: () => _showTempChallengeModal(context),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFE57373),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          child: const Text('Tregua temporal (5 min)'),
-                        ),
-                      ] else ...[
-                        ElevatedButton(
-                          onPressed: stopLock,
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green,
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size.fromHeight(50),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
-                          ),
-                          child: const Text('Finalizar y Desbloquear'),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
+              _buildHeader(),
+              if (!isLocked) _buildLauncherUI() else _buildLockScreenUI(),
             ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeader() {
+    return Column(
+      children: [
+        Container(
+          width: 70,
+          height: 70,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: const Color(0xFF556B2F).withOpacity(0.1),
+            border: Border.all(color: const Color(0xFF556B2F), width: 1),
+          ),
+          child: const Icon(Icons.self_improvement, size: 36, color: Color(0xFF556B2F)),
+        ),
+        const SizedBox(height: 12),
+        Text(
+          isLocked ? 'MODO ENFOQUE (iOS)' : 'antiprocrastinación',
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.w300,
+            letterSpacing: 1.2,
+            color: Color(0xFF2C3539),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildLauncherUI() {
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _buildPropiaApp(Icons.edit_note, "Notas", _showNotasModal),
+              _buildPropiaApp(Icons.bedtime, "Sueño", _showSleepCycleModal),
+              _buildPropiaApp(Icons.task_alt, "Tareas", _showTaskOrganizerModal),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.grey.shade300),
+            ),
+            child: const Text(
+              '"La disciplina es el puente entre metas y logros."',
+              style: TextStyle(fontStyle: FontStyle.italic, color: Colors.black54),
+              textAlign: TextAlign.center,
+            ),
+          ),
+          const SizedBox(height: 24),
+          Expanded(
+            child: ListView(
+              children: [
+                _buildAppItem(Icons.camera_alt_outlined, "Cámara"),
+                _buildAppItem(Icons.chat_bubble_outline, "Mensajes"),
+                _buildAppItem(Icons.map_outlined, "Mapas"),
+                _buildAppItem(Icons.phone_outlined, "Llamadas"),
+                _buildAppItem(Icons.chat_outlined, "WhatsApp"),
+                _buildAppItem(Icons.camera_alt, "Instagram", isDopamine: true),
+                _buildAppItem(Icons.videogame_asset, "Casino Slot", isDopamine: true),
+                _buildAppItem(Icons.public, "Navegador Web", isDopamine: true),
+              ],
+            ),
+          ),
+          const Divider(),
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: () => _showFocusSetupModal(context),
+                  icon: const Icon(Icons.lock_clock),
+                  label: const Text('Modo Enfoque'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF556B2F),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+            ],
+          )
+        ],
+      ),
+    );
+  }
+
+  Widget _buildLockScreenUI() {
+    return Expanded(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Text(
+            formatDuration(remainingSeconds),
+            style: const TextStyle(fontSize: 56, fontWeight: FontWeight.w200, color: Color(0xFF2C3539)),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Mantén tu mente centrada en tu actividad actual.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.grey, fontSize: 13),
+          ),
+          const SizedBox(height: 48),
+          if (remainingSeconds > 0) ...[
+            OutlinedButton(
+              onPressed: () => _showLongChallengeModal(context),
+              style: OutlinedButton.styleFrom(
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                side: const BorderSide(color: Color(0xFF556B2F)),
+              ),
+              child: const Text('Ya terminé mi actividad', style: TextStyle(color: Color(0xFF556B2F))),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: () => _showTempChallengeModal(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFE57373),
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Tregua temporal (5 min)'),
+            ),
+          ] else ...[
+            ElevatedButton(
+              onPressed: stopLock,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.green,
+                foregroundColor: Colors.white,
+                minimumSize: const Size.fromHeight(50),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+              child: const Text('Finalizar y Desbloquear'),
+            ),
+          ],
+        ],
       ),
     );
   }
