@@ -21,7 +21,9 @@ import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -37,6 +39,7 @@ import com.antiprocrastinacion.lock.LockManager
 import com.antiprocrastinacion.lock.MotivationalPhrases
 import com.antiprocrastinacion.lock.ZenNote
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 
 /**
  * V26: Pantalla principal del nuevo launcher.
@@ -488,6 +491,24 @@ private fun LauncherWidgetCard(
                 )
             }
         }
+    }
+}
+
+/** Botón de inicio rápido de Modo Enfoque (25/45/90 min). */
+@Composable
+private fun RowScope.FocusQuickButton(
+    label: String,
+    duration: Int,
+    onClick: (Int) -> Unit
+) {
+    Button(
+        onClick = { onClick(duration) },
+        modifier = Modifier.weight(1f),
+        shape = RoundedCornerShape(12.dp),
+        colors = ButtonDefaults.buttonColors(containerColor = LchAccent),
+        contentPadding = PaddingValues(vertical = 12.dp)
+    ) {
+        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold)
     }
 }
 

@@ -133,7 +133,13 @@ class MainActivity : FragmentActivity() {
                             onOpenSleepCycle = { currentScreen = "sleep" },
                             onOpenOrganizer = { currentScreen = "organizer" },
                             onOpenAppDrawer = { currentScreen = "drawer" },
-                            onOpenSettings = { currentScreen = "config" }
+                            onOpenSettings = { currentScreen = "config" },
+                            onStartFocus = { minutes ->
+                                lockManager.startLock(minutes)
+                                isLockedState = true
+                                isTempUnlockedState = false
+                                LockMonitoringService.startService(this@MainActivity)
+                            }
                         )
                     }
                     "drawer" -> {

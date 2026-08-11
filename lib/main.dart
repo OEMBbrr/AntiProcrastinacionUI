@@ -58,6 +58,9 @@ class _MainLockScreenState extends State<MainLockScreen> {
   int noSocialTargetMinutes = 60;
   Timer? noSocialTimer;
 
+  // Modo Paseo
+  bool isWalkModeActive = false;
+
   @override
   void initState() {
     super.initState();
@@ -237,11 +240,12 @@ class _MainLockScreenState extends State<MainLockScreen> {
                 child: const Text('Modo Trabajo Activo', style: TextStyle(color: Color(0xFFE57373), fontSize: 12, fontWeight: FontWeight.bold)),
               ),
             if (isNoSocialModeActive && !isLocked)
+            if (isWalkModeActive && !isLocked)
               Container(
                 margin: const EdgeInsets.only(top: 8),
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
-                child: Text('Modo Sin Redes: ${formatDuration(noSocialRemainingSeconds)}', style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
+                decoration: BoxDecoration(color: const Color(0xFF556B2F).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: const Text('Modo Paseo Activo', style: TextStyle(color: Color(0xFF556B2F), fontSize: 12, fontWeight: FontWeight.bold)),
               ),
           ],
         ),
@@ -324,6 +328,7 @@ class _MainLockScreenState extends State<MainLockScreen> {
                     _buildAppleAppRow(CupertinoIcons.map, "Mapas"),
                     _buildAppleAppRow(CupertinoIcons.phone, "Llamadas"),
                     _buildAppleAppRow(CupertinoIcons.bubble_left_bubble_right, "WhatsApp"),
+                    _buildAppleAppRow(CupertinoIcons.music_note, "Apple Music", isMusic: true),
                     _buildAppleAppRow(CupertinoIcons.photo, "Instagram", isDopamine: true),
                     _buildAppleAppRow(CupertinoIcons.gamecontroller, "Casino Slot", isDopamine: true),
                     _buildAppleAppRow(CupertinoIcons.globe, "Navegador Web", isDopamine: true, isLast: true),
@@ -338,46 +343,56 @@ class _MainLockScreenState extends State<MainLockScreen> {
           Row(
             children: [
               Expanded(
-                child: ElevatedButton(
-                  onPressed: isNoSocialModeActive ? null : () => _showNoSocialSetupModal(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: const Color(0xFF2C3539),
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.shade300)),
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(CupertinoIcons.eye_slash, size: 20),
-                      SizedBox(height: 4),
-                      Text('Sin Redes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
-                    ],
-                  ),
+                child: _buildModeButton(
+                  icon: CupertinoIcons.eye_slash,
+                  label: 'Sin Redes',
+                  isActive: isNoSocialModeActive,
+                  onPressed: isNoSocialModeActive || isWalkModeActive ? null : () => _showNoSocialSetupModal(context),
                 ),
               ),
-              const SizedBox(width: 12),
+              const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
-                  onPressed: () => _showFocusSetupModal(context),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF2C3539),
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(vertical: 20),
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-                  ),
-                  child: const Column(
-                    children: [
-                      Icon(CupertinoIcons.lock_shield, size: 20),
-                      SizedBox(height: 4),
-                      Text('Enfoque', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
-                    ],
-                  ),
+                child: _buildModeButton(
+                  icon: CupertinoIcons.tree,
+                  label: 'Paseo',
+                  isActive: isWalkModeActive,
+                  onPressed: isNoSocialModeActive || isLocked ? null : () => setState(() => isWalkModeActive = !isWalkModeActive),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: _buildModeButton(
+                  icon: CupertinoIcons.lock_shield,
+                  label: 'Enfoque',
+                  isActive: isLocked,
+                  onPressed: isNoSocialModeActive || isWalkModeActive ? null : () => _showFocusSetupModal(context),
                 ),
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildModeButton({required IconData icon, required String label, required bool isActive, required VoidCallback? onPressed}) {
+    return ElevatedButton(
+      onPressed: onPressed,
+      style: ElevatedButton.styleFrom(
+        backgroundColor: isActive ? const Color(0xFF2C3539) : Colors.white,
+        foregroundColor: isActive ? Colors.white : const Color(0xFF2C3539),
+        padding: const EdgeInsets.symmetric(vertical: 16),
+        elevation: 0,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16), 
+          side: BorderSide(color: isActive ? Colors.transparent : Colors.grey.shade300)
+        ),
+      ),
+      child: Column(
+        children: [
+          Icon(icon, size: 20),
+          const SizedBox(height: 4),
+          Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
         ],
       ),
     );
@@ -572,26 +587,41 @@ class _MainLockScreenState extends State<MainLockScreen> {
     );
   }
 
-  Widget _buildAppleAppRow(IconData icon, String name, {bool isDopamine = false, bool isFirst = false, bool isLast = false}) {
+  Widget _buildAppleAppRow(IconData icon, String name, {bool isDopamine = false, bool isMusic = false, bool isFirst = false, bool isLast = false}) {
     return InkWell(
       onTap: () {
-        if (isWorkModeActive && isDopamine) {
+        if (isWorkModeActive && (isDopamine || isMusic)) {
           _showWorkModeBlockedDialog(name);
           return;
         }
-        if (isNoSocialModeActive && isDopamine && name != "WhatsApp") {
+        if (isNoSocialModeActive && (isDopamine || isMusic) && name != "WhatsApp") {
           _showNoSocialBlockedDialog(name);
           return;
         }
 
-        if (isDopamine) {
-          _showIntentionalityDialog(name);
-        } else {
-          if (isNoSocialModeActive) {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Límite de 30 mins activado para $name.')));
-          } else {
-            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+        if (isWalkModeActive) {
+          if (isMusic) {
+            _showWalkModeBlockedDialog(name);
+            return;
           }
+          if (isDopamine) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Límite de 15 mins para $name en Modo Paseo.')));
+            return;
+          }
+          if (name == "WhatsApp") {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Límite de 20 mins para WhatsApp en Modo Paseo.')));
+            return;
+          }
+        }
+
+        if (isDopamine) {
+           _showIntentionalityDialog(name);
+        } else {
+           if (isNoSocialModeActive) {
+             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Límite de 30 mins activado para $name.')));
+           } else {
+             ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+           }
         }
       },
       child: Container(
@@ -846,6 +876,23 @@ class _MainLockScreenState extends State<MainLockScreen> {
             onPressed: () => Navigator.pop(ctx),
             style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2C3539), foregroundColor: Colors.white),
             child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWalkModeBlockedDialog(String appName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Disfruta el momento', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Estás en Modo Paseo.\n\n$appName ha sido bloqueada intencionalmente para que conectes con tu entorno y disfrutes del paseo.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF556B2F), foregroundColor: Colors.white),
+            child: const Text('Volver a caminar'),
           ),
         ],
       ),

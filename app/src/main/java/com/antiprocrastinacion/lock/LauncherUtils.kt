@@ -133,6 +133,21 @@ object LauncherUtils {
         context.startActivity(intent)
     }
 
+    /** ¿Es nuestra app el inicio predeterminado del sistema (HOME)? */
+    fun isDefaultHome(context: Context): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+            roleManager.isRoleHeld(android.app.role.RoleManager.ROLE_HOME)
+        } else {
+            @Suppress("DEPRECATION")
+            val resolveInfo = context.packageManager.resolveActivity(
+                Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME),
+                PackageManager.MATCH_DEFAULT_ONLY
+            )
+            resolveInfo?.activityInfo?.packageName == context.packageName
+        }
+    }
+
     fun getForegroundPackage(context: Context): String? {
         if (!hasUsageStatsPermission(context)) return null
         val usageStatsManager = context.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
