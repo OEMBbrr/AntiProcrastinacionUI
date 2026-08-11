@@ -52,6 +52,12 @@ class _MainLockScreenState extends State<MainLockScreen> {
     5: {'start': null, 'end': null},
   };
 
+  // Modo Sin Redes/Dopamina
+  bool isNoSocialModeActive = false;
+  int noSocialRemainingSeconds = 0;
+  int noSocialTargetMinutes = 60;
+  Timer? noSocialTimer;
+
   @override
   void initState() {
     super.initState();
@@ -65,7 +71,23 @@ class _MainLockScreenState extends State<MainLockScreen> {
   void dispose() {
     workModeChecker?.cancel();
     timer?.cancel();
+    noSocialTimer?.cancel();
     super.dispose();
+  }
+
+  void _startNoSocialMode() {
+    setState(() {
+      isNoSocialModeActive = true;
+      noSocialRemainingSeconds = noSocialTargetMinutes * 60;
+    });
+    noSocialTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (noSocialRemainingSeconds > 0) {
+        setState(() => noSocialRemainingSeconds--);
+      } else {
+        t.cancel();
+        setState(() => isNoSocialModeActive = false);
+      }
+    });
   }
 
   void _checkWorkModeStatus() {
@@ -161,13 +183,13 @@ class _MainLockScreenState extends State<MainLockScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    Widget content = Scaffold(
+      backgroundColor: const Color(0xFFFDFBF7),
       body: SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(24.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 16.0),
           child: Column(
             children: [
-              const SizedBox(height: 20),
               _buildHeader(),
               if (!isLocked) _buildLauncherUI() else _buildLockScreenUI(),
             ],
@@ -175,6 +197,19 @@ class _MainLockScreenState extends State<MainLockScreen> {
         ),
       ),
     );
+
+    if (isNoSocialModeActive) {
+      return ColorFiltered(
+        colorFilter: const ColorFilter.matrix([
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0.2126, 0.7152, 0.0722, 0, 0,
+          0,      0,      0,      1, 0,
+        ]),
+        child: content,
+      );
+    }
+    return content;
   }
 
   Widget _buildHeader() {
@@ -200,7 +235,14 @@ class _MainLockScreenState extends State<MainLockScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(color: const Color(0xFFE57373).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
                 child: const Text('Modo Trabajo Activo', style: TextStyle(color: Color(0xFFE57373), fontSize: 12, fontWeight: FontWeight.bold)),
-              )
+              ),
+            if (isNoSocialModeActive && !isLocked)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: Colors.grey.shade200, borderRadius: BorderRadius.circular(12)),
+                child: Text('Modo Sin Redes: ${formatDuration(noSocialRemainingSeconds)}', style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
           ],
         ),
         if (!isLocked)
@@ -292,24 +334,49 @@ class _MainLockScreenState extends State<MainLockScreen> {
           ),
           const SizedBox(height: 24),
 
-          // Focus Button
-          ElevatedButton(
-            onPressed: () => _showFocusSetupModal(context),
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF2C3539),
-              foregroundColor: Colors.white,
-              padding: const EdgeInsets.symmetric(vertical: 20),
-              elevation: 0,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-            ),
-            child: const Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(CupertinoIcons.lock_shield, size: 20),
-                SizedBox(width: 8),
-                Text('Iniciar Modo Enfoque', style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
-              ],
-            ),
+          // Mode Buttons
+          Row(
+            children: [
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: isNoSocialModeActive ? null : () => _showNoSocialSetupModal(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: const Color(0xFF2C3539),
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20), side: BorderSide(color: Colors.grey.shade300)),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(CupertinoIcons.eye_slash, size: 20),
+                      SizedBox(height: 4),
+                      Text('Sin Redes', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () => _showFocusSetupModal(context),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2C3539),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 20),
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: const Column(
+                    children: [
+                      Icon(CupertinoIcons.lock_shield, size: 20),
+                      SizedBox(height: 4),
+                      Text('Enfoque', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600, letterSpacing: -0.5)),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -508,14 +575,23 @@ class _MainLockScreenState extends State<MainLockScreen> {
   Widget _buildAppleAppRow(IconData icon, String name, {bool isDopamine = false, bool isFirst = false, bool isLast = false}) {
     return InkWell(
       onTap: () {
-        if (isDopamine && isWorkModeActive) {
+        if (isWorkModeActive && isDopamine) {
           _showWorkModeBlockedDialog(name);
           return;
         }
+        if (isNoSocialModeActive && isDopamine && name != "WhatsApp") {
+          _showNoSocialBlockedDialog(name);
+          return;
+        }
+
         if (isDopamine) {
           _showIntentionalityDialog(name);
         } else {
-          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+          if (isNoSocialModeActive) {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Límite de 30 mins activado para $name.')));
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+          }
         }
       },
       child: Container(
@@ -757,6 +833,96 @@ class _MainLockScreenState extends State<MainLockScreen> {
           );
         }
       ),
+    );
+  }
+  void _showNoSocialBlockedDialog(String appName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bloqueado', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Estás en el Modo Sin Redes.\n\n$appName se mantendrá bloqueado hasta que se acabe tu temporizador.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2C3539), foregroundColor: Colors.white),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNoSocialSetupModal(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              height: MediaQuery.of(context).size.height * 0.7,
+              padding: const EdgeInsets.all(32),
+              decoration: const BoxDecoration(
+                color: Color(0xFFFDFBF7),
+                borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Container(
+                      width: 48,
+                      height: 4,
+                      decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+                    ),
+                  ),
+                  const SizedBox(height: 32),
+                  const Text('Modo Sin Redes', style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold, letterSpacing: -1, color: Color(0xFF2C3539))),
+                  const SizedBox(height: 8),
+                  const Text('Bloquea distracciones. La pantalla se pondrá en escala de grises. Este modo no se puede apagar hasta que el tiempo acabe.', style: TextStyle(color: Colors.black54, fontSize: 15, height: 1.4)),
+                  const SizedBox(height: 48),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      IconButton(
+                        icon: const Icon(CupertinoIcons.minus_circle_fill, size: 40, color: Color(0xFF2C3539)),
+                        onPressed: () {
+                          if (noSocialTargetMinutes > 15) setModalState(() => noSocialTargetMinutes -= 15);
+                        },
+                      ),
+                      const SizedBox(width: 24),
+                      Text('$noSocialTargetMinutes min', style: const TextStyle(fontSize: 40, fontWeight: FontWeight.w200, color: Color(0xFF2C3539), fontFeatures: [FontFeature.tabularFigures()])),
+                      const SizedBox(width: 24),
+                      IconButton(
+                        icon: const Icon(CupertinoIcons.plus_circle_fill, size: 40, color: Color(0xFF2C3539)),
+                        onPressed: () {
+                          if (noSocialTargetMinutes < 240) setModalState(() => noSocialTargetMinutes += 15);
+                        },
+                      ),
+                    ],
+                  ),
+                  const Spacer(),
+                  ElevatedButton(
+                    onPressed: () {
+                      Navigator.pop(context);
+                      _startNoSocialMode();
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF2C3539),
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size.fromHeight(60),
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                    ),
+                    child: const Text('Comenzar Desintoxicación', style: TextStyle(fontSize: 18, fontWeight: FontWeight.w600)),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
