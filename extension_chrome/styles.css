@@ -7,6 +7,9 @@
     --zen-olive: #5A6E61;
     --zen-sage: #8C9B90;
     --zen-coral: #D97D75;
+    --hover-bg: rgba(90, 110, 97, 0.08);
+    --shadow-sm: 0 1px 2px 0 rgba(60,64,67,0.3), 0 1px 3px 1px rgba(60,64,67,0.15);
+    --shadow-md: 0 1px 3px 0 rgba(60,64,67,0.3), 0 4px 8px 3px rgba(60,64,67,0.15);
     --radius-md: 14px;
     --radius-sm: 8px;
     --font-family: 'Google Sans', Roboto, Arial, sans-serif;
@@ -109,11 +112,11 @@ body {
     border-radius: var(--radius-md);
     padding: 10px 12px;
     margin-bottom: 14px;
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
-    transition: box-shadow 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
 }
 .account-box:hover {
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-md);
 }
 .account-header {
     display: flex;
@@ -320,11 +323,11 @@ body {
     padding: 22px 18px;
     text-align: center;
     margin-bottom: 16px;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-    transition: box-shadow 0.3s ease, transform 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s, transform 0.2s;
 }
 .timer-box:hover {
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-md);
     transform: translateY(-1px);
 }
 
@@ -573,12 +576,12 @@ body {
     border-radius: var(--radius-md);
     padding: 16px;
     border: 1px solid var(--border-soft);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
-    transition: box-shadow 0.3s ease;
+    box-shadow: var(--shadow-sm);
+    transition: box-shadow 0.2s;
     margin-bottom: 16px;
 }
 .sites-box:hover {
-    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+    box-shadow: var(--shadow-md);
 }
 
 .box-header {
@@ -741,7 +744,7 @@ body {
     padding: 24px;
     width: 100%;
     color: var(--text-main);
-    box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+    box-shadow: var(--shadow-md);
     border: 1px solid var(--border-soft);
 }
 
