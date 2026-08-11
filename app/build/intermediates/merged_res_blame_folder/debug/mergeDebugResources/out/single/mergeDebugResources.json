@@ -1,54 +1,58 @@
 [
     {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_app_logo.jpg.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\app_logo.jpg"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_memo_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/memo_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_light_bulb_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/light_bulb_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_brain_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/brain_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_pushpin_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/pushpin_3d.png"
+    },
+    {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/xml_wallpaper.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/xml/wallpaper.xml"
     },
     {
         "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_zen_widget_bg.xml.flat",
         "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/zen_widget_bg.xml"
     },
     {
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_ic_launcher_foreground.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/ic_launcher_foreground.xml"
+    },
+    {
         "merged": "com.antiprocrastinacion.lock.app-debug-62:/layout_zen_widget.xml.flat",
         "source": "com.antiprocrastinacion.lock.app-main-64:/layout/zen_widget.xml"
     },
     {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_brain_3d.png.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\brain_3d.png"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_app_logo.jpg.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/app_logo.jpg"
     },
     {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\xml_wallpaper.xml.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\xml\\wallpaper.xml"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_rocket_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/rocket_3d.png"
     },
     {
         "merged": "com.antiprocrastinacion.lock.app-debug-62:/xml_zen_widget_info.xml.flat",
         "source": "com.antiprocrastinacion.lock.app-main-64:/xml/zen_widget_info.xml"
     },
     {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_pushpin_3d.png.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\pushpin_3d.png"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_sparkles_3d.png.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/sparkles_3d.png"
     },
     {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_rocket_3d.png.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\rocket_3d.png"
-    },
-    {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_ic_launcher_foreground.xml.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\ic_launcher_foreground.xml"
-    },
-    {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_light_bulb_3d.png.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\light_bulb_3d.png"
+        "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_zen_widget_step_bg.xml.flat",
+        "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/zen_widget_step_bg.xml"
     },
     {
         "merged": "com.antiprocrastinacion.lock.app-debug-62:/drawable_zen_widget_btn_bg.xml.flat",
         "source": "com.antiprocrastinacion.lock.app-main-64:/drawable/zen_widget_btn_bg.xml"
-    },
-    {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_memo_3d.png.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\memo_3d.png"
-    },
-    {
-        "merged": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-debug-62:\\drawable_sparkles_3d.png.flat",
-        "source": "C:\\Users\\USUARIO\\.gradle\\daemon\\8.11.1\\com.antiprocrastinacion.lock.app-main-64:\\drawable\\sparkles_3d.png"
     }
 ]

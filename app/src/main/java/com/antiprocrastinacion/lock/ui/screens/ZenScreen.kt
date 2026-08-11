@@ -32,6 +32,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antiprocrastinacion.lock.LockManager
+import com.antiprocrastinacion.lock.PhraseGenerator
 import com.antiprocrastinacion.lock.ui.theme.*
 import kotlinx.coroutines.delay
 
@@ -150,9 +151,9 @@ fun ZenScreen(
         tempChallengeType = "math"
     }
 
-    // Generar desafío de Frase Mediana (1 de 100)
+    // Generar desafío de Frase Mediana (generador combinatorio, miles de variantes)
     fun preparePhraseChallenge() {
-        mediumPhraseText = LockManager.MEDIUM_TEMP_UNLOCK_PHRASES.random()
+        mediumPhraseText = PhraseGenerator.mediumTemp()
         mediumPhraseUserInput = ""
         tempChallengeType = "phrase"
     }
@@ -807,7 +808,7 @@ fun ZenScreen(
                         ) {
                             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 Icon(Icons.Default.FormatQuote, contentDescription = null)
-                                Text("Frase de Enfoque (100 frases)")
+                                Text("Frase de Enfoque")
                             }
                         }
                     } else if (tempChallengeType == "math") {

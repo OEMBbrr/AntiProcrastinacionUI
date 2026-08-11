@@ -2,13 +2,4 @@
 <resources>
     <string name="app_name">AntiProcrastinación</string>
     <string name="wallpaper_description">Sistema de enfoque profundo y bloqueo contra distracciones.</string>
-
-    <!-- V26: widget de escritorio -->
-    <string name="widget_title">Modo Enfoque</string>
-    <string name="widget_subtitle">Inicia una sesión sin distracciones</string>
-    <string name="widget_btn_25">25 min</string>
-    <string name="widget_btn_45">45 min</string>
-    <string name="widget_btn_90">90 min</string>
-    <string name="widget_default_phrase">Haz una cosa a la vez. Estás donde estás.</string>
-    <string name="widget_open_notes">Abrir mis notas</string>
 </resources>

@@ -24,6 +24,7 @@ import com.antiprocrastinacion.lock.ui.screens.ConfigScreen
 import com.antiprocrastinacion.lock.ui.screens.ZenScreen
 import com.antiprocrastinacion.lock.ui.launcher.AppDrawerScreen
 import com.antiprocrastinacion.lock.ui.launcher.LauncherScreen
+import com.antiprocrastinacion.lock.ui.launcher.ModosScreen
 import com.antiprocrastinacion.lock.ui.launcher.NotesAppScreen
 import com.antiprocrastinacion.lock.ui.launcher.OrganizerScreen
 import com.antiprocrastinacion.lock.ui.launcher.SleepCycleScreen
@@ -40,6 +41,8 @@ class MainActivity : FragmentActivity() {
     private var isTempUnlockedState by mutableStateOf(false)
     private var darkTheme by mutableStateOf(false)
     private var configVersion by mutableStateOf(0)
+    // V29: estado del Modo Paseo (activa/desactiva a voluntad, sin temporizador)
+    private var paseoActive by mutableStateOf(false)
     // V25: pantalla actual del launcher ("launcher" | "drawer" | "notes" | "sleep" | "organizer" | "config" | "zen")
     private var currentScreen by mutableStateOf("launcher")
     // V24 (Propuesta 2): solicitud de tregua entrante desde el PC (null = ninguna)
@@ -103,6 +106,7 @@ class MainActivity : FragmentActivity() {
         isLockedState = lockManager.isLocked
         isTempUnlockedState = lockManager.isTempUnlocked
         darkTheme = lockManager.darkModeEnabled
+        paseoActive = lockManager.paseoModeEnabled
         // V26: cargar el acento del sistema elegido en Ajustes -> Colores
         ZenTheme.accent = AccentPresets.byKey(lockManager.accentPresetKey)
 
@@ -153,6 +157,12 @@ class MainActivity : FragmentActivity() {
                     com.antiprocrastinacion.lock.ui.launcher.LauncherTheme.isDark = darkTheme
                 }
 
+                // V29: activar/desactivar el Modo Paseo a voluntad (sin temporizador)
+                val togglePaseo: () -> Unit = {
+                    lockManager.paseoModeEnabled = !lockManager.paseoModeEnabled
+                    paseoActive = lockManager.paseoModeEnabled
+                }
+
                 LaunchedEffect(isLockedState) {
                     currentScreen = if (isLockedState) "zen" else "launcher"
                 }
@@ -166,17 +176,35 @@ class MainActivity : FragmentActivity() {
                             onOpenOrganizer = { currentScreen = "organizer" },
                             onOpenAppDrawer = { currentScreen = "drawer" },
                             onOpenSettings = { currentScreen = "config" },
+                            onOpenModes = { currentScreen = "modos" },
                             onStartFocus = { minutes ->
                                 lockManager.startLock(minutes)
                                 isLockedState = true
                                 isTempUnlockedState = false
                                 LockMonitoringService.startService(this@MainActivity)
-                            }
+                            },
+                            paseoActive = paseoActive,
+                            onTogglePaseo = togglePaseo
+                        )
+                    }
+                    "modos" -> {
+                        ModosScreen(
+                            onBack = { currentScreen = "launcher" },
+                            onStartFocus = { minutes ->
+                                lockManager.startLock(minutes)
+                                isLockedState = true
+                                isTempUnlockedState = false
+                                LockMonitoringService.startService(this@MainActivity)
+                            },
+                            paseoActive = paseoActive,
+                            onTogglePaseo = togglePaseo
                         )
                     }
                     "drawer" -> {
                         AppDrawerScreen(
-                            onBack = { currentScreen = "launcher" }
+                            onBack = { currentScreen = "launcher" },
+                            lockManager = lockManager,
+                            workModeActive = lockManager.isWorkModeActive()
                         )
                     }
                     "notes" -> {
@@ -218,7 +246,9 @@ class MainActivity : FragmentActivity() {
                                 lockManager.accentPresetKey = key
                                 ZenTheme.accent = AccentPresets.byKey(key)
                             },
-                            onBackToLauncher = { currentScreen = "launcher" }
+                            onBackToLauncher = { currentScreen = "launcher" },
+                            paseoActive = paseoActive,
+                            onTogglePaseo = togglePaseo
                         )
                     }
                     "zen" -> {

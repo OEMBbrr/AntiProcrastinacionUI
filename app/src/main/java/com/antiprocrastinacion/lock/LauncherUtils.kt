@@ -9,6 +9,7 @@ import android.content.pm.PackageManager
 import android.graphics.drawable.BitmapDrawable
 import android.net.Uri
 import android.os.Build
+import android.provider.MediaStore
 import android.provider.Settings
 import android.provider.Telephony
 import androidx.compose.ui.graphics.ImageBitmap
@@ -17,7 +18,8 @@ import androidx.core.graphics.drawable.toBitmap
 
 data class AppInfo(
     val label: String,
-    val packageName: String
+    val packageName: String,
+    val isDistraction: Boolean = false
 )
 
 object LauncherUtils {
@@ -254,6 +256,32 @@ object LauncherUtils {
             .sortedBy { it.label }
     }
 
+    /**
+     * V28: Lista COMPLETA del cajón de aplicaciones. A diferencia de
+     * getHealthUtilityApps, aquí TAMBIÉN aparecen WhatsApp, redes sociales,
+     * juegos y navegadores, pero marcados con `isDistraction` para que la UI
+     * los muestre oscuros/opacos y NO permita abrirlos.
+     * Solo se ocultan: nuestra app, otros launchers y el ruido de sistema.
+     */
+    fun getLauncherApps(context: Context): List<AppInfo> {
+        val systemHomes = getSystemHomePackages(context)
+        return getInstalledApps(context)
+            .filter { app ->
+                val pkg = app.packageName
+                if (pkg == context.packageName) return@filter false      // nuestra app
+                if (pkg in systemHomes) return@filter false              // otros launchers
+                isUserApp(context, pkg)                                   // solo apps de usuario
+            }
+            .map { app ->
+                AppInfo(
+                    label = app.label,
+                    packageName = app.packageName,
+                    isDistraction = isDistractionApp(app.packageName, app.label.lowercase())
+                )
+            }
+            .sortedBy { it.label }
+    }
+
     /** Una app instalada por el usuario (no viene de fábrica). */
     private fun isUserApp(context: Context, pkg: String): Boolean {
         return try {
@@ -276,6 +304,132 @@ object LauncherUtils {
         // Navegadores web son dopamínicos según la visión (se ocultan del cajón)
         val browsers = listOf("chrome", "firefox", "edge", "samsung internet", "opera", "browser")
         return browsers.any { lower.contains(it) }
+    }
+
+    /** True si el paquete es una app considerada distracción (sin depender del label). */
+    fun isDistractionPackage(pkg: String): Boolean = isDistractionApp(pkg, "")
+
+    /** WhatsApp siempre se identifica por su paquete oficial. */
+    fun isWhatsApp(pkg: String): Boolean =
+        pkg == "com.whatsapp" || pkg == "com.whatsapp.w4b" || pkg.startsWith("com.whatsapp")
+
+    /** Apps de videollamadas/teletrabajo que en Modo Escuela/Trabajo quedan libres. */
+    fun isVideoCallPackage(pkg: String): Boolean {
+        val lower = pkg.lowercase()
+        return lower == "com.google.android.apps.meetings" ||
+            lower.startsWith("com.google.android.apps.meetings") ||
+            lower.contains("zoom") || lower.contains("teams") ||
+            lower.contains("meet") || lower.contains("skype") ||
+            lower.contains("duo") || lower.contains("webex") ||
+            lower.contains("discord")
+    }
+
+    /**
+     * En Modo Escuela/Trabajo: WhatsApp y apps de videollamada (Meet, Zoom, Teams)
+     * quedan libres; el resto de distractoras se bloquean.
+     */
+    fun isWorkModeAppAllowed(pkg: String): Boolean {
+        if (isWhatsApp(pkg)) return true
+        if (isVideoCallPackage(pkg)) return true
+        return !isDistractionPackage(pkg)
+    }
+
+    // ---------------------------------------------------------------------
+    // V29: MODO PASEO — clasificación de apps según la visión del usuario
+    // (RRSS/juegos/dopamínicas: 15 min; WhatsApp: 20 min; música: bloqueada;
+    // cámara, llamadas, SMS, maps y útiles: libres; el resto: libre).
+    // ---------------------------------------------------------------------
+
+    /** Categoría de una app dentro del Modo Paseo. */
+    enum class WalkAppCategory { ESSENTIAL, WHATSAPP, MUSIC, DOPAMINE, FREE }
+
+    /** Apps de música/reproducción que el Modo Paseo bloquea por completo. */
+    fun isMusicPackage(pkg: String): Boolean {
+        val lower = pkg.lowercase()
+        val explicit = setOf(
+            "com.spotify.music", "com.spotify.tv", "com.google.android.apps.youtube.music",
+            "com.apple.android.music", "com.pandora.android", "com.soundcloud.android",
+            "com.deezer.android.app", "com.amazon.mp3", "com.tidal.main", "com.audible.application",
+            "com.clearchannel.iheartradio", "com.maxmpz.audioplayer", "com.nullsoft.winamp",
+            "com.bambuna.podcastaddict", "com.samsung.android.music", "com.mi.globalmusic",
+            "com.huawei.music", "com.sonyericsson.music", "com.xiaomi.music"
+        )
+        if (explicit.contains(pkg)) return true
+        return lower.contains("music") || lower.contains("spotify") || lower.contains("pandora") ||
+            lower.contains("soundcloud") || lower.contains("deezer") || lower.contains("podcast") ||
+            lower.contains("winamp") || lower.contains("iheartradio") || lower.contains("mp3") ||
+            lower.contains("tidal")
+    }
+
+    private var cameraPackagesCache: Set<String>? = null
+
+    /** Apps de cámara (la oficial y las que responden al intent de captura). */
+    fun getCameraPackages(context: Context): Set<String> {
+        cameraPackagesCache?.let { return it }
+        val set = mutableSetOf(
+            "org.codeaurora.snapcam", "com.sec.android.app.camera", "com.android.camera",
+            "com.android.camera2", "com.miui.camera", "com.huawei.camera", "com.oppo.camera",
+            "com.vivo.camera", "com.oplus.camera", "com.transsion.camera"
+        )
+        try {
+            val pm = context.packageManager
+            val intent = Intent(MediaStore.ACTION_IMAGE_CAPTURE)
+            val infos = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                pm.queryIntentActivities(intent, PackageManager.ResolveInfoFlags.of(0))
+            } else {
+                @Suppress("DEPRECATION")
+                pm.queryIntentActivities(intent, 0)
+            }
+            infos.forEach { set.add(it.activityInfo.packageName) }
+        } catch (_: Exception) {
+        }
+        cameraPackagesCache = set
+        return set
+    }
+
+    /** Apps esenciales que NUNCA se bloquean en Modo Paseo (cámara, llamadas, SMS, maps...). */
+    fun isEssentialWalkApp(context: Context, pkg: String): Boolean {
+        if (pkg == context.packageName) return true
+        getDefaultDialerPackage(context)?.let { if (pkg == it) return true }
+        getDefaultSmsPackage(context)?.let { if (pkg == it) return true }
+        if (pkg in getCameraPackages(context)) return true
+        val lower = pkg.lowercase()
+        if (lower == "com.google.android.apps.maps" || lower.contains("maps")) return true
+        if (lower == "com.google.android.contacts" || lower == "com.android.contacts" || lower.contains("contacts")) return true
+        return false
+    }
+
+    /** RRSS, juegos, navegadores y apps dopamínicas que llevan límite de uso en Modo Paseo. */
+    fun isDopamineWalkPackage(pkg: String): Boolean {
+        val lower = pkg.lowercase()
+        val social = listOf(
+            "facebook", "instagram", "tiktok", "snapchat", "twitter", "twitch", "reddit",
+            "pinterest", "linkedin", "telegram", "youtube", "discord", "threads"
+        )
+        val gaming = listOf(
+            "game", "games", "candy", "royale", "pubg", "codm", "genshin", "roblox",
+            "fortnite", "minecraft", "clash", "brawl", "among"
+        )
+        val browsers = listOf(
+            "chrome", "firefox", "edge", "samsung internet", "samsungbrowser", "opera",
+            "miui.browser", "ucbrowser", "brave"
+        )
+        val casino = listOf("casino", "bet", "slot", "loto", "poker", "bingo")
+        if (social.any { lower.contains(it) }) return true
+        if (gaming.any { lower.contains(it) }) return true
+        if (browsers.any { lower.contains(it) }) return true
+        if (casino.any { lower.contains(it) }) return true
+        if (lower.contains("browser")) return true
+        return false
+    }
+
+    /** Clasifica una app dentro del Modo Paseo (orden de prioridad ESSENTIAL > WHATSAPP > MUSIC > DOPAMINE). */
+    fun classifyWalkApp(context: Context, pkg: String): WalkAppCategory {
+        if (isEssentialWalkApp(context, pkg)) return WalkAppCategory.ESSENTIAL
+        if (isWhatsApp(pkg)) return WalkAppCategory.WHATSAPP
+        if (isMusicPackage(pkg)) return WalkAppCategory.MUSIC
+        if (isDopamineWalkPackage(pkg)) return WalkAppCategory.DOPAMINE
+        return WalkAppCategory.FREE
     }
 
     /** Icono de una app en formato ImageBitmap (para mostrar solo logos). */

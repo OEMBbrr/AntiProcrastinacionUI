@@ -88,6 +88,28 @@ class LockManager(context: Context) {
         private const val KEY_POMODORO_PHASES = "pomodoro_phases_json"
         const val POMODORO_MAX_WORK_MINUTES = 60
         const val POMODORO_MAX_REST_MINUTES = 30
+
+        // V28: Modo Escuela/Trabajo (activación + horario L-V)
+        private const val KEY_WORK_MODE_ENABLED = "work_mode_enabled"
+        private const val KEY_WORK_SCHEDULE = "work_schedule_json"
+        private const val KEY_WORK_WHATSAPP_MINUTES = "work_whatsapp_minutes"
+        private const val KEY_WORK_WHATSAPP_SESSION_START = "work_whatsapp_session_start"
+        const val WORK_MODE_GRACE_MINUTES = 5 // colchón tras la hora de salida
+
+        // V28: configuración de los modos (Paseo / Sin Redes / Enfoque)
+        private const val KEY_PASEO_DOPAMINE_MINUTES = "paseo_dopamine_minutes"
+        private const val KEY_PASEO_WHATSAPP_MINUTES = "paseo_whatsapp_minutes"
+        private const val KEY_PASEO_MUSIC_BLOCKED = "paseo_music_blocked"
+
+        // V29: Modo Paseo — estado de activación y control de uso continuo
+        private const val KEY_PASEO_MODE_ENABLED = "paseo_mode_enabled"
+        private const val KEY_PASEO_START_TIME = "paseo_start_time"
+        private const val KEY_PASEO_USAGE_JSON = "paseo_usage_json"
+        private const val KEY_PASEO_BLOCKED_JSON = "paseo_blocked_json"
+
+        private const val KEY_NOSOCIAL_DEFAULT_MINUTES = "nosocial_default_minutes"
+        private const val KEY_NOSOCIAL_GRAYSCALE = "nosocial_grayscale"
+        private const val KEY_FOCUS_DEFAULT_MINUTES = "focus_default_minutes"
         
         // 1. Frases MUY LARGAS (150 a 200 palabras) para "Ya terminé mi actividad"
         val LONG_FINISH_EARLY_PHRASES = listOf(
@@ -365,6 +387,236 @@ class LockManager(context: Context) {
         }
 
     // ================================================================================
+    // V28: MODO ESCUELA / TRABAJO (activación + horario de Lunes a Viernes)
+    // El bloqueo de apps distractoras se activa automáticamente dentro del horario.
+    // ================================================================================
+
+    /** Horario de un día (day: 1=Lunes ... 5=Viernes). Tiempos en minutos del día (0-1439). */
+    data class DaySchedule(val day: Int, val startMinute: Int, val endMinute: Int)
+
+    private val workScheduleGson = Gson()
+
+    var workModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_WORK_MODE_ENABLED, false)
+        set(value) {
+            prefs.edit().putBoolean(KEY_WORK_MODE_ENABLED, value).apply()
+        }
+
+    var workSchedule: List<DaySchedule>
+        get() {
+            val json = prefs.getString(KEY_WORK_SCHEDULE, null) ?: return emptyList()
+            return try {
+                val type = object : TypeToken<List<DaySchedule>>() {}.type
+                workScheduleGson.fromJson<List<DaySchedule>>(json, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_WORK_SCHEDULE, workScheduleGson.toJson(value)).apply()
+        }
+
+    /** Establece (o elimina) el horario de un día. Si start/end no son válidos, lo borra. */
+    fun setWorkSchedule(day: Int, startMinute: Int, endMinute: Int) {
+        val updated = workSchedule.filterNot { it.day == day }.toMutableList()
+        if (day in 1..5 && startMinute in 0..1439 && endMinute in 0..1439 && endMinute > startMinute) {
+            updated.add(DaySchedule(day, startMinute, endMinute))
+        }
+        workSchedule = updated.sortedBy { it.day }
+    }
+
+    /** True si el Modo Escuela/Trabajo está activado Y estamos dentro de un horario (con colchón de salida). */
+    fun isWorkModeActive(now: Long = System.currentTimeMillis()): Boolean {
+        if (!workModeEnabled) return false
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = now
+        val isoDay = when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> 1
+            java.util.Calendar.TUESDAY -> 2
+            java.util.Calendar.WEDNESDAY -> 3
+            java.util.Calendar.THURSDAY -> 4
+            java.util.Calendar.FRIDAY -> 5
+            java.util.Calendar.SATURDAY -> 6
+            else -> 7
+        }
+        val sched = workSchedule.firstOrNull { it.day == isoDay } ?: return false
+        val nowMin = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        return nowMin >= sched.startMinute && nowMin < sched.endMinute + WORK_MODE_GRACE_MINUTES
+    }
+
+    // V28: en Modo Escuela/Trabajo, WhatsApp queda exento pero con límite de
+    // minutos seguidos (por defecto 15). Se reinicia al salir del modo.
+    var workWhatsAppMinutes: Int
+        get() = prefs.getInt(KEY_WORK_WHATSAPP_MINUTES, 15).coerceIn(1, 60)
+        set(value) = prefs.edit().putInt(KEY_WORK_WHATSAPP_MINUTES, value.coerceIn(1, 60)).apply()
+
+    /** Milisegundos restantes de WhatsApp dentro del Modo Escuela activo. */
+    fun workWhatsAppRemainingMs(): Long {
+        if (!isWorkModeActive()) return 0L
+        val start = prefs.getLong(KEY_WORK_WHATSAPP_SESSION_START, 0L)
+        if (start == 0L) return workWhatsAppMinutes * 60_000L
+        return (workWhatsAppMinutes * 60_000L - (System.currentTimeMillis() - start)).coerceAtLeast(0L)
+    }
+
+    /** True si en Modo Escuela el usuario aún puede usar WhatsApp (no agotó su límite). */
+    fun isWorkWhatsAppAvailable(): Boolean = workWhatsAppRemainingMs() > 0
+
+    /** Inicia (o conserva) la sesión de WhatsApp cuando se abre durante el modo Escuela. */
+    fun startWorkWhatsAppSessionIfNeeded() {
+        if (!isWorkModeActive()) return
+        val start = prefs.getLong(KEY_WORK_WHATSAPP_SESSION_START, 0L)
+        val now = System.currentTimeMillis()
+        if (start == 0L || now - start > workWhatsAppMinutes * 60_000L) {
+            prefs.edit().putLong(KEY_WORK_WHATSAPP_SESSION_START, now).apply()
+        }
+    }
+
+    /** Borra la sesión de WhatsApp (se llama al salir del modo Escuela o al cerrar la app). */
+    fun clearWorkWhatsAppSession() {
+        prefs.edit().remove(KEY_WORK_WHATSAPP_SESSION_START).apply()
+    }
+
+    // ================================================================================
+    // V28: CONFIGURACIÓN DE LOS MODOS (Paseo / Sin Redes / Enfoque)
+    // ================================================================================
+
+    // Modo Paseo: límites configurables (apps dopamina, WhatsApp, música)
+    // V29: por defecto 15 min RRSS/juegos y 20 min WhatsApp según la visión del usuario.
+    var paseoDopamineMinutes: Int
+        get() = prefs.getInt(KEY_PASEO_DOPAMINE_MINUTES, 15).coerceIn(1, 120)
+        set(value) = prefs.edit().putInt(KEY_PASEO_DOPAMINE_MINUTES, value.coerceIn(1, 120)).apply()
+
+    var paseoWhatsAppMinutes: Int
+        get() = prefs.getInt(KEY_PASEO_WHATSAPP_MINUTES, 20).coerceIn(1, 120)
+        set(value) = prefs.edit().putInt(KEY_PASEO_WHATSAPP_MINUTES, value.coerceIn(1, 120)).apply()
+
+    var paseoMusicBlocked: Boolean
+        get() = prefs.getBoolean(KEY_PASEO_MUSIC_BLOCKED, true)
+        set(value) = prefs.edit().putBoolean(KEY_PASEO_MUSIC_BLOCKED, value).apply()
+
+    // ================================================================================
+    // V29: MODO PASEO — ACTIVACIÓN VOLUNTARIA SIN TEMPORIZADOR
+    // ================================================================================
+
+    /** True si el Modo Paseo está activo (se activa/desactiva a voluntad, sin temporizador). */
+    var paseoModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_PASEO_MODE_ENABLED, false)
+        set(value) {
+            android.util.Log.d(
+                "ZEN_PASEO",
+                "paseoModeEnabled -> $value (prev=${prefs.getBoolean(KEY_PASEO_MODE_ENABLED, false)})",
+                Throwable("ZEN_PASEO trace")
+            )
+            prefs.edit().putBoolean(KEY_PASEO_MODE_ENABLED, value).apply()
+            if (value) {
+                prefs.edit().putLong(KEY_PASEO_START_TIME, System.currentTimeMillis()).apply()
+            }
+            resetPaseoState()
+        }
+
+    val paseoStartTime: Long
+        get() = prefs.getLong(KEY_PASEO_START_TIME, 0L)
+
+    /** Minutos transcurridos desde que se activó el Modo Paseo (0 si inactivo). */
+    val paseoElapsedMinutes: Long
+        get() = if (!paseoModeEnabled || paseoStartTime <= 0L) 0L
+                else (System.currentTimeMillis() - paseoStartTime) / 60_000L
+
+    /** Tiempo acumulado de uso de una app durante el Modo Paseo (solo mientras está en primer plano). */
+    fun paseoUsageMs(pkg: String): Long {
+        val json = prefs.getString(KEY_PASEO_USAGE_JSON, null) ?: return 0L
+        return try {
+            val type = object : TypeToken<Map<String, Long>>() {}.type
+            val map = pomodoroGson.fromJson<Map<String, Long>>(json, type) ?: emptyMap()
+            map[pkg] ?: 0L
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    /** Límite de uso seguido para una app dentro del Modo Paseo. */
+    fun paseoLimitMs(pkg: String): Long =
+        if (LauncherUtils.isWhatsApp(pkg)) paseoWhatsAppMinutes * 60_000L
+        else paseoDopamineMinutes * 60_000L
+
+    /** Tiempo restante permitido de una app dentro del Modo Paseo. */
+    fun paseoRemainingMs(pkg: String): Long =
+        (paseoLimitMs(pkg) - paseoUsageMs(pkg)).coerceAtLeast(0L)
+
+    /** Acumula tiempo de uso de una app del Modo Paseo y persiste el total. */
+    fun addPaseoUsage(pkg: String, deltaMs: Long) {
+        if (deltaMs <= 0L) return
+        try {
+            val type = object : TypeToken<Map<String, Long>>() {}.type
+            val map = (prefs.getString(KEY_PASEO_USAGE_JSON, null)?.let {
+                pomodoroGson.fromJson<Map<String, Long>>(it, type) ?: emptyMap()
+            } ?: emptyMap()).toMutableMap()
+            map[pkg] = (map[pkg] ?: 0L) + deltaMs
+            prefs.edit().putString(KEY_PASEO_USAGE_JSON, pomodoroGson.toJson(map)).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /** True si una app ya alcanzó su límite y quedó bloqueada durante el Modo Paseo. */
+    fun isPaseoBlocked(pkg: String): Boolean {
+        val json = prefs.getString(KEY_PASEO_BLOCKED_JSON, null) ?: return false
+        return try {
+            val type = object : TypeToken<List<String>>() {}.type
+            val list = pomodoroGson.fromJson<List<String>>(json, type) ?: emptyList()
+            pkg in list
+        } catch (e: Exception) {
+            false
+        }
+    }
+
+    /** Bloquea una app durante el Modo Paseo (solo esa app; el resto sigue disponible). */
+    fun blockPaseoApp(pkg: String) {
+        try {
+            val type = object : TypeToken<List<String>>() {}.type
+            val list = (prefs.getString(KEY_PASEO_BLOCKED_JSON, null)?.let {
+                pomodoroGson.fromJson<List<String>>(it, type) ?: emptyList()
+            } ?: emptyList()).toMutableList()
+            if (pkg !in list) list.add(pkg)
+            prefs.edit().putString(KEY_PASEO_BLOCKED_JSON, pomodoroGson.toJson(list)).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /** Apps bloqueadas durante el Modo Paseo. */
+    fun paseoBlockedPackages(): List<String> {
+        val json = prefs.getString(KEY_PASEO_BLOCKED_JSON, null) ?: return emptyList()
+        return try {
+            val type = object : TypeToken<List<String>>() {}.type
+            pomodoroGson.fromJson<List<String>>(json, type) ?: emptyList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+    }
+
+    private fun resetPaseoState() {
+        prefs.edit()
+            .remove(KEY_PASEO_USAGE_JSON)
+            .remove(KEY_PASEO_BLOCKED_JSON)
+            .apply()
+    }
+
+    // Modo Sin Redes: duración por defecto (15-240 min) + escala de grises
+    var noSocialDefaultMinutes: Int
+        get() = prefs.getInt(KEY_NOSOCIAL_DEFAULT_MINUTES, 60).coerceIn(15, 240)
+        set(value) = prefs.edit().putInt(KEY_NOSOCIAL_DEFAULT_MINUTES, value.coerceIn(15, 240)).apply()
+
+    var noSocialGrayScale: Boolean
+        get() = prefs.getBoolean(KEY_NOSOCIAL_GRAYSCALE, true)
+        set(value) = prefs.edit().putBoolean(KEY_NOSOCIAL_GRAYSCALE, value).apply()
+
+    // Modo Enfoque: duración por defecto (5-480 min)
+    var focusDefaultMinutes: Int
+        get() = prefs.getInt(KEY_FOCUS_DEFAULT_MINUTES, 25).coerceIn(5, 480)
+        set(value) = prefs.edit().putInt(KEY_FOCUS_DEFAULT_MINUTES, value.coerceIn(5, 480)).apply()
+
+    // ================================================================================
     // V24: PROGRAMACIÓN POMODORO (fases de trabajo/descanso del enfoque en curso)
     // Estructura: N descansos -> N+1 bloques de trabajo iguales. Empieza y termina en trabajo.
     // ================================================================================
@@ -434,6 +686,8 @@ class LockManager(context: Context) {
         tempUnlockEndTime = phase.endTime.coerceAtMost(lockEndTime)
         cooldownEndTime = 0L
         android.util.Log.d("ZEN_POMODORO", "Descanso libre concedido hasta $tempUnlockEndTime")
+        // V28: propagar el desbloqueo temporal a la extensión (tregua_until)
+        pushLockStateToFirebase(isLocked, lockEndTime)
     }
 
     val isTempUnlocked: Boolean
@@ -451,10 +705,10 @@ class LockManager(context: Context) {
     fun startLock(durationMinutes: Int) {
         val endTime = System.currentTimeMillis() + (durationMinutes * 60 * 1000)
         lockEndTime = endTime
-        // Asignación aleatoria de frases
-        longPhrase = LONG_FINISH_EARLY_PHRASES.random()
-        mediumPhrase = MEDIUM_TEMP_UNLOCK_PHRASES.random()
-        shortPhrase = SHORT_FINISHED_PHRASES.random()
+        // Asignación aleatoria de frases (generador combinatorio, miles de variantes)
+        longPhrase = PhraseGenerator.longFinish()
+        mediumPhrase = PhraseGenerator.mediumTemp()
+        shortPhrase = PhraseGenerator.shortFinished()
         // V24: construir la programación Pomodoro (fases trabajo/descanso)
         pomodoroPhases = if (pomodoroEnabled && durationMinutes >= 10) {
             buildPomodoroSchedule(System.currentTimeMillis(), durationMinutes, pomodoroRestCount, pomodoroRestMinutes)
@@ -480,6 +734,8 @@ class LockManager(context: Context) {
         val now = System.currentTimeMillis()
         tempUnlockEndTime = now + (5 * 60 * 1000)
         cooldownEndTime = now + (15 * 60 * 1000)
+        // V28: propagar la tregua a la extensión (tregua_until)
+        pushLockStateToFirebase(isLocked, lockEndTime)
     }
 
     /** Termina el descanso Pomodoro en curso y adelanta el resto de fases para volver a trabajo ya. */
@@ -648,9 +904,9 @@ class LockManager(context: Context) {
                             }
                         }
                         pomodoroPhases = remotePhases
-                        if (longPhrase.isBlank()) longPhrase = LONG_FINISH_EARLY_PHRASES.random()
-                        if (mediumPhrase.isBlank()) mediumPhrase = MEDIUM_TEMP_UNLOCK_PHRASES.random()
-                        if (shortPhrase.isBlank()) shortPhrase = SHORT_FINISHED_PHRASES.random()
+                        if (longPhrase.isBlank()) longPhrase = PhraseGenerator.longFinish()
+                        if (mediumPhrase.isBlank()) mediumPhrase = PhraseGenerator.mediumTemp()
+                        if (shortPhrase.isBlank()) shortPhrase = PhraseGenerator.shortFinished()
                         android.util.Log.d("ZEN_SYNC", "Bloqueo cruzado aplicado desde $sourceDevice (hasta $expiresAtRemote)")
                         remoteLockCallback?.invoke(true)
                     }
@@ -899,6 +1155,8 @@ class LockManager(context: Context) {
         val data = mapOf(
             "is_locked" to locked,
             "expires_at" to expiresAt,
+            // V28: desbloqueo temporal (tregua) activo desde el teléfono; 0 si no hay
+            "tregua_until" to (if (isTempUnlocked) tempUnlockEndTime else 0L),
             "updated_at" to System.currentTimeMillis(),
             "source_device" to "android",
             "pomodoro_enabled" to (locked && pomodoroPhases.isNotEmpty()),

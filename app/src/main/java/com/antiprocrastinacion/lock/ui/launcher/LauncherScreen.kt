@@ -17,18 +17,29 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Bedtime
+import androidx.compose.material.icons.filled.CenterFocusStrong
 import androidx.compose.material.icons.filled.Checklist
+import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Timer
+import androidx.compose.material.icons.filled.Tune
+import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -40,14 +51,17 @@ import com.antiprocrastinacion.lock.MotivationalPhrases
 import com.antiprocrastinacion.lock.ZenNote
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 
 /**
- * V26: Pantalla principal del nuevo launcher.
- * - Barra superior con las apps propias (Notas, Ciclo de Sueño, Organizador).
- * - Inicio rápido de Modo Enfoque (25/45/90 min).
- * - Frases de motivación + widgets de tareas, hora de dormir y notas recientes.
- * - Aviso para establecer la app como inicio predeterminado (HOME real).
- * - Acceso al cajón de aplicaciones (solo logos) y a los ajustes.
+ * V27: Home del launcher rediseñado (arquitectura visual tipo iOS).
+ * - Reloj real en vivo.
+ * - Widgets con aspecto translúcido de material (esquinas redondeadas, cabecera de widget).
+ * - Widget de Modo Enfoque con steppers de horas y minutos (sin presets fijos).
+ * - Grid de apps propias + Dock inferior.
+ * - Acceso a la pantalla de Modos.
  */
 @Composable
 fun LauncherScreen(
@@ -57,13 +71,15 @@ fun LauncherScreen(
     onOpenOrganizer: () -> Unit,
     onOpenAppDrawer: () -> Unit,
     onOpenSettings: () -> Unit,
-    onStartFocus: (Int) -> Unit
+    onOpenModes: () -> Unit,
+    onStartFocus: (Int) -> Unit,
+    paseoActive: Boolean,
+    onTogglePaseo: () -> Unit
 ) {
+    val context = androidx.compose.ui.platform.LocalContext.current
     val currentPhrase = remember { MotivationalPhrases.getRandomPhrase() }
     var recentNotes by remember { mutableStateOf<List<ZenNote>>(emptyList()) }
-    val context = androidx.compose.ui.platform.LocalContext.current
 
-    // V26: launcher como inicio real -> comprobar si es HOME predeterminado
     var isDefaultHome by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
         isDefaultHome = withContext(kotlinx.coroutines.Dispatchers.IO) {
@@ -71,14 +87,22 @@ fun LauncherScreen(
         }
     }
 
-    // V25: escuchar notas para el widget "Notas más recientes"
     LaunchedEffect(Unit) {
         lockManager.observeNotes { updated ->
             recentNotes = updated.take(3)
         }
     }
 
-    // Frase cambia cada 20s para no aburrir
+    // Reloj en vivo (se actualiza cada segundo)
+    var now by remember { mutableStateOf(LocalTime.now()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            now = LocalTime.now()
+            delay(1_000)
+        }
+    }
+
+    // Frase cambia cada 20s
     var phraseIndex by remember { mutableIntStateOf(0) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -87,428 +111,629 @@ fun LauncherScreen(
         }
     }
 
-    Surface(
-        modifier = Modifier.fillMaxSize(),
-        color = LchBg
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(LchGradientStart, LchGradientEnd)
+                )
+            )
     ) {
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
+                .padding(horizontal = 16.dp)
+                .padding(top = 8.dp, bottom = 24.dp),
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
-            Spacer(modifier = Modifier.height(24.dp)) // Dynamic Island
+            Spacer(modifier = Modifier.height(16.dp)) // Dynamic Island
 
-            // Cabecera del launcher
+            // ---- RELOJ (widget principal del home) ----
+            ClockWidget(now = now)
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ---- Widget: Modo Enfoque (steppers horas/minutos) ----
+            FocusModeWidget(onStartFocus = onStartFocus, onOpenModes = onOpenModes)
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ---- Widget: Modo Paseo (activa/desactiva a voluntad) ----
+            PaseoModeWidget(paseoActive = paseoActive, onTogglePaseo = onTogglePaseo)
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ---- Widget: Frase motivacional ----
+            ZenWidgetCard(icon = Icons.Default.CenterFocusStrong, title = "En foco") {
+                AnimatedContent(
+                    targetState = phraseIndex,
+                    label = "PhraseLauncher",
+                    transitionSpec = {
+                        (fadeIn(tween(600)) + scaleIn(initialScale = 0.97f, animationSpec = tween(600)))
+                            .togetherWith(
+                                fadeOut(tween(600)) + scaleOut(targetScale = 1.03f, animationSpec = tween(600))
+                            )
+                    }
+                ) { idx ->
+                    Text(
+                        text = MotivationalPhrases.PHRASES[idx % MotivationalPhrases.PHRASES.size],
+                        fontSize = 14.sp,
+                        lineHeight = 20.sp,
+                        color = LchText,
+                        textAlign = TextAlign.Center,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ---- Fila de widgets pequeños: Notas + Tareas ----
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                Column {
+                ZenWidgetCard(
+                    icon = Icons.Default.EditNote,
+                    title = "Notas",
+                    onClick = onOpenNotes,
+                    modifier = Modifier.weight(1f)
+                ) {
+                    if (recentNotes.isEmpty()) {
+                        Text(
+                            text = "Tu primera nota aparece aquí.",
+                            fontSize = 12.sp,
+                            color = LchMuted,
+                            maxLines = 3,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    } else {
+                        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                            recentNotes.forEach { note ->
+                                Text(
+                                    text = note.content,
+                                    fontSize = 12.sp,
+                                    color = LchText,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                            }
+                        }
+                    }
+                }
+                ZenWidgetCard(
+                    icon = Icons.Default.Checklist,
+                    title = "Tareas",
+                    onClick = onOpenOrganizer,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        text = "antiprocrastinación",
-                        fontSize = 22.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = LchText,
-                        letterSpacing = 0.5.sp
+                        text = "Organizador\nestilo Notion",
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = LchMuted
                     )
+                }
+            }
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ---- Fila de widgets: Sueño + Modos ----
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(14.dp)
+            ) {
+                ZenWidgetCard(
+                    icon = Icons.Default.Bedtime,
+                    title = "Sueño",
+                    onClick = onOpenSleepCycle,
+                    modifier = Modifier.weight(1f)
+                ) {
                     Text(
-                        text = "Launcher sin distracciones",
+                        text = "Ciclos de descanso",
                         fontSize = 12.sp,
                         color = LchMuted
                     )
                 }
-                IconButton(onClick = onOpenSettings) {
-                    Icon(
-                        imageVector = Icons.Default.Settings,
-                        contentDescription = "Ajustes",
-                        tint = LchMuted
-                    )
-                }
-            }
-
-            // Barra superior: apps propias de AntiProcrastinación
-            LauncherQuickApps(
-                onOpenNotes = onOpenNotes,
-                onOpenSleepCycle = onOpenSleepCycle,
-                onOpenOrganizer = onOpenOrganizer
-            )
-
-            // V26: aviso para convertir la app en el Inicio real del dispositivo
-            if (!isDefaultHome) {
-                Card(
-                    modifier = Modifier.fillMaxWidth(),
-                    shape = RoundedCornerShape(20.dp),
-                    colors = CardDefaults.cardColors(containerColor = LchSurfaceHi),
-                    border = BorderStroke(1.dp, LchBorder)
-                ) {
-                    Column(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Row(
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.spacedBy(8.dp)
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.Home,
-                                contentDescription = null,
-                                tint = LchAccent,
-                                modifier = Modifier.size(20.dp)
-                            )
-                            Text(
-                                text = "Hazme tu Inicio",
-                                fontSize = 14.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = LchText
-                            )
-                        }
-                        Text(
-                            text = "Pulsa Inicio en tu teléfono y este launcher (notas, frases y modos) aparecerá de inmediato, sin distracciones.",
-                            fontSize = 12.sp,
-                            lineHeight = 17.sp,
-                            color = LchMuted
-                        )
-                        Button(
-                            onClick = { LauncherUtils.requestHomeRole(context) },
-                            modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(containerColor = LchAccent),
-                            contentPadding = PaddingValues(vertical = 10.dp)
-                        ) {
-                            Text(
-                                text = "Establecer como Inicio",
-                                fontSize = 13.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-            }
-
-            // V26: inicio rápido del Modo Enfoque
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = LchSurface),
-                border = BorderStroke(1.dp, LchBorder),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
-                ) {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.Timer,
-                            contentDescription = null,
-                            tint = LchAccent,
-                            modifier = Modifier.size(20.dp)
-                        )
-                        Column {
-                            Text(
-                                text = "Modo Enfoque",
-                                fontSize = 15.sp,
-                                fontWeight = FontWeight.Bold,
-                                color = LchText
-                            )
-                            Text(
-                                text = "Inicia una sesión de concentración sin distracciones",
-                                fontSize = 11.sp,
-                                color = LchMuted
-                            )
-                        }
-                    }
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        FocusQuickButton(label = "25 min", duration = 25, onClick = onStartFocus)
-                        FocusQuickButton(label = "45 min", duration = 45, onClick = onStartFocus)
-                        FocusQuickButton(label = "90 min", duration = 90, onClick = onStartFocus)
-                    }
-                }
-            }
-
-            // Tarjeta de frase motivacional
-            Card(
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = LchSurface),
-                border = BorderStroke(1.dp, LchBorder),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(20.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                ZenWidgetCard(
+                    icon = Icons.Default.Tune,
+                    title = "Modos",
+                    onClick = onOpenModes,
+                    modifier = Modifier.weight(1f)
                 ) {
                     Text(
-                        text = "●",
-                        fontSize = 8.sp,
-                        color = LchAccent
+                        text = "Enfoque, paseo,\nsin redes",
+                        fontSize = 12.sp,
+                        lineHeight = 17.sp,
+                        color = LchMuted
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
-                    AnimatedContent(
-                        targetState = phraseIndex,
-                        label = "PhraseLauncher",
-                        transitionSpec = {
-                            (fadeIn(tween(600)) + scaleIn(initialScale = 0.97f, animationSpec = tween(600)))
-                                .togetherWith(
-                                    fadeOut(tween(600)) + scaleOut(targetScale = 1.03f, animationSpec = tween(600))
-                                )
-                        }
-                    ) { idx ->
-                        Text(
-                            text = MotivationalPhrases.PHRASES[idx % MotivationalPhrases.PHRASES.size],
-                            fontSize = 14.sp,
-                            lineHeight = 20.sp,
-                            color = LchText,
-                            textAlign = TextAlign.Center,
-                            fontWeight = FontWeight.Medium
-                        )
-                    }
                 }
             }
 
-            // Widget: Tareas de hoy (Organizador)
-            LauncherWidgetCard(
-                icon = Icons.Default.Checklist,
-                title = "Tareas de hoy",
-                subtitle = "Abre tu organizador estilo Notion",
-                onClick = onOpenOrganizer
-            )
-
-            // Widget: Hora recomendada para dormir (Ciclo de sueño)
-            LauncherWidgetCard(
-                icon = Icons.Default.Bedtime,
-                title = "Ciclo de sueño",
-                subtitle = "Calcula tus horas de descanso",
-                onClick = onOpenSleepCycle
-            )
-
-            // Widget: Notas más recientes
-            Card(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable(onClick = onOpenNotes),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = LchSurface),
-                border = BorderStroke(1.dp, LchBorder),
-                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-            ) {
-                Column(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.spacedBy(8.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Icon(
-                            imageVector = Icons.Default.EditNote,
-                            contentDescription = null,
-                            tint = LchAccent,
-                            modifier = Modifier.size(18.dp)
-                        )
-                        Text(
-                            text = "Notas recientes",
-                            fontSize = 13.sp,
-                            fontWeight = FontWeight.Bold,
-                            color = LchText
-                        )
-                    }
-                    if (recentNotes.isEmpty()) {
-                        Text(
-                            text = "Todavía no tienes notas. Escribe tu primera nota aquí.",
-                            fontSize = 12.sp,
-                            color = LchMuted,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis
-                        )
-                    } else {
-                        recentNotes.forEach { note ->
-                            Text(
-                                text = note.content,
-                                fontSize = 13.sp,
-                                color = LchText,
-                                maxLines = 2,
-                                overflow = TextOverflow.Ellipsis
-                            )
-                        }
-                    }
-                }
+            // ---- Aviso: convertir en Inicio real ----
+            if (!isDefaultHome) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HomeRoleCard(onRequest = { LauncherUtils.requestHomeRole(context) })
             }
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            // ---- Grid de apps propias ----
+            AppGrid(
+                onOpenNotes = onOpenNotes,
+                onOpenSleepCycle = onOpenSleepCycle,
+                onOpenOrganizer = onOpenOrganizer,
+                onOpenModes = onOpenModes
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // ---- Dock ----
+            Dock(onOpenAppDrawer = onOpenAppDrawer, onOpenSettings = onOpenSettings)
 
             Spacer(modifier = Modifier.height(8.dp))
-
-            // Botón de acceso al cajón de aplicaciones
-            Button(
-                onClick = onOpenAppDrawer,
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(16.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = LchAccent),
-                contentPadding = PaddingValues(vertical = 16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Apps,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.width(8.dp))
-                Text(
-                    text = "Aplicaciones",
-                    fontSize = 15.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
-
-            Spacer(modifier = Modifier.height(12.dp))
         }
     }
 }
 
-/** Atajos superiores a las apps propias de la suite. */
+/** Reloj gigante del home con fecha en español. */
 @Composable
-private fun LauncherQuickApps(
-    onOpenNotes: () -> Unit,
-    onOpenSleepCycle: () -> Unit,
-    onOpenOrganizer: () -> Unit
-) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.spacedBy(12.dp)
-    ) {
-        QuickAppTile(icon = Icons.Default.EditNote, label = "Notas", onClick = onOpenNotes, weight = 1f)
-        QuickAppTile(icon = Icons.Default.Bedtime, label = "Sueño", onClick = onOpenSleepCycle, weight = 1f)
-        QuickAppTile(icon = Icons.Default.Checklist, label = "Tareas", onClick = onOpenOrganizer, weight = 1f)
-    }
-}
-
-@Composable
-private fun RowScope.QuickAppTile(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    label: String,
-    onClick: () -> Unit,
-    weight: Float
-) {
+private fun ClockWidget(now: LocalTime) {
     Column(
         modifier = Modifier
-            .weight(weight)
-            .clip(RoundedCornerShape(16.dp))
-            .background(LchSurface)
-            .border(1.dp, LchBorder, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
-            .padding(vertical = 14.dp),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(6.dp)
+            .fillMaxWidth()
+            .padding(vertical = 4.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Box(
-            modifier = Modifier
-                .size(44.dp)
-                .clip(CircleShape)
-                .background(LchAccent.copy(alpha = 0.12f)),
-            contentAlignment = Alignment.Center
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = label,
-                tint = LchAccent,
-                modifier = Modifier.size(22.dp)
-            )
-        }
         Text(
-            text = label,
-            fontSize = 12.sp,
-            fontWeight = FontWeight.SemiBold,
-            color = LchText
+            text = now.format(DateTimeFormatter.ofPattern("HH:mm", Locale.getDefault())),
+            fontSize = 76.sp,
+            lineHeight = 78.sp,
+            fontWeight = FontWeight.Light,
+            color = LchText,
+            letterSpacing = (-2).sp
+        )
+        Spacer(modifier = Modifier.height(2.dp))
+        val dayLabel = java.time.LocalDate.now()
+            .format(DateTimeFormatter.ofPattern("EEEE d 'de' MMMM", Locale.getDefault()))
+        Text(
+            text = dayLabel.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.getDefault()) else it.toString() },
+            fontSize = 15.sp,
+            color = LchMuted,
+            fontWeight = FontWeight.Medium
         )
     }
 }
 
-/** Tarjeta-widget genérica del launcher. */
+/** Widget de Modo Enfoque: selector de modo + steppers de horas y minutos. */
 @Composable
-private fun LauncherWidgetCard(
-    icon: androidx.compose.ui.graphics.vector.ImageVector,
-    title: String,
-    subtitle: String,
-    onClick: () -> Unit
+private fun FocusModeWidget(
+    onStartFocus: (Int) -> Unit,
+    onOpenModes: () -> Unit
 ) {
-    Card(
+    var hours by remember { mutableIntStateOf(0) }
+    var minutes by remember { mutableIntStateOf(25) }
+
+    val totalMinutes = hours * 60 + minutes
+
+    Column(
         modifier = Modifier
             .fillMaxWidth()
-            .clickable(onClick = onClick),
-        shape = RoundedCornerShape(20.dp),
-        colors = CardDefaults.cardColors(containerColor = LchSurface),
-        border = BorderStroke(1.dp, LchBorder),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            .clip(RoundedCornerShape(28.dp))
+            .background(LchWidgetBg)
+            .border(1.dp, LchWidgetBorder, RoundedCornerShape(28.dp))
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
+        // Cabecera del widget
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
-            horizontalArrangement = Arrangement.spacedBy(14.dp),
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
                 modifier = Modifier
-                    .size(40.dp)
-                    .clip(CircleShape)
-                    .background(LchAccent.copy(alpha = 0.10f)),
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(LchAccent.copy(alpha = 0.16f)),
                 contentAlignment = Alignment.Center
             ) {
                 Icon(
-                    imageVector = icon,
+                    imageVector = Icons.Default.Timer,
                     contentDescription = null,
                     tint = LchAccent,
                     modifier = Modifier.size(20.dp)
                 )
             }
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = title,
-                    fontSize = 14.sp,
+                    text = "MODO ENFOQUE",
+                    fontSize = 11.sp,
                     fontWeight = FontWeight.Bold,
-                    color = LchText
+                    color = LchAccent,
+                    letterSpacing = 0.8.sp
                 )
                 Text(
-                    text = subtitle,
+                    text = "Tiempo de concentración sin distracciones",
                     fontSize = 11.sp,
-                    color = LchMuted
+                    color = LchMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
                 )
             }
+            IconButton(onClick = onOpenModes) {
+                Icon(
+                    imageVector = Icons.Default.Tune,
+                    contentDescription = "Ver todos los modos",
+                    tint = LchMuted,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+
+        // Steppers: horas | minutos
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            TimeStepColumn(
+                label = "HORAS",
+                value = hours,
+                onDec = { if (hours > 0) hours-- },
+                onInc = { if (hours < 23) hours++ }
+            )
+            Text(
+                text = ":",
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Light,
+                color = LchMuted
+            )
+            TimeStepColumn(
+                label = "MINUTOS",
+                value = minutes,
+                onDec = {
+                    if (minutes > 0) minutes-- else if (hours > 0) { minutes = 59; hours-- }
+                },
+                onInc = {
+                    if (minutes < 59) minutes++ else if (hours < 23) { minutes = 0; hours++ }
+                }
+            )
+        }
+
+        Spacer(modifier = Modifier.height(16.dp))
+
+        // Botón iniciar
+        Button(
+            onClick = { if (totalMinutes > 0) onStartFocus(totalMinutes) },
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(52.dp),
+            shape = RoundedCornerShape(16.dp),
+            colors = ButtonDefaults.buttonColors(
+                containerColor = LchAccent,
+                contentColor = LchOnAccent
+            ),
+            enabled = totalMinutes > 0
+        ) {
+            Icon(
+                imageVector = Icons.Default.Timer,
+                contentDescription = null,
+                modifier = Modifier.size(18.dp)
+            )
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = if (hours > 0) "Iniciar · $hours h $minutes min" else "Iniciar · $minutes min",
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold
+            )
         }
     }
 }
 
-/** Botón de inicio rápido de Modo Enfoque (25/45/90 min). */
+/** Widget de Modo Paseo: interruptor de activación voluntaria sin temporizador. */
 @Composable
-private fun RowScope.FocusQuickButton(
-    label: String,
-    duration: Int,
-    onClick: (Int) -> Unit
+private fun PaseoModeWidget(
+    paseoActive: Boolean,
+    onTogglePaseo: () -> Unit
 ) {
-    Button(
-        onClick = { onClick(duration) },
-        modifier = Modifier.weight(1f),
-        shape = RoundedCornerShape(12.dp),
-        colors = ButtonDefaults.buttonColors(containerColor = LchAccent),
-        contentPadding = PaddingValues(vertical = 12.dp)
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(if (paseoActive) LchAccent.copy(alpha = 0.14f) else LchWidgetBg)
+            .border(1.dp, if (paseoActive) LchAccent.copy(alpha = 0.5f) else LchWidgetBorder, RoundedCornerShape(28.dp))
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
     ) {
-        Text(label, fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(LchAccent.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.DirectionsWalk,
+                    contentDescription = null,
+                    tint = LchAccent,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "MODO PASEO",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = LchAccent,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = if (paseoActive) "Activo: vive el momento" else "RRSS 15 min · WhatsApp 20 min · música bloqueada",
+                    fontSize = 11.sp,
+                    color = LchMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+            Switch(
+                checked = paseoActive,
+                onCheckedChange = { onTogglePaseo() },
+                colors = SwitchDefaults.colors(
+                    checkedTrackColor = LchAccent,
+                    uncheckedTrackColor = LchMuted.copy(alpha = 0.3f),
+                    checkedThumbColor = LchOnAccent
+                )
+            )
+        }
+        Spacer(modifier = Modifier.height(6.dp))
+        Text(
+            text = if (paseoActive)
+                "● ACTIVO — se desactiva a voluntad"
+            else
+                "Sin temporizador. Al pasear, solo las apps con límite se bloquearán al alcanzarlo.",
+            fontSize = 11.sp,
+            fontWeight = if (paseoActive) FontWeight.Bold else FontWeight.Normal,
+            color = if (paseoActive) LchAccent else LchMuted,
+            textAlign = TextAlign.Center
+        )
     }
 }
 
+/** Columna de stepper (label + botones −/valor/+) estilo contador de iOS. */
+@Composable
+private fun TimeStepColumn(
+    label: String,
+    value: Int,
+    onDec: () -> Unit,
+    onInc: () -> Unit
+) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(
+            text = label,
+            fontSize = 10.sp,
+            fontWeight = FontWeight.Bold,
+            color = LchMuted,
+            letterSpacing = 0.8.sp
+        )
+        Spacer(modifier = Modifier.height(6.dp))
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            StepButton(icon = Icons.Default.Remove, onClick = onDec)
+            Text(
+                text = String.format(Locale.getDefault(), "%02d", value),
+                fontSize = 40.sp,
+                fontWeight = FontWeight.Light,
+                color = LchText,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.width(64.dp)
+            )
+            StepButton(icon = Icons.Default.Add, onClick = onInc)
+        }
+    }
+}
+
+@Composable
+private fun StepButton(icon: ImageVector, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(40.dp)
+            .clip(CircleShape)
+            .background(LchAccent.copy(alpha = 0.12f))
+            .clickable(onClick = onClick),
+        contentAlignment = Alignment.Center
+    ) {
+        Icon(
+            imageVector = icon,
+            contentDescription = null,
+            tint = LchAccent,
+            modifier = Modifier.size(20.dp)
+        )
+    }
+}
+
+/** Tarjeta-widget translúcida tipo iOS con cabecera (icono + título). */
+@Composable
+private fun ZenWidgetCard(
+    icon: ImageVector,
+    title: String,
+    modifier: Modifier = Modifier,
+    onClick: (() -> Unit)? = null,
+    content: @Composable () -> Unit
+) {
+    val clickModifier = if (onClick != null) modifier.clip(RoundedCornerShape(24.dp)).clickable(onClick = onClick) else modifier
+    Column(
+        modifier = clickModifier
+            .clip(RoundedCornerShape(24.dp))
+            .background(LchWidgetBg)
+            .border(1.dp, LchWidgetBorder, RoundedCornerShape(24.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = null,
+                tint = LchAccent,
+                modifier = Modifier.size(16.dp)
+            )
+            Text(
+                text = title.uppercase(Locale.getDefault()),
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = LchMuted,
+                letterSpacing = 0.6.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+        content()
+    }
+}
+
+/** Tarjeta para establecer la app como Inicio real del dispositivo. */
+@Composable
+private fun HomeRoleCard(onRequest: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(24.dp))
+            .background(LchWidgetBg)
+            .border(1.dp, LchWidgetBorder, RoundedCornerShape(24.dp))
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Icon(imageVector = Icons.Default.Home, contentDescription = null, tint = LchAccent, modifier = Modifier.size(18.dp))
+            Text(text = "Hazme tu Inicio", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = LchText)
+        }
+        Text(
+            text = "Pulsa Inicio en tu teléfono y este launcher (reloj, notas, frases y modos) aparecerá de inmediato, sin distracciones.",
+            fontSize = 12.sp,
+            lineHeight = 17.sp,
+            color = LchMuted
+        )
+        Button(
+            onClick = onRequest,
+            modifier = Modifier.fillMaxWidth(),
+            shape = RoundedCornerShape(14.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = LchAccent),
+            contentPadding = PaddingValues(vertical = 10.dp)
+        ) {
+            Text(text = "Establecer como Inicio", fontSize = 13.sp, fontWeight = FontWeight.Bold)
+        }
+    }
+}
+
+/** Grid de iconos de apps propias con etiqueta (estilo home de iOS). */
+@Composable
+private fun AppGrid(
+    onOpenNotes: () -> Unit,
+    onOpenSleepCycle: () -> Unit,
+    onOpenOrganizer: () -> Unit,
+    onOpenModes: () -> Unit
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly
+    ) {
+        AppIconTile(icon = Icons.Default.EditNote, label = "Notas", onClick = onOpenNotes)
+        AppIconTile(icon = Icons.Default.Bedtime, label = "Sueño", onClick = onOpenSleepCycle)
+        AppIconTile(icon = Icons.Default.Checklist, label = "Tareas", onClick = onOpenOrganizer)
+        AppIconTile(icon = Icons.Default.Tune, label = "Modos", onClick = onOpenModes)
+    }
+}
+
+@Composable
+private fun AppIconTile(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(18.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(58.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(
+                    Brush.verticalGradient(
+                        colors = listOf(LchAccent, LchAccent.copy(alpha = 0.78f))
+                    )
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = icon,
+                contentDescription = label,
+                tint = LchOnAccent,
+                modifier = Modifier.size(28.dp)
+            )
+        }
+        Text(
+            text = label,
+            fontSize = 11.sp,
+            fontWeight = FontWeight.SemiBold,
+            color = LchText,
+            maxLines = 1
+        )
+    }
+}
+
+/** Dock inferior con acceso al cajón de apps y a los ajustes. */
+@Composable
+private fun Dock(onOpenAppDrawer: () -> Unit, onOpenSettings: () -> Unit) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(LchWidgetBg)
+            .border(1.dp, LchWidgetBorder, RoundedCornerShape(28.dp))
+            .padding(horizontal = 18.dp, vertical = 12.dp),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        DockTile(icon = Icons.Default.Apps, label = "Aplicaciones", onClick = onOpenAppDrawer)
+        DockTile(icon = Icons.Default.Settings, label = "Ajustes", onClick = onOpenSettings)
+    }
+}
+
+@Composable
+private fun DockTile(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        modifier = Modifier
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(horizontal = 18.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(50.dp)
+                .clip(RoundedCornerShape(14.dp))
+                .background(LchAccent.copy(alpha = 0.14f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(imageVector = icon, contentDescription = label, tint = LchAccent, modifier = Modifier.size(24.dp))
+        }
+        Text(text = label, fontSize = 10.sp, color = LchMuted, fontWeight = FontWeight.Medium)
+    }
+}

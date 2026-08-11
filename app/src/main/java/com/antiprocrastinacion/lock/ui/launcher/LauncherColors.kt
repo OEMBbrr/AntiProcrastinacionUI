@@ -59,3 +59,10 @@ val LchGradientEnd: Color
 
 val LchOnAccent: Color
     get() = if (ZenTheme.isDark) Color(0xFF0F171E) else Color.White
+
+// V27: fondo translúcido de los widgets del home (estilo iOS)
+val LchWidgetBg: Color
+    get() = if (ZenTheme.isDark) Color(0xCC1B252E) else Color(0xF2FFFFFF)
+
+val LchWidgetBorder: Color
+    get() = if (ZenTheme.isDark) Color(0x333A4654) else Color(0x2ED9D2C3)

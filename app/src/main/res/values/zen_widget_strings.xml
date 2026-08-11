@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="widget_title">Enfoque</string>
+    <string name="widget_subtitle">Modo concentración</string>
+    <string name="widget_hours_label">Horas</string>
+    <string name="widget_minutes_label">Minutos</string>
+    <string name="widget_colon">:</string>
+    <string name="widget_hour_default">00</string>
+    <string name="widget_min_default">25</string>
+    <string name="widget_start">Iniciar</string>
+    <string name="widget_open_notes">Abrir mis notas</string>
+</resources>

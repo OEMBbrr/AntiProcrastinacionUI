@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import kotlinx.coroutines.*
 
@@ -17,6 +18,10 @@ class LockMonitoringService : Service() {
     private val serviceScope = CoroutineScope(Dispatchers.Main + serviceJob)
     private lateinit var lockManager: LockManager
     private var lastRelaunchTime = 0L
+    // V29: Modo Paseo — seguimiento de la app en primer plano para medir uso continuo
+    private var paseoTrackedPkg: String? = null
+    private var paseoTrackedSince = 0L
+    private var lastPaseoBlockTime = 0L
 
     companion object {
         const val CHANNEL_ID = "anti_proc_lock_channel"
@@ -140,26 +145,38 @@ class LockMonitoringService : Service() {
         }
     }
 
-    private fun buildNotification(isLocked: Boolean) = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle(if (isLocked) "Modo Enfoque Máxima Seguridad 🧘" else "AntiProcrastinación 🧘")
-        .setContentText(
-            if (isLocked) "Protección activa ininterrumpida contra distracciones"
-            else "Sincronización activa. Esperando modo enfoque..."
-        )
-        .setSmallIcon(R.drawable.ic_launcher_foreground)
-        .setOngoing(true)
-        .setPriority(NotificationCompat.PRIORITY_LOW)
-        .setContentIntent(
-            PendingIntent.getActivity(
-                this,
-                0,
-                Intent(this, MainActivity::class.java).apply {
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION)
-                },
-                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+    private fun buildNotification(isLocked: Boolean): android.app.Notification {
+        val paseo = lockManager.paseoModeEnabled && !isLocked
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle(
+                when {
+                    isLocked -> "Modo Enfoque Máxima Seguridad 🧘"
+                    paseo -> "Modo Paseo activo 🚶"
+                    else -> "AntiProcrastinación 🧘"
+                }
             )
-        )
-        .build()
+            .setContentText(
+                when {
+                    isLocked -> "Protección activa ininterrumpida contra distracciones"
+                    paseo -> "Vive el momento: RRSS y juegos con límite, WhatsApp 20 min, música bloqueada."
+                    else -> "Sincronización activa. Esperando modo enfoque..."
+                }
+            )
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setOngoing(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setContentIntent(
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    Intent(this, MainActivity::class.java).apply {
+                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or Intent.FLAG_ACTIVITY_NO_ANIMATION)
+                    },
+                    PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
+            )
+            .build()
+    }
 
     private fun updateNotification() {
         try {
@@ -174,8 +191,26 @@ class LockMonitoringService : Service() {
         serviceScope.launch {
             var wasTempUnlocked = lockManager.isTempUnlocked
             var wasLocked = lockManager.isLocked
+            var wasPaseoOn = lockManager.paseoModeEnabled
 
             while (isActive) {
+                // V29: MODO PASEO — vigilancia de uso continuo (RRSS/juegos 15 min, WhatsApp 20 min,
+                // música bloqueada). Solo bloquea la app en uso; el resto queda disponible.
+                if (lockManager.paseoModeEnabled && !lockManager.isLocked) {
+                    if (!wasPaseoOn) {
+                        wasPaseoOn = true
+                        wasLocked = false
+                        updateNotification()
+                    }
+                    monitorPaseoLoop()
+                    delay(500)
+                    continue
+                }
+                if (wasPaseoOn) {
+                    wasPaseoOn = false
+                    updateNotification()
+                }
+
                 if (!lockManager.isLocked) {
                     // V20: modo escucha — el servicio permanece activo esperando
                     // un posible bloqueo cruzado desde la extensión de Chrome
@@ -205,6 +240,8 @@ class LockMonitoringService : Service() {
                 // 1. Detección instantánea de vencimiento de tregua
                 if (wasTempUnlocked && !isTempUnlocked) {
                     wasTempUnlocked = false
+                    // V28: limpiar tregua_until en Firebase para que la extensión re-bloquee
+                    lockManager.pushLockStateToFirebase(lockManager.isLocked, lockManager.lockEndTime)
                     relaunchLockScreenInstant()
                 } else {
                     wasTempUnlocked = isTempUnlocked
@@ -263,6 +300,85 @@ class LockMonitoringService : Service() {
             }
             startActivity(launchIntent)
         }
+    }
+
+    /**
+     * V29: una pasada del vigilante del Modo Paseo. Mide el tiempo en primer plano
+     * de las apps con límite (RRSS/juegos/dopamínicas y WhatsApp) y expulsa de la
+     * app al superar el límite. Solo bloquea la app en uso; el resto sigue libre.
+     */
+    private fun monitorPaseoLoop() {
+        val fg = LauncherUtils.getForegroundPackage(applicationContext)
+        if (fg == null || fg == packageName) {
+            paseoTrackedPkg = null
+            paseoTrackedSince = 0L
+            return
+        }
+
+        val category = LauncherUtils.classifyWalkApp(applicationContext, fg)
+        when (category) {
+            LauncherUtils.WalkAppCategory.MUSIC -> {
+                if (lockManager.paseoMusicBlocked) {
+                    if (!lockManager.isPaseoBlocked(fg)) lockManager.blockPaseoApp(fg)
+                    relaunchPaseoBlock(fg, "Música bloqueada durante el paseo. Vive el momento.")
+                }
+                paseoTrackedPkg = null
+                paseoTrackedSince = 0L
+            }
+            LauncherUtils.WalkAppCategory.WHATSAPP,
+            LauncherUtils.WalkAppCategory.DOPAMINE -> {
+                if (lockManager.isPaseoBlocked(fg)) {
+                    relaunchPaseoBlock(
+                        fg,
+                        "Límite de ${lockManager.paseoLimitMs(fg) / 60_000L} min alcanzado en esta app."
+                    )
+                    paseoTrackedPkg = null
+                    paseoTrackedSince = 0L
+                    return
+                }
+                val now = System.currentTimeMillis()
+                if (fg == paseoTrackedPkg && paseoTrackedSince > 0L) {
+                    lockManager.addPaseoUsage(fg, now - paseoTrackedSince)
+                    if (lockManager.paseoUsageMs(fg) >= lockManager.paseoLimitMs(fg)) {
+                        lockManager.blockPaseoApp(fg)
+                        relaunchPaseoBlock(
+                            fg,
+                            "Límite de ${lockManager.paseoLimitMs(fg) / 60_000L} min alcanzado en esta app."
+                        )
+                        paseoTrackedPkg = null
+                        paseoTrackedSince = 0L
+                        return
+                    }
+                }
+                paseoTrackedPkg = fg
+                paseoTrackedSince = now
+            }
+            else -> {
+                // Apps esenciales o libres: sin límite, pausar el contador.
+                paseoTrackedPkg = null
+                paseoTrackedSince = 0L
+            }
+        }
+    }
+
+    /** Expulsa al usuario de la app bloqueada y avisa con un Toast (debounce anti-spam). */
+    private fun relaunchPaseoBlock(pkg: String, message: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastPaseoBlockTime < 1500) return
+        lastPaseoBlockTime = now
+        try {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+        }
+        val launchIntent = Intent(applicationContext, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
+        }
+        startActivity(launchIntent)
     }
 
     private fun isEmergencyPackage(pkg: String): Boolean {

@@ -385,6 +385,14 @@ document.addEventListener('DOMContentLoaded', () => {
             // V24 (Propuesta 2): el teléfono aprobó la tregua
             if (mathModal) mathModal.classList.add('hidden');
             updateUI();
+        } else if (request && request.action === 'treguaDenied') {
+            // V28: el teléfono denegó la tregua o no respondió a tiempo
+            if (mathModal) mathModal.classList.add('hidden');
+            const reason = (request.reason === 'timeout')
+                ? 'El teléfono no respondió a tiempo. Inténtalo de nuevo dentro de un momento.'
+                : 'El teléfono rechazó la tregua. Sigue concentrado y respeta tu enfoque.';
+            alert(reason);
+            updateUI();
         }
     });
 

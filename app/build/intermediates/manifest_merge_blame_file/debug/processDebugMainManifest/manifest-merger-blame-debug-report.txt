@@ -10,34 +10,34 @@
 10
 11    <!-- Permiso de Internet para Firebase SDK -->
 12    <uses-permission android:name="android.permission.INTERNET" />
-12-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:6:5-67
-12-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:6:22-64
+12-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:6:5-67
+12-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:6:22-64
 13
 14    <!-- Permiso para iniciar en el boot y mantener el bloqueo tras reiniciar -->
 15    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-15-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:9:5-81
-15-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:9:22-78
+15-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:9:5-81
+15-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:9:22-78
 16
 17    <!-- Permiso para consultar los launchers del sistema y poder redirigir al real -->
 18    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
-18-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:12:5-77
-18-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:12:22-74
+18-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:12:5-77
+18-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:12:22-74
 19
 20    <!-- Permiso para monitorear aplicaciones en primer plano -->
 21    <uses-permission android:name="android.permission.PACKAGE_USAGE_STATS" />
-21-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:15:5-114
-21-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:15:22-75
+21-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:15:5-114
+21-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:15:22-75
 22
 23    <!-- Permisos para Foreground Service (Evita que el sistema o HiOS mate la app) -->
 24    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-24-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:18:5-77
-24-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:18:22-74
+24-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:18:5-77
+24-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:18:22-74
 25    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
-25-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:19:5-114
-25-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:19:22-86
+25-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:19:5-114
+25-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:19:22-86
 26    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-26-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:20:5-77
-26-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:20:22-74
+26-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:20:5-77
+26-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:20:22-74
 27    <uses-permission android:name="android.permission.USE_BIOMETRIC" /> <!-- suppress DeprecatedClassUsageInspection -->
 27-->[androidx.biometric:biometric:1.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\688226101c96300b06440b6bf69649ef\transformed\biometric-1.1.0\AndroidManifest.xml:24:5-72
 27-->[androidx.biometric:biometric:1.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\688226101c96300b06440b6bf69649ef\transformed\biometric-1.1.0\AndroidManifest.xml:24:22-69
@@ -63,115 +63,115 @@
 36-->[androidx.core:core:1.15.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\64330f763aa602cac1b62304e69955ab\transformed\core-1.15.0\AndroidManifest.xml:26:22-94
 37
 38    <application
-38-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:22:5-79:19
+38-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:22:5-79:19
 39        android:allowBackup="true"
-39-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:23:9-35
+39-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:23:9-35
 40        android:appComponentFactory="androidx.core.app.CoreComponentFactory"
 40-->[androidx.core:core:1.15.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\64330f763aa602cac1b62304e69955ab\transformed\core-1.15.0\AndroidManifest.xml:28:18-86
 41        android:debuggable="true"
 42        android:extractNativeLibs="false"
 43        android:icon="@drawable/app_logo"
-43-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:24:9-42
+43-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:24:9-42
 44        android:label="AntiProcrastinacion"
-44-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:25:9-44
+44-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:25:9-44
 45        android:supportsRtl="true"
-45-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:26:9-35
+45-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:26:9-35
 46        android:theme="@android:style/Theme.DeviceDefault.NoActionBar" >
-46-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:27:9-71
+46-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:27:9-71
 47
 48        <!-- Actividad principal registrada como App estándar y Launcher -->
 49        <activity
-49-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:30:9-42:20
+49-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:30:9-42:20
 50            android:name="com.antiprocrastinacion.lock.MainActivity"
-50-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:31:13-41
+50-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:31:13-41
 51            android:excludeFromRecents="true"
-51-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:34:13-46
+51-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:34:13-46
 52            android:exported="true"
-52-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:32:13-36
+52-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:32:13-36
 53            android:launchMode="singleTask"
-53-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:33:13-44
+53-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:33:13-44
 54            android:theme="@android:style/Theme.DeviceDefault.NoActionBar" >
-54-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:35:13-75
+54-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:35:13-75
 55            <intent-filter>
-55-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:36:13-41:29
+55-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:36:13-41:29
 56                <action android:name="android.intent.action.MAIN" />
-56-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:37:17-69
-56-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:37:25-66
+56-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:37:17-69
+56-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:37:25-66
 57
 58                <category android:name="android.intent.category.LAUNCHER" />
-58-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:38:17-77
-58-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:38:27-74
+58-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:38:17-77
+58-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:38:27-74
 59                <category android:name="android.intent.category.HOME" />
-59-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:39:17-73
-59-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:39:27-70
+59-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:39:17-73
+59-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:39:27-70
 60                <category android:name="android.intent.category.DEFAULT" />
-60-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:17-76
-60-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:27-73
+60-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:17-76
+60-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:27-73
 61            </intent-filter>
 62        </activity>
 63
 64        <!-- Servicio Foreground para el monitoreo ininterrumpido -->
 65        <service
-65-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:45:9-53:19
+65-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:45:9-53:19
 66            android:name="com.antiprocrastinacion.lock.LockMonitoringService"
-66-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:46:13-50
+66-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:46:13-50
 67            android:enabled="true"
-67-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:47:13-35
+67-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:47:13-35
 68            android:exported="false"
-68-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:48:13-37
+68-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:48:13-37
 69            android:foregroundServiceType="specialUse" >
-69-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:49:13-55
+69-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:49:13-55
 70            <property
-70-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:50:13-52:80
+70-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:50:13-52:80
 71                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
-71-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:51:17-76
+71-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:51:17-76
 72                android:value="Anti-procrastination lock screen enforcement" />
-72-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:52:17-77
+72-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:52:17-77
 73        </service>
 74
 75        <!-- Receptor de arranque para persistencia de bloqueo -->
 76        <receiver
-76-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:56:9-64:20
+76-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:56:9-64:20
 77            android:name="com.antiprocrastinacion.lock.BootReceiver"
-77-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:57:13-41
+77-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:57:13-41
 78            android:enabled="true"
-78-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:58:13-35
+78-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:58:13-35
 79            android:exported="true" >
-79-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:59:13-36
+79-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:59:13-36
 80            <intent-filter>
-80-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:60:13-63:29
+80-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:60:13-63:29
 81                <action android:name="android.intent.action.BOOT_COMPLETED" />
-81-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:61:17-79
-81-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:61:25-76
+81-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:61:17-79
+81-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:61:25-76
 82
 83                <category android:name="android.intent.category.DEFAULT" />
-83-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:17-76
-83-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:27-73
+83-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:17-76
+83-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:27-73
 84            </intent-filter>
 85        </receiver>
 86
 87        <!-- V26: widget de escritorio (Modo Enfoque + notas) -->
 88        <receiver
-88-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:67:9-77:20
+88-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:67:9-77:20
 89            android:name="com.antiprocrastinacion.lock.ZenWidgetProvider"
-89-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:68:13-46
+89-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:68:13-46
 90            android:exported="true"
-90-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:69:13-36
+90-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:69:13-36
 91            android:label="@string/widget_title" >
-91-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:70:13-49
+91-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:70:13-49
 92            <intent-filter>
-92-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:71:13-73:29
+92-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:71:13-73:29
 93                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-93-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:72:17-84
-93-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:72:25-81
+93-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:72:17-84
+93-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:72:25-81
 94            </intent-filter>
 95
 96            <meta-data
-96-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:74:13-76:59
+96-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:74:13-76:59
 97                android:name="android.appwidget.provider"
-97-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:75:17-58
+97-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:75:17-58
 98                android:resource="@xml/zen_widget_info" />
-98-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:76:17-56
+98-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:76:17-56
 99        </receiver>
 100
 101        <activity
@@ -252,8 +252,8 @@
 139-->[com.google.firebase:firebase-auth:23.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\0902722244072161c1159fcf47527382\transformed\firebase-auth-23.1.0\AndroidManifest.xml:36:25-66
 140
 141                <category android:name="android.intent.category.DEFAULT" />
-141-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:17-76
-141-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:27-73
+141-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:17-76
+141-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:27-73
 142                <category android:name="android.intent.category.BROWSABLE" />
 142-->[com.google.firebase:firebase-auth:23.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\0902722244072161c1159fcf47527382\transformed\firebase-auth-23.1.0\AndroidManifest.xml:39:17-78
 142-->[com.google.firebase:firebase-auth:23.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\0902722244072161c1159fcf47527382\transformed\firebase-auth-23.1.0\AndroidManifest.xml:39:27-75
@@ -287,8 +287,8 @@
 157-->[com.google.firebase:firebase-auth:23.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\0902722244072161c1159fcf47527382\transformed\firebase-auth-23.1.0\AndroidManifest.xml:36:25-66
 158
 159                <category android:name="android.intent.category.DEFAULT" />
-159-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:17-76
-159-->C:\Users\USUARIO\Documents\AntiProcrastinacion\app\src\main\AndroidManifest.xml:40:27-73
+159-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:17-76
+159-->C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\app\src\main\AndroidManifest.xml:40:27-73
 160                <category android:name="android.intent.category.BROWSABLE" />
 160-->[com.google.firebase:firebase-auth:23.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\0902722244072161c1159fcf47527382\transformed\firebase-auth-23.1.0\AndroidManifest.xml:39:17-78
 160-->[com.google.firebase:firebase-auth:23.1.0] C:\Users\USUARIO\.gradle\caches\8.11.1\transforms\0902722244072161c1159fcf47527382\transformed\firebase-auth-23.1.0\AndroidManifest.xml:39:27-75

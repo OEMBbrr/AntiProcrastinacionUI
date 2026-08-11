@@ -1,7 +1,12 @@
 package com.antiprocrastinacion.lock
 
 object MotivationalPhrases {
-    val PHRASES = listOf(
+    /** V28: lista de 10.000 frases distintas (150 curadas + 9.850 generadas). */
+    val PHRASES: List<String> by lazy {
+        PhraseGenerator.motivationalList(10000, CURATED)
+    }
+
+    private val CURATED = listOf(
         "✨ Tu mente es para tener ideas, no para guardarlas. Anótalas en tus notas.",
         "🌿 La disciplina de hoy es la tranquilidad de tu futuro.",
         "💡 Si una idea cruza tu mente, anótala en tus notas y sigue enfocado.",
@@ -155,6 +160,6 @@ object MotivationalPhrases {
     )
 
     fun getRandomPhrase(): String {
-        return PHRASES.random()
+        return PhraseGenerator.motivational()
     }
 }
