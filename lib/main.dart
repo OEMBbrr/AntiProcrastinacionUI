@@ -304,7 +304,7 @@ class _MainLockScreenState extends State<MainLockScreen> {
               child: const Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(CupertinoIcons.unlock, size: 20),
+                  Icon(Icons.lock_open_rounded, size: 20),
                   SizedBox(width: 8),
                   Text('Desbloquear Dispositivo', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
                 ],

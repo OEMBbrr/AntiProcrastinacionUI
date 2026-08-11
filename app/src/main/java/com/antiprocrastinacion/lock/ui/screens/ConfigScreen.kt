@@ -13,6 +13,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.LockOpen
@@ -730,7 +731,7 @@ fun ConfigScreen(
                     ) {
                         TextButton(onClick = { onBackToLauncher() }) {
                             Icon(
-                                imageVector = androidx.compose.material.icons.automirrored.filled.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Volver al launcher",
                                 tint = ZenSage,
                                 modifier = Modifier.size(18.dp)
