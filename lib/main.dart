@@ -3,6 +3,9 @@ import 'dart:math';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:flutter/cupertino.dart';
+import 'screens/zen_notes_screen.dart';
+import 'screens/zen_sleep_screen.dart';
+import 'screens/zen_tasks_screen.dart';
 
 void main() {
   runApp(const AntiProcrastinacionApp());
@@ -687,44 +690,15 @@ class _MainLockScreenState extends State<MainLockScreen> {
   }
 
   void _showNotasModal() {
-    showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => _buildSimpleModal(ctx, 'Notas Rápidas', 'Aquí irá la app nativa de Notas para apuntar pensamientos.'));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (ctx) => const ZenNotesScreen());
   }
 
   void _showSleepCycleModal() {
-    showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => _buildSimpleModal(ctx, 'Ciclo de Sueño', 'Calculadora de fases de sueño y alarmas suaves para evitar despertar en fase profunda.'));
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (ctx) => const ZenSleepScreen());
   }
 
   void _showTaskOrganizerModal() {
-    showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => _buildSimpleModal(ctx, 'Organizador de Tareas', 'Gestor de tareas diarias y planificador estilo Notion.'));
-  }
-
-  Widget _buildSimpleModal(BuildContext ctx, String title, String description) {
-    return Container(
-      height: MediaQuery.of(ctx).size.height * 0.7,
-      padding: const EdgeInsets.all(24),
-      decoration: const BoxDecoration(
-        color: Color(0xFFFDFBF7),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2C3539))),
-          const SizedBox(height: 16),
-          Text(description, style: const TextStyle(color: Colors.black54, fontSize: 16)),
-          const Spacer(),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(ctx),
-            style: ElevatedButton.styleFrom(
-              minimumSize: const Size.fromHeight(50),
-              backgroundColor: const Color(0xFF556B2F),
-              foregroundColor: Colors.white,
-            ),
-            child: const Text('Cerrar'),
-          )
-        ],
-      ),
-    );
+    showModalBottomSheet(context: context, isScrollControlled: true, backgroundColor: Colors.transparent, builder: (ctx) => const ZenTasksScreen());
   }
 
   void _showFocusSetupModal(BuildContext context) {
