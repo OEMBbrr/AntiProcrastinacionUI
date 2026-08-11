@@ -145,9 +145,9 @@ class _MainLockScreenState extends State<MainLockScreen> {
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildPropiaApp(Icons.edit_note, "Notas"),
-                          _buildPropiaApp(Icons.bedtime, "Sueño"),
-                          _buildPropiaApp(Icons.task_alt, "Tareas"),
+                          _buildPropiaApp(Icons.edit_note, "Notas", _showNotasModal),
+                          _buildPropiaApp(Icons.bedtime, "Sueño", _showSleepCycleModal),
+                          _buildPropiaApp(Icons.task_alt, "Tareas", _showTaskOrganizerModal),
                         ],
                       ),
                       const SizedBox(height: 24),
@@ -175,6 +175,9 @@ class _MainLockScreenState extends State<MainLockScreen> {
                             _buildAppItem(Icons.map_outlined, "Mapas"),
                             _buildAppItem(Icons.phone_outlined, "Llamadas"),
                             _buildAppItem(Icons.chat_outlined, "WhatsApp"),
+                            _buildAppItem(Icons.camera_alt, "Instagram", isDopamine: true),
+                            _buildAppItem(Icons.videogame_asset, "Casino Slot", isDopamine: true),
+                            _buildAppItem(Icons.public, "Navegador Web", isDopamine: true),
                           ],
                         ),
                       ),
@@ -347,23 +350,99 @@ class _MainLockScreenState extends State<MainLockScreen> {
     );
   }
 
-  Widget _buildPropiaApp(IconData icon, String label) {
-    return Column(
-      children: [
-        Icon(icon, color: const Color(0xFF556B2F), size: 28),
-        const SizedBox(height: 4),
-        Text(label, style: const TextStyle(fontSize: 12, color: Colors.black87)),
-      ],
+  Widget _buildPropiaApp(IconData icon, String label, VoidCallback onTap) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Padding(
+        padding: const EdgeInsets.all(8.0),
+        child: Column(
+          children: [
+            Icon(icon, color: const Color(0xFF556B2F), size: 28),
+            const SizedBox(height: 4),
+            Text(label, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+          ],
+        ),
+      ),
     );
   }
 
-  Widget _buildAppItem(IconData icon, String name) {
+  Widget _buildAppItem(IconData icon, String name, {bool isDopamine = false}) {
     return ListTile(
       leading: Icon(icon, color: Colors.grey.shade600),
       title: Text(name, style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.w400)),
       onTap: () {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+        if (isDopamine) {
+          _showIntentionalityDialog(name);
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $name...')));
+        }
       },
+    );
+  }
+
+  void _showIntentionalityDialog(String appName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('¿Intención Real?', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Estás a punto de abrir $appName.\n\n¿Realmente necesitas usarla o solo buscas distraerte un rato?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Solo quería distraerme', style: TextStyle(color: Colors.grey)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Abriendo $appName...')));
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF556B2F), foregroundColor: Colors.white),
+            child: const Text('Necesito usarla'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showNotasModal() {
+    showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => _buildSimpleModal(ctx, 'Notas Rápidas', 'Aquí irá la app nativa de Notas para apuntar pensamientos.'));
+  }
+
+  void _showSleepCycleModal() {
+    showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => _buildSimpleModal(ctx, 'Ciclo de Sueño', 'Calculadora de fases de sueño y alarmas suaves para evitar despertar en fase profunda.'));
+  }
+
+  void _showTaskOrganizerModal() {
+    showModalBottomSheet(context: context, isScrollControlled: true, builder: (ctx) => _buildSimpleModal(ctx, 'Organizador de Tareas', 'Gestor de tareas diarias y planificador estilo Notion.'));
+  }
+
+  Widget _buildSimpleModal(BuildContext ctx, String title, String description) {
+    return Container(
+      height: MediaQuery.of(ctx).size.height * 0.7,
+      padding: const EdgeInsets.all(24),
+      decoration: const BoxDecoration(
+        color: Color(0xFFFDFBF7),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Color(0xFF2C3539))),
+          const SizedBox(height: 16),
+          Text(description, style: const TextStyle(color: Colors.black54, fontSize: 16)),
+          const Spacer(),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(
+              minimumSize: const Size.fromHeight(50),
+              backgroundColor: const Color(0xFF556B2F),
+              foregroundColor: Colors.white,
+            ),
+            child: const Text('Cerrar'),
+          )
+        ],
+      ),
     );
   }
 

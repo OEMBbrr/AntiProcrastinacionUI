@@ -534,17 +534,27 @@ class LockManager(context: Context) {
         get() = firebaseAuth.currentUser?.email ?: prefs.getString("google_user_email", "") ?: ""
 
     /**
+     * V24.1: clave limpia del nodo que usa esta app en Firebase (/users/<targetKey>).
+     * Es la MISMA que publica el teléfono en device_info y en LAN para que la
+     * extensión la adopte y ambos dispositivos usen exactamente el mismo nodo.
+     */
+    val targetKey: String
+        get() {
+            val email = googleUserEmail
+            val rawKey = if (email.isNotEmpty()) email else userSyncKey
+            return rawKey.lowercase().trim().replace(Regex("[^a-z0-9_]"), "_")
+        }
+
+    /**
      * V24 (Bug 4): referencia base al nodo del usuario.
      * Prioridad: correo de Google → sync key (ZEN-XXXX) → UID.
      * Se antepone el sync key al UID para que una sesión anónima de respaldo
      * NO cambie la ruta de datos de los usuarios que conectan por PIN.
      */
     private fun userRef(): com.google.firebase.database.DatabaseReference {
-        val email = googleUserEmail
-        val rawKey = if (email.isNotEmpty()) email else userSyncKey
-        val targetKey = rawKey.lowercase().trim().replace(Regex("[^a-z0-9_]"), "_")
-        android.util.Log.d("ZEN_SYNC", "userRef path -> /users/${targetKey} (email='${email}', pin='${devicePin}')")
-        return firebaseDb.getReference("users").child(targetKey)
+        val key = targetKey
+        android.util.Log.d("ZEN_SYNC", "userRef path -> /users/${key} (email='${googleUserEmail}', pin='${devicePin}')")
+        return firebaseDb.getReference("users").child(key)
     }
 
     private var extensionPingListener: ValueEventListener? = null
@@ -754,9 +764,10 @@ class LockManager(context: Context) {
     }
 
     // ================================================================================
-    // V24: AUTENTICACIÓN DE DOS PASOS DEL BLOQUEO CRUZADO (código del PC -> notificación)
-    // El PC genera un código, lo publica en /users/<target>/auth_request y el teléfono
-    // muestra una notificación con ese código para que el usuario lo escriba en el PC.
+    // V24.1: AUTENTICACIÓN DE DOS PASOS DEL BLOQUEO CRUZADO (código del TELÉFONO -> PC)
+    // El PC SOLO solicita (status:'requesting'). El TELÉFONO genera el código, lo
+    // muestra en su notificación y lo publica de vuelta (status:'pending' + code).
+    // El usuario escribe el código en el PC y la extensión lo verifica.
     // ================================================================================
     private val authRequestCallbacks = mutableListOf<(String, String) -> Unit>() // (reqId, code)
     private var authRequestListener: ValueEventListener? = null
@@ -775,12 +786,34 @@ class LockManager(context: Context) {
                 val requester = snapshot.child("requester").getValue(String::class.java) ?: ""
                 val status = snapshot.child("status").getValue(String::class.java) ?: ""
                 val code = snapshot.child("code").getValue(String::class.java) ?: ""
-                // Solo atender solicitudes del PC, nuevas y pendientes
+                val expiresAt = snapshot.child("expires_at").getValue(Long::class.java) ?: (System.currentTimeMillis() + 3 * 60 * 1000)
+                // Solo atender solicitudes del PC y nuevas
                 if (requester != "chrome_extension") return
                 if (reqId == lastAuthRequestId) return
                 lastAuthRequestId = reqId
-                if (status == "pending" && code.isNotEmpty()) {
-                    android.util.Log.d("ZEN_2FA", "Código de verificación recibido desde el PC: $code")
+                if (System.currentTimeMillis() > expiresAt) return // solicitud caducada
+
+                if (status == "requesting") {
+                    // V24.1: la extensión SOLICITA el código; el TELÉFONO lo genera,
+                    // lo muestra por notificación y lo publica de vuelta para que la
+                    // extensión lo lea y pueda verificarlo al escribirlo en el PC.
+                    val generated = (1000..9999).random().toString()
+                    android.util.Log.d("ZEN_2FA", "Solicitud del PC recibida. Código generado por el teléfono: $generated")
+                    ref.updateChildren(
+                        mapOf(
+                            "id" to reqId,
+                            "status" to "pending",
+                            "code" to generated,
+                            "requested_at" to (snapshot.child("requested_at").getValue(Long::class.java) ?: System.currentTimeMillis()),
+                            "expires_at" to expiresAt,
+                            "responded_at" to System.currentTimeMillis()
+                        )
+                    )
+                    // Notificar a las UI (notificación + diálogo MainActivity)
+                    authRequestCallbacks.toList().forEach { cb -> cb.invoke(reqId, generated) }
+                } else if (status == "pending" && code.isNotEmpty()) {
+                    // Compatibilidad: extensión vieja que ya enviaba el código (status pending)
+                    android.util.Log.d("ZEN_2FA", "Código de verificación recibido desde el PC (flujo antiguo): $code")
                     authRequestCallbacks.toList().forEach { cb -> cb.invoke(reqId, code) }
                 }
             }
@@ -808,7 +841,8 @@ class LockManager(context: Context) {
             "model" to deviceModel,
             "android_last_ping" to now,
             "last_ping" to now,
-            "online" to true
+            "online" to true,
+            "target_key" to targetKey
         )
 
         ref.updateChildren(data).addOnCompleteListener { task ->
@@ -889,7 +923,9 @@ class LockManager(context: Context) {
         val json = prefs.getString("zen_notes_local_json", null) ?: return emptyList()
         return try {
             val type = object : TypeToken<List<ZenNote>>() {}.type
-            gson.fromJson<List<ZenNote>>(json, type) ?: emptyList()
+            val notes = gson.fromJson<List<ZenNote>>(json, type) ?: emptyList()
+            // V24.1: migrar categorías viejas a la clave canónica al cargar
+            notes.map { it.copy(category = normalizeCategory(it.category)) }
         } catch (e: Exception) {
             emptyList()
         }
@@ -929,13 +965,35 @@ class LockManager(context: Context) {
         heartbeatJob = null
     }
 
-    fun addNote(content: String, category: String = "General", onComplete: ((Boolean) -> Unit)? = null) {
+    /**
+     * V24.1 (Bug categorías): normaliza cualquier categoría a la clave CANÓNICA que
+     * usan todos los dispositivos: 'general' | 'tarea' | 'idea' | 'reflexion'.
+     * Tolera mayúsculas, acentos y etiquetas viejas ("Tarea", "Reflexión", etc.)
+     * para que las notas sincronicen correctamente entre Android y la extensión.
+     */
+    fun normalizeCategory(raw: String): String {
+        val key = raw.trim().lowercase()
+            .replace("ó", "o")
+            .replace("í", "i")
+            .replace("é", "e")
+            .replace("á", "a")
+            .replace("ú", "u")
+        return when (key) {
+            "", "general" -> "general"
+            "tarea" -> "tarea"
+            "idea" -> "idea"
+            "reflexion" -> "reflexion"
+            else -> "general"
+        }
+    }
+
+    fun addNote(content: String, category: String = "general", onComplete: ((Boolean) -> Unit)? = null) {
         if (content.isBlank()) return
         val noteId = "note_${System.currentTimeMillis()}_${(1000..9999).random()}"
         val newNote = ZenNote(
             id = noteId,
             content = content.trim(),
-            category = if (category.isBlank()) "General" else category,
+            category = normalizeCategory(category),
             timestamp = System.currentTimeMillis(),
             deviceSource = "android"
         )
@@ -1008,7 +1066,7 @@ class LockManager(context: Context) {
                     for (child in snapshot.children) {
                         val id = child.child("id").getValue(String::class.java) ?: child.key ?: ""
                         val content = child.child("content").getValue(String::class.java) ?: ""
-                        val category = child.child("category").getValue(String::class.java) ?: "General"
+                        val category = normalizeCategory(child.child("category").getValue(String::class.java) ?: "")
                         val timestamp = child.child("timestamp").getValue(Long::class.java) ?: 0L
                         val source = child.child("deviceSource").getValue(String::class.java) ?: "android"
                         if (content.isNotEmpty()) {
@@ -1040,7 +1098,7 @@ class LockManager(context: Context) {
 data class ZenNote(
     val id: String = "",
     val content: String = "",
-    val category: String = "General",
+    val category: String = "general",
     val timestamp: Long = 0L,
     val deviceSource: String = "android"
 )

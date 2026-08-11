@@ -62,7 +62,8 @@ fun ConfigScreen(
     onGoogleSignIn: () -> Unit = {},
     darkTheme: Boolean = false,
     onDarkThemeChange: (Boolean) -> Unit = {},
-    configVersion: Int = 0
+    configVersion: Int = 0,
+    onBackToLauncher: (() -> Unit)? = null
 ) {
     val context = LocalContext.current
     
@@ -721,6 +722,25 @@ fun ConfigScreen(
                     }
                 }
 
+                // V25: volver al launcher desde Ajustes
+                if (onBackToLauncher != null) {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.Start
+                    ) {
+                        TextButton(onClick = { onBackToLauncher() }) {
+                            Icon(
+                                imageVector = androidx.compose.material.icons.automirrored.filled.ArrowBack,
+                                contentDescription = "Volver al launcher",
+                                tint = ZenSage,
+                                modifier = Modifier.size(18.dp)
+                            )
+                            Spacer(modifier = Modifier.width(4.dp))
+                            Text("Launcher", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenSage)
+                        }
+                    }
+                }
+
                 Column(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     modifier = Modifier.fillMaxWidth()
@@ -1019,29 +1039,43 @@ fun ConfigScreen(
                                         modifier = Modifier.fillMaxWidth()
                                     )
                                 } else {
+                                    // V24.1 (T4): steppers compactos con el VALOR ACTUAL destacado
+                                    // (estilo de la extensión): "Descansos: N" / "Descanso (máx M): X min".
+                                    HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
+
                                     // Número de descansos
                                     Row(
                                         modifier = Modifier.fillMaxWidth(),
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "Descansos",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = ZenSage)
+                                                text = "Descansos: ",
+                                                fontSize = 13.sp,
+                                                color = ZenCharcoal,
+                                                fontWeight = FontWeight.Medium
                                             )
                                             Text(
-                                                text = "$pomodoroRestCount ${if (pomodoroRestCount == 1) "descanso" else "descansos"}",
-                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ZenCharcoal)
+                                                text = "$pomodoroRestCount",
+                                                fontSize = 22.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ZenGreen
+                                            )
+                                            Text(
+                                                text = " ${if (pomodoroRestCount == 1) "descanso" else "descansos"}",
+                                                fontSize = 13.sp,
+                                                color = ZenCharcoal,
+                                                fontWeight = FontWeight.Medium
                                             )
                                         }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             IconButton(
                                                 onClick = {
                                                     pomodoroRestCount = (pomodoroRestCount - 1).coerceAtLeast(1)
                                                     lockManager.pomodoroRestCount = pomodoroRestCount
                                                 },
-                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                modifier = Modifier.size(32.dp).clip(CircleShape),
                                                 enabled = pomodoroRestCount > 1
                                             ) {
                                                 Icon(Icons.Default.Remove, contentDescription = "Reducir descansos", tint = ZenGreen)
@@ -1051,7 +1085,7 @@ fun ConfigScreen(
                                                     pomodoroRestCount = (pomodoroRestCount + 1).coerceAtMost(pomodoroMaxRestCount)
                                                     lockManager.pomodoroRestCount = pomodoroRestCount
                                                 },
-                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                modifier = Modifier.size(32.dp).clip(CircleShape),
                                                 enabled = pomodoroRestCount < pomodoroMaxRestCount
                                             ) {
                                                 Icon(Icons.Default.Add, contentDescription = "Aumentar descansos", tint = ZenGreen)
@@ -1067,23 +1101,27 @@ fun ConfigScreen(
                                         verticalAlignment = Alignment.CenterVertically,
                                         horizontalArrangement = Arrangement.SpaceBetween
                                     ) {
-                                        Column {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
                                             Text(
-                                                text = "Duración del descanso (máx $pomodoroMaxRest)",
-                                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, color = ZenSage)
+                                                text = "Descanso (máx $pomodoroMaxRest): ",
+                                                fontSize = 13.sp,
+                                                color = ZenCharcoal,
+                                                fontWeight = FontWeight.Medium
                                             )
                                             Text(
                                                 text = "$pomodoroRestMinutes min",
-                                                style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, color = ZenCharcoal)
+                                                fontSize = 22.sp,
+                                                fontWeight = FontWeight.Bold,
+                                                color = ZenGreen
                                             )
                                         }
-                                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                                             IconButton(
                                                 onClick = {
                                                     pomodoroRestMinutes = (pomodoroRestMinutes - 1).coerceAtLeast(1)
                                                     lockManager.pomodoroRestMinutes = pomodoroRestMinutes
                                                 },
-                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                modifier = Modifier.size(32.dp).clip(CircleShape),
                                                 enabled = pomodoroRestMinutes > 1
                                             ) {
                                                 Icon(Icons.Default.Remove, contentDescription = "Reducir descanso", tint = ZenGreen)
@@ -1093,7 +1131,7 @@ fun ConfigScreen(
                                                     pomodoroRestMinutes = (pomodoroRestMinutes + 1).coerceAtMost(pomodoroMaxRest)
                                                     lockManager.pomodoroRestMinutes = pomodoroRestMinutes
                                                 },
-                                                modifier = Modifier.size(36.dp).clip(CircleShape),
+                                                modifier = Modifier.size(32.dp).clip(CircleShape),
                                                 enabled = pomodoroRestMinutes < pomodoroMaxRest
                                             ) {
                                                 Icon(Icons.Default.Add, contentDescription = "Aumentar descanso", tint = ZenGreen)
@@ -1161,10 +1199,12 @@ fun ConfigScreen(
                     }
 
                     if (showAppSelector) {
+                        // V24.1 (T3): altura con límite (heightIn) para que la lista de apps
+                        // scrollee por sí sola dentro del límite y el padre scrollee aparte.
                         Card(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(160.dp),
+                                .heightIn(max = 240.dp),
                             shape = RoundedCornerShape(12.dp),
                             colors = CardDefaults.cardColors(containerColor = ZenWhite),
                             border = BorderStroke(1.dp, ZenSage.copy(alpha = 0.2f)),

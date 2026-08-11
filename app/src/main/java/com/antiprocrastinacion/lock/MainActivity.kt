@@ -22,6 +22,11 @@ import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
 import com.antiprocrastinacion.lock.ui.screens.ConfigScreen
 import com.antiprocrastinacion.lock.ui.screens.ZenScreen
+import com.antiprocrastinacion.lock.ui.launcher.AppDrawerScreen
+import com.antiprocrastinacion.lock.ui.launcher.LauncherScreen
+import com.antiprocrastinacion.lock.ui.launcher.NotesAppScreen
+import com.antiprocrastinacion.lock.ui.launcher.OrganizerScreen
+import com.antiprocrastinacion.lock.ui.launcher.SleepCycleScreen
 import com.antiprocrastinacion.lock.ui.theme.AntiProcrastinacionTheme
 import kotlinx.coroutines.launch
 
@@ -33,6 +38,8 @@ class MainActivity : FragmentActivity() {
     private var isTempUnlockedState by mutableStateOf(false)
     private var darkTheme by mutableStateOf(false)
     private var configVersion by mutableStateOf(0)
+    // V25: pantalla actual del launcher ("launcher" | "drawer" | "notes" | "sleep" | "organizer" | "config" | "zen")
+    private var currentScreen by mutableStateOf("launcher")
     // V24 (Propuesta 2): solicitud de tregua entrante desde el PC (null = ninguna)
     private var treguaRequest by mutableStateOf<String?>(null)
     // V24: código 2FA que el PC solicita para el Bloqueo Cruzado (null = ninguno)
@@ -50,6 +57,9 @@ class MainActivity : FragmentActivity() {
         onBackPressedDispatcher.addCallback(this) {
             if (lockManager.isLocked && !lockManager.isTempUnlocked) {
                 // Bloqueado por completo: deshabilitar retroceso
+            } else if (currentScreen != "launcher" && currentScreen != "zen") {
+                // V25: desde cualquier pantalla interna del launcher volver al home
+                currentScreen = "launcher"
             } else {
                 isEnabled = false
                 onBackPressedDispatcher.onBackPressed()
@@ -100,14 +110,49 @@ class MainActivity : FragmentActivity() {
 
         setContent {
             AntiProcrastinacionTheme(darkTheme = darkTheme) {
-                var currentScreen by remember { mutableStateOf(if (isLockedState) "zen" else "config") }
                 val scope = rememberCoroutineScope()
 
+                // V25: el launcher se propaga al tema desaturado según modo claro/oscuro
+                LaunchedEffect(darkTheme) {
+                    com.antiprocrastinacion.lock.ui.launcher.LauncherTheme.isDark = darkTheme
+                }
+
                 LaunchedEffect(isLockedState) {
-                    currentScreen = if (isLockedState) "zen" else "config"
+                    currentScreen = if (isLockedState) "zen" else "launcher"
                 }
 
                 when (currentScreen) {
+                    "launcher" -> {
+                        LauncherScreen(
+                            lockManager = lockManager,
+                            onOpenNotes = { currentScreen = "notes" },
+                            onOpenSleepCycle = { currentScreen = "sleep" },
+                            onOpenOrganizer = { currentScreen = "organizer" },
+                            onOpenAppDrawer = { currentScreen = "drawer" },
+                            onOpenSettings = { currentScreen = "config" }
+                        )
+                    }
+                    "drawer" -> {
+                        AppDrawerScreen(
+                            onBack = { currentScreen = "launcher" }
+                        )
+                    }
+                    "notes" -> {
+                        NotesAppScreen(
+                            lockManager = lockManager,
+                            onBack = { currentScreen = "launcher" }
+                        )
+                    }
+                    "sleep" -> {
+                        SleepCycleScreen(
+                            onBack = { currentScreen = "launcher" }
+                        )
+                    }
+                    "organizer" -> {
+                        OrganizerScreen(
+                            onBack = { currentScreen = "launcher" }
+                        )
+                    }
                     "config" -> {
                         ConfigScreen(
                             lockManager = lockManager,
@@ -126,7 +171,8 @@ class MainActivity : FragmentActivity() {
                             onDarkThemeChange = { newValue ->
                                 darkTheme = newValue
                                 lockManager.darkModeEnabled = newValue
-                            }
+                            },
+                            onBackToLauncher = { currentScreen = "launcher" }
                         )
                     }
                     "zen" -> {

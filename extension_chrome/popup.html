@@ -205,12 +205,12 @@
         </div>
     </div>
 
-    <!-- V24: Modal de verificación 2FA del Bloqueo Cruzado (código que llega por notificación al teléfono) -->
+    <!-- V24.1: Modal de verificación 2FA del Bloqueo Cruzado (el teléfono genera el código) -->
     <div class="modal-overlay hidden" id="auth-code-modal">
         <div class="modal-card">
             <h4><img src="emojis/sync_icon.svg" alt="" class="menu-icon"> Confirmar Bloqueo Cruzado</h4>
-            <p>Se ha enviado un código de verificación a la notificación de tu teléfono. Escríbelo aquí para continuar:</p>
-            <div class="auth-pending hidden" id="auth-pending">📱 Revisa la notificación de AntiProcrastinación en tu teléfono...</div>
+            <p>Se ha solicitado un código de verificación a tu teléfono. El teléfono lo generará y te llegará por notificación. Escríbelo aquí para continuar:</p>
+            <div class="auth-pending hidden" id="auth-pending">📱 Generando código en tu teléfono... Revisa la notificación de AntiProcrastinación.</div>
             <input type="text" id="auth-code-input" maxlength="4" inputmode="numeric" placeholder="0000">
             <div class="auth-error hidden" id="auth-error">Código incorrecto o expirado. Intenta de nuevo.</div>
             <div class="modal-actions">

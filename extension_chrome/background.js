@@ -24,9 +24,11 @@ let pomodoroPhases = [];
 const POMODORO_MAX_WORK_MINUTES = 60;
 const POMODORO_MAX_REST_MINUTES = 30;
 
-// V24: verificación de dos pasos del Bloqueo Cruzado desde el PC.
-// El código se genera aquí, se publica en /auth_request para que el teléfono lo
-// muestre en una notificación, y solo se confirma si el usuario lo escribe en el PC.
+// V24.1: verificación de dos pasos del Bloqueo Cruzado desde el PC.
+// La extensión SOLO solicita el código (status:'requesting'); el TELÉFONO lo genera,
+// lo muestra por notificación y lo publica de vuelta (status:'pending' + code).
+// La extensión lo lee por polling para compararlo con el que escribe el usuario en el PC,
+// pero nunca lo muestra en pantalla: quien lo ve es el usuario en el teléfono.
 let pendingAuth = null; // { requestId, code, expiresAt }
 
 // Estado de sesión
@@ -35,6 +37,10 @@ let firebaseIdToken = null;
 let firebaseRefreshToken = null;
 let userEmail = null;
 let syncKey = null;
+// V24.1: nodo del dispositivo adoptado desde el teléfono (target_key publicado
+// en device_info/LAN). Garantiza que la extensión escriba EXACTAMENTE en el nodo
+// que el teléfono escucha, de modo que el código 2FA siempre llegue.
+let pairedTargetKey = null;
 
 // V24: Firebase Anonymous Auth como respaldo (Bug 4 de la auditoría).
 // Cuando no hay sesión de Google, se obtiene un token anónimo válido para que
@@ -92,20 +98,85 @@ function cleanKey(key) {
     return key.toLowerCase().trim().replace(/[^a-z0-9_]/g, '_');
 }
 
+// V24.1: normaliza cualquier categoría a la clave canónica compartida con Android
+// ('general' | 'tarea' | 'idea' | 'reflexion'). Tolera mayúsculas y acentos.
+function normalizeCategory(raw) {
+    const key = String(raw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+    switch (key) {
+        case 'tarea': return 'tarea';
+        case 'idea': return 'idea';
+        case 'reflexion': return 'reflexion';
+        default: return 'general';
+    }
+}
+
 function getTargetKey() {
+    if (pairedTargetKey) return cleanKey(pairedTargetKey);
     if (userEmail && userEmail.includes('@')) return cleanKey(userEmail);
     if (syncKey) return cleanKey(syncKey);
     if (firebaseUid) return cleanKey(firebaseUid);
     return "USER_DEFAULT_12345";
 }
 
+// V24.1: adopta la clave de nodo que publica el teléfono (device_info o LAN).
+function adoptPairedTargetKey(rawKey) {
+    if (!rawKey) return false;
+    const clean = cleanKey(String(rawKey));
+    if (!clean || clean === "USER_DEFAULT_12345") return false;
+    if (pairedTargetKey !== clean) {
+        pairedTargetKey = clean;
+        chrome.storage.local.set({ pairedTargetKey: clean });
+        console.log("ZEN_2FA: nodo adoptado del teléfono -> /users/" + clean);
+        return true;
+    }
+    return false;
+}
+
+// V24.1: espera a que el teléfono genere el código y lo publique en /auth_request.
+// Lee el nodo repetidamente; cuando aparece status:'pending' + code, lo guarda en
+// memoria (la extensión lo conoce pero NO lo muestra; el usuario lo lee del teléfono).
+function pollForAuthCode(requestId, expiresAt) {
+    let tries = 0;
+    const maxTries = 30; // ~30 segundos (1s por intento)
+    const timer = setInterval(() => {
+        tries++;
+        if (tries > maxTries || Date.now() > expiresAt) {
+            clearInterval(timer);
+            if (pendingAuth && pendingAuth.requestId === requestId && !pendingAuth.code) {
+                // Caducó sin que el teléfono respondiera
+                pendingAuth = null;
+                chrome.storage.local.set({ pendingAuth: null });
+            }
+            return;
+        }
+        const target = getTargetKey();
+        fetchDb(`/users/${target}/auth_request.json`)
+            .then(res => res ? res.json() : null)
+            .then(data => {
+                if (!data || data.id !== requestId) return;
+                if (data.status === 'pending' && data.code) {
+                    clearInterval(timer);
+                    pendingAuth = { requestId, code: String(data.code).trim(), expiresAt };
+                    chrome.storage.local.set({ pendingAuth });
+                    console.log("ZEN_2FA: código recibido del teléfono (no se muestra en el PC)");
+                } else if (data.status === 'approved') {
+                    clearInterval(timer);
+                    pendingAuth = null;
+                    chrome.storage.local.set({ pendingAuth: null });
+                }
+            })
+            .catch(() => {});
+    }, 1000);
+}
+
 // Cargar sesión guardada
-chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey', 'darkModeEnabled', 'crossDeviceLockEnabled', 'anonIdToken', 'anonRefreshToken', 'pomodoroEnabled', 'pomodoroWorkMinutes', 'pomodoroRestMinutes', 'pomodoroRestCount', 'pomodoroPhases', 'pendingAuth'], (res) => {
+chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey', 'darkModeEnabled', 'crossDeviceLockEnabled', 'anonIdToken', 'anonRefreshToken', 'pomodoroEnabled', 'pomodoroWorkMinutes', 'pomodoroRestMinutes', 'pomodoroRestCount', 'pomodoroPhases', 'pendingAuth', 'pairedTargetKey'], (res) => {
     if (res.firebaseUid) firebaseUid = res.firebaseUid;
     if (res.firebaseIdToken) firebaseIdToken = res.firebaseIdToken;
     if (res.firebaseRefreshToken) firebaseRefreshToken = res.firebaseRefreshToken;
     if (res.userEmail) userEmail = res.userEmail;
     if (res.syncKey) syncKey = res.syncKey;
+    if (res.pairedTargetKey) pairedTargetKey = res.pairedTargetKey;
     if (res.anonIdToken) anonIdToken = res.anonIdToken;
     if (res.anonRefreshToken) anonRefreshToken = res.anonRefreshToken;
     if (typeof res.darkModeEnabled === 'boolean') darkModeEnabled = res.darkModeEnabled;
@@ -369,10 +440,11 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'getState') {
         // V24: leer la sesión desde storage para evitar el estado vacío al despertar
         // el service worker (MV3): las variables en memoria se reinician en frío.
-        chrome.storage.local.get(['firebaseUid', 'userEmail', 'syncKey'], (res) => {
+        chrome.storage.local.get(['firebaseUid', 'userEmail', 'syncKey', 'pairedTargetKey'], (res) => {
             if (res.firebaseUid) firebaseUid = res.firebaseUid;
             if (res.userEmail) userEmail = res.userEmail;
             if (res.syncKey) syncKey = res.syncKey;
+            if (res.pairedTargetKey) pairedTargetKey = res.pairedTargetKey;
             const now = Date.now();
             const phase = currentPomodoroPhase(now);
             sendResponse({
@@ -446,13 +518,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         remainingSeconds = request.minutes * 60;
         sendResponse({ success: true });
     } else if (request.action === 'requestAuthCode') {
-        // V24: el PC pide el código 2FA para activar/desactivar el Bloqueo Cruzado.
-        // El código se publica en /auth_request y el teléfono lo muestra por notificación.
+        // V24.1: la extensión SOLO SOLICITA el código; el TELÉFONO lo genera,
+        // lo muestra en su notificación y lo publica de vuelta en /auth_request.
+        // La extensión lo lee por polling (sin mostrarlo) para poder verificarlo.
         const target = getTargetKey();
-        const code = String(Math.floor(1000 + Math.random() * 9000));
         const requestId = `auth_${Date.now()}`;
         const expiresAt = Date.now() + 3 * 60 * 1000; // válido 3 minutos
-        pendingAuth = { requestId, code, expiresAt };
+        pendingAuth = { requestId, code: null, expiresAt };
         chrome.storage.local.set({ pendingAuth });
         fetchDb(`/users/${target}/auth_request.json`, {
             method: 'PUT',
@@ -460,13 +532,14 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             body: JSON.stringify({
                 id: requestId,
                 requester: 'chrome_extension',
-                status: 'pending',
-                code: code,
+                status: 'requesting', // el teléfono responderá con status:'pending' + code
                 requested_at: Date.now(),
                 expires_at: expiresAt
             })
         }).then((res) => {
             if (res && res.ok) {
+                // Empezar a esperar la respuesta del teléfono
+                pollForAuthCode(requestId, expiresAt);
                 sendResponse({ success: true, requestId, expiresAt });
             } else {
                 pendingAuth = null;
@@ -480,28 +553,72 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true;
     } else if (request.action === 'verifyAuthCode') {
-        // V24: el usuario escribe en el PC el código que llegó a su teléfono.
+        // V24.1: verifica el código que el TELÉFONO publicó. Además compara con
+        // la respuesta viva en Firebase para no depender solo de memoria local.
         const input = String(request.code || '').trim();
-        if (pendingAuth && pendingAuth.code && pendingAuth.code === input) {
-            if (Date.now() > pendingAuth.expiresAt) {
-                pendingAuth = null;
-                chrome.storage.local.set({ pendingAuth: null });
-                sendResponse({ success: false, error: 'Código expirado' });
-            } else {
-                const target = getTargetKey();
-                const id = pendingAuth.requestId;
-                pendingAuth = null;
-                chrome.storage.local.set({ pendingAuth: null });
-                fetchDb(`/users/${target}/auth_request.json`, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id, status: 'approved', responded_at: Date.now() })
-                }).catch(() => {});
-                sendResponse({ success: true });
-            }
-        } else {
-            sendResponse({ success: false, error: 'Código incorrecto' });
-        }
+        const target = getTargetKey();
+        fetchDb(`/users/${target}/auth_request.json`)
+            .then(res => res ? res.json() : null)
+            .then(data => {
+                const phoneCode = (data && data.code) ? String(data.code).trim() : (pendingAuth && pendingAuth.code ? pendingAuth.code : null);
+                const expiresAt = (data && data.expires_at) || (pendingAuth ? pendingAuth.expiresAt : 0);
+                if (data && data.status === 'approved') {
+                    // Ya aprobada en otro intento; aceptar si coincide con un código previo
+                    if (phoneCode && phoneCode === input) {
+                        pendingAuth = null;
+                        chrome.storage.local.set({ pendingAuth: null });
+                        sendResponse({ success: true });
+                    } else {
+                        sendResponse({ success: false, error: 'Código incorrecto' });
+                    }
+                    return;
+                }
+                if (!phoneCode) {
+                    sendResponse({ success: false, error: 'El teléfono aún no ha generado el código. Revisa la notificación.' });
+                    return;
+                }
+                if (Date.now() > expiresAt) {
+                    pendingAuth = null;
+                    chrome.storage.local.set({ pendingAuth: null });
+                    sendResponse({ success: false, error: 'Código expirado' });
+                    return;
+                }
+                if (phoneCode === input) {
+                    const id = (data && data.id) || (pendingAuth ? pendingAuth.requestId : null);
+                    pendingAuth = null;
+                    chrome.storage.local.set({ pendingAuth: null });
+                    if (id) {
+                        fetchDb(`/users/${target}/auth_request.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id, status: 'approved', responded_at: Date.now() })
+                        }).catch(() => {});
+                    }
+                    sendResponse({ success: true });
+                } else {
+                    sendResponse({ success: false, error: 'Código incorrecto' });
+                }
+            })
+            .catch(() => {
+                // Fallback a memoria local si falla la lectura
+                const localCode = pendingAuth && pendingAuth.code;
+                if (localCode && localCode === input && Date.now() <= pendingAuth.expiresAt) {
+                    const id = pendingAuth.requestId;
+                    pendingAuth = null;
+                    chrome.storage.local.set({ pendingAuth: null });
+                    if (id) {
+                        fetchDb(`/users/${target}/auth_request.json`, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id, status: 'approved', responded_at: Date.now() })
+                        }).catch(() => {});
+                    }
+                    sendResponse({ success: true });
+                } else {
+                    sendResponse({ success: false, error: 'Sin conexión con Firebase' });
+                }
+            });
+        return true;
     } else if (request.action === 'requestTregua') {
         // V24 (Propuesta 2): la tregua de la PC se verifica en el teléfono.
         // Se escribe una solicitud en Firebase y el teléfono la aprueba/deniega.
@@ -549,12 +666,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.tabs.create({ url: chrome.runtime.getURL('login.html') });
         sendResponse({ success: true });
     } else if (request.action === 'sessionUpdated') {
-        chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey'], (res) => {
+        chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey', 'pairedTargetKey'], (res) => {
             if (res.firebaseUid) firebaseUid = res.firebaseUid;
             if (res.firebaseIdToken) firebaseIdToken = res.firebaseIdToken;
             if (res.firebaseRefreshToken) firebaseRefreshToken = res.firebaseRefreshToken;
             if (res.userEmail) userEmail = res.userEmail;
             if (res.syncKey) syncKey = res.syncKey;
+            if (res.pairedTargetKey) pairedTargetKey = res.pairedTargetKey;
             pollFirebaseSync();
         });
         sendResponse({ success: true });
@@ -574,7 +692,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                                 list.push({
                                     id: item.id || key,
                                     content: item.content,
-                                    category: item.category || 'general',
+                                    category: normalizeCategory(item.category),
                                     timestamp: item.timestamp || 0,
                                     deviceSource: item.deviceSource || 'chrome_extension'
                                 });
@@ -603,7 +721,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const payload = {
             id: noteId,
             content: request.content,
-            category: request.category || 'general',
+            category: normalizeCategory(request.category),
             timestamp: Date.now(),
             deviceSource: 'chrome_extension'
         };
@@ -897,6 +1015,11 @@ function connectLanWebSocket() {
         if (!data || data.status !== 'ok') return;
         lastLanUpdate = Date.now();
         isLanActive = true;
+        // V24.1: adoptar el nodo real del teléfono que llega por LAN
+        if (data.target_key) {
+            const adopted = adoptPairedTargetKey(data.target_key);
+            if (adopted) pollFirebaseSync();
+        }
         connectedDeviceInfo = {
             brand: data.brand || 'TECNO',
             model: data.model || 'POVA 6',
@@ -1135,6 +1258,13 @@ function pollFirebaseSync() {
         .then(res => res ? res.json() : null)
         .then(deviceData => {
             if (deviceData && (deviceData.brand || deviceData.model)) {
+                // V24.1: adoptar el nodo real del teléfono si lo publica
+                if (deviceData.target_key) {
+                    const adopted = adoptPairedTargetKey(deviceData.target_key);
+                    if (adopted && target !== getTargetKey()) {
+                        pollFirebaseSync();
+                    }
+                }
                 const androidPing = deviceData.android_last_ping || deviceData.last_ping || 0;
                 const isOnline = (now - androidPing < 30000);
                 if (isOnline) {

@@ -529,6 +529,25 @@ html[data-theme="dark"] .note-text-input {
     border: 1.5px solid rgba(148, 163, 184, 0.3);
 }
 
+html[data-theme="dark"] textarea#note-text-input,
+html[data-theme="dark"] .search-box input {
+    background: #16202A;
+    color: var(--text-main);
+    border: 1.5px solid rgba(148, 163, 184, 0.3);
+    caret-color: var(--text-main);
+}
+
+html[data-theme="dark"] textarea#note-text-input::placeholder,
+html[data-theme="dark"] .search-box input::placeholder {
+    color: var(--text-muted);
+}
+
+html[data-theme="dark"] textarea#note-text-input:focus,
+html[data-theme="dark"] .search-box input:focus {
+    background: #16202A;
+    border-color: var(--zen-olive);
+}
+
 html[data-theme="dark"] .btn-google-login,
 html[data-theme="dark"] .google-btn {
     background: #2A343E;

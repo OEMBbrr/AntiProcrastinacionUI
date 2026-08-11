@@ -4,6 +4,17 @@ document.addEventListener('DOMContentLoaded', () => {
     let currentFilter = 'all';
     let notesCache = [];
 
+    // V24.1: clave canónica de categoría compartida con Android (tolera mayúsculas/acentos)
+    function normalizeCategory(raw) {
+        const key = String(raw || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim();
+        switch (key) {
+            case 'tarea': return 'tarea';
+            case 'idea': return 'idea';
+            case 'reflexion': return 'reflexion';
+            default: return 'general';
+        }
+    }
+
     // DOM Elements
     const btnFontSub = document.getElementById('btn-font-sub');
     const btnFontAdd = document.getElementById('btn-font-add');
@@ -195,7 +206,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         let filtered = notesCache.filter(note => {
             const matchesQuery = note.content.toLowerCase().includes(query);
-            const noteCat = note.category || 'general';
+            const noteCat = normalizeCategory(note.category);
             const matchesFilter = currentFilter === 'all' || noteCat === currentFilter;
             return matchesQuery && matchesFilter;
         });
@@ -213,7 +224,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         notesGrid.innerHTML = filtered.map(note => {
             const dateStr = note.timestamp ? new Date(note.timestamp).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-            const catLabel = getCatLabel(note.category || 'general');
+            const catLabel = getCatLabel(normalizeCategory(note.category));
             const sourceBadge = note.deviceSource === 'android' ? '📱 Android' : '🌐 Chrome';
 
             return `

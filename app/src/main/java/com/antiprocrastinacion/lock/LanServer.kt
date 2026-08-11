@@ -77,6 +77,7 @@ class LanServer(
         put("model", lockManager.deviceModel)
         put("device_pin", lockManager.devicePin)
         put("user_email", lockManager.googleUserEmail)
+        put("target_key", lockManager.targetKey)
         put("is_locked", lockManager.isLocked)
         put("remaining_seconds", lockManager.timeRemaining / 1000)
         put("is_lan", true)

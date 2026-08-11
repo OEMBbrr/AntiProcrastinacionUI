@@ -48,10 +48,11 @@ fun ZenNotesModal(
     var fontSizeSp by remember { mutableIntStateOf(14) } // Control de tamaño de texto (12-24sp)
     var notesList by remember { mutableStateOf<List<ZenNote>>(emptyList()) }
     var selectedCategory by remember { mutableStateOf("Todas") }
-    var newNoteCategory by remember { mutableStateOf("General") }
+    var newNoteCategory by remember { mutableStateOf("general") }
     var isAdding by remember { mutableStateOf(false) }
-    val categories = listOf("Todas", "General", "Tarea", "Idea", "Reflexión")
-    val noteCreationCategories = listOf("General", "Tarea", "Idea", "Reflexión")
+    // V24.1: claves CANÓNICAS compartidas con la extensión (minúsculas, sin acentos)
+    val categories = listOf("Todas", "general", "tarea", "idea", "reflexion")
+    val noteCreationCategories = listOf("general", "tarea", "idea", "reflexion")
 
     LaunchedEffect(Unit) {
         lockManager.observeNotes { updated ->
@@ -199,7 +200,7 @@ fun ZenNotesModal(
                             ) {
                                 Box(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp), contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = cat,
+                                        text = categoryLabel(cat),
                                         fontSize = 10.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal,
                                         color = if (isSelected) Color.White else ZenCharcoal
@@ -259,7 +260,7 @@ fun ZenNotesModal(
                             ) {
                                 Box(contentAlignment = Alignment.Center) {
                                     Text(
-                                        text = cat,
+                                        text = categoryLabel(cat),
                                         fontSize = 10.sp,
                                         fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
                                         color = if (isSelected) Color.White else ZenSage
@@ -338,7 +339,12 @@ private fun NoteCard(
     }
 
     val sourceBadge = if (note.deviceSource == "chrome_extension") "🌐 Chrome" else "📱 Android"
-    val categoryBadge = note.category.ifBlank { "General" }
+    val categoryBadge = when (note.category) {
+        "tarea" -> "Tarea"
+        "idea" -> "Idea"
+        "reflexion" -> "Reflexión"
+        else -> "General"
+    }
 
     Card(
         modifier = Modifier.fillMaxWidth(),
@@ -406,4 +412,14 @@ private fun NoteCard(
             }
         }
     }
+}
+
+// V24.1: etiqueta legible para cada categoría canónica compartida con la extensión.
+private fun categoryLabel(cat: String): String = when (cat) {
+    "tarea" -> "Tarea"
+    "idea" -> "Idea"
+    "reflexion" -> "Reflexión"
+    "general" -> "General"
+    "Todas" -> "Todas"
+    else -> cat
 }

@@ -213,7 +213,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (authCodeInput) authCodeInput.focus();
             } else {
                 if (authError) {
-                    authError.textContent = 'No se pudo enviar el código al teléfono. Revisa la conexión.';
+                    authError.textContent = 'No se pudo solicitar el código. Revisa la conexión y que el teléfono esté vinculado.';
                     authError.classList.remove('hidden');
                 }
             }
@@ -245,8 +245,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     chrome.runtime.sendMessage({ action: 'setSetting', setting: 'crossDeviceLock', value: pendingCrossLockValue });
                     pendingCrossLockValue = null;
                 } else {
-                    if (authError) authError.classList.remove('hidden');
-                    if (authCodeInput) { authCodeInput.value = ''; authCodeInput.focus(); }
+                    if (authError && res && res.error && res.error.indexOf('aún no ha generado') !== -1) {
+                        if (authPending) authPending.classList.remove('hidden');
+                        authError.classList.add('hidden');
+                        setTimeout(() => btnConfirmAuth.click(), 1500);
+                    } else {
+                        if (authError) authError.classList.remove('hidden');
+                        if (authCodeInput) { authCodeInput.value = ''; authCodeInput.focus(); }
+                    }
                 }
             });
         });

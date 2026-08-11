@@ -190,18 +190,23 @@ fun ZenScreen(
     Scaffold(
         containerColor = CreamBackground
     ) { innerPadding ->
+        // V24.1 (T3): scroll en la pantalla principal para que todo el contenido
+        // (cabecera, frase, temporizador, botones) se pueda ver en pantallas pequeñas.
         Column(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
-                .padding(horizontal = 24.dp, vertical = 16.dp),
+                .padding(horizontal = 24.dp, vertical = 16.dp)
+                .verticalScroll(rememberScrollState()),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             // Cabecera Zen
+            // V24.1 (T5): padding superior amplio para que el logo, "MODO ENFOQUE" y la
+            // frase motivadora no queden ocultos bajo la cámara perforada / Dynamic Island.
             Column(
                 horizontalAlignment = Alignment.CenterHorizontally,
-                modifier = Modifier.padding(top = 12.dp)
+                modifier = Modifier.padding(top = 56.dp)
             ) {
                 Image(
                     painter = painterResource(id = com.antiprocrastinacion.lock.R.drawable.app_logo),
