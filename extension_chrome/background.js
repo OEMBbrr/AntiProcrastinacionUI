@@ -346,6 +346,7 @@ chrome.storage.local.get(['customDomains', 'parentalEnabled'], (res) => {
 });
 
 let treguaUntil = 0;
+let treguaCooldownUntil = 0;
 
 function getActiveRulesList() {
     let active = [];
@@ -464,7 +465,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 phaseType: phase ? phase.type : 'none',
                 phaseEnd: phase ? phase.end_ms : 0,
                 pendingAuthActive: !!(pendingAuth && pendingAuth.expiresAt > now),
-                treguaUntil: treguaUntil || 0
+                treguaUntil: treguaUntil || 0,
+                treguaCooldownUntil: treguaCooldownUntil || 0
             });
         });
         return true;
@@ -524,6 +526,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         broadcastPhase('none', null);
         sendResponse({ success: true });
     } else if (request.action === 'grantTregua') {
+        if (Date.now() < treguaCooldownUntil) {
+            sendResponse({ success: false, error: 'Cooldown activo' });
+            return true;
+        }
         treguaUntil = Date.now() + (request.minutes * 60 * 1000);
         updateNetRules();
         sendResponse({ success: true });
@@ -630,6 +636,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             });
         return true;
     } else if (request.action === 'requestTregua') {
+        if (Date.now() < treguaCooldownUntil) {
+            sendResponse({ success: false, error: 'Cooldown activo' });
+            return true;
+        }
         // V24 (Propuesta 2): la tregua de la PC se verifica en el teléfono.
         // Se escribe una solicitud en Firebase y el teléfono la aprueba/deniega.
         const target = getTargetKey();
@@ -959,6 +969,7 @@ function startBackgroundTimer() {
         // Finaliza tregua si aplica
         if (treguaUntil > 0 && Date.now() >= treguaUntil) {
             treguaUntil = 0;
+            treguaCooldownUntil = Date.now() + (10 * 60 * 1000); // 10 mins cooldown
             updateNetRules(); // Restaurar el bloqueo
         }
 

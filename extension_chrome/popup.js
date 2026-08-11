@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUI() {
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
-            const { isLocked, remainingSeconds, customDomains, parentalEnabled, firebaseUid, userEmail, syncKey, connectedDeviceInfo, phaseType, treguaUntil } = response;
+            const { isLocked, remainingSeconds, customDomains, parentalEnabled, firebaseUid, userEmail, syncKey, connectedDeviceInfo, phaseType, treguaUntil, treguaCooldownUntil } = response;
 
             // V24: banner de descanso Pomodoro (tregua libre)
             const restBanner = document.getElementById('pomodoro-rest-banner');
@@ -576,6 +576,15 @@ document.addEventListener('DOMContentLoaded', () => {
                     }
                 }
             });
+
+            const now = Date.now();
+            if (treguaCooldownUntil && treguaCooldownUntil > now) {
+                btnTregua.disabled = true;
+                btnTregua.textContent = `Tregua en ${formatTime(Math.floor((treguaCooldownUntil - now) / 1000))}`;
+            } else {
+                btnTregua.disabled = false;
+                btnTregua.textContent = "Pedir Tregua";
+            }
 
             if (isLocked) {
                 const now = Date.now();
