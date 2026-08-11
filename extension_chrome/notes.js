@@ -22,7 +22,12 @@ document.addEventListener('DOMContentLoaded', () => {
     const userEmailText = document.getElementById('user-email-text');
 
     const catChips = document.querySelectorAll('.cat-chip');
+    const noteTitleInput = document.getElementById('note-title-input');
     const noteTextInput = document.getElementById('note-text-input');
+    const noteImgInput = document.getElementById('note-img-input');
+    const noteImgPreview = document.getElementById('note-img-preview');
+    const imgPreviewEl = document.getElementById('img-preview-el');
+    const btnRemoveImg = document.getElementById('btn-remove-img');
     const btnSaveNote = document.getElementById('btn-save-note');
 
     const searchInput = document.getElementById('search-input');
@@ -63,6 +68,47 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!saveStatus) return;
         saveStatus.textContent = text;
         saveStatus.className = 'save-status ' + (ok ? 'ok' : 'warn');
+    }
+
+    // Image Upload Logic
+    if (noteImgInput) {
+        noteImgInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const MAX_WIDTH = 800;
+                    let width = img.width;
+                    let height = img.height;
+                    
+                    if (width > MAX_WIDTH) {
+                        height = Math.round((height * MAX_WIDTH) / width);
+                        width = MAX_WIDTH;
+                    }
+                    canvas.width = width;
+                    canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    const compressedBase64 = canvas.toDataURL('image/jpeg', 0.7);
+                    
+                    if (imgPreviewEl) imgPreviewEl.src = compressedBase64;
+                    if (noteImgPreview) noteImgPreview.classList.remove('hidden');
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        });
+    }
+
+    if (btnRemoveImg) {
+        btnRemoveImg.addEventListener('click', () => {
+            if (imgPreviewEl) imgPreviewEl.src = '';
+            if (noteImgPreview) noteImgPreview.classList.add('hidden');
+            if (noteImgInput) noteImgInput.value = '';
+        });
     }
 
     // V20: aplicar modo oscuro compartido a la interfaz del bloc de notas
@@ -138,8 +184,8 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.onMessage.addListener((request) => {
         if (request && request.action === 'noteCloudStatus') {
             const msg = request.ok
-                ? '✅ Nota guardada y sincronizada en la nube'
-                : '⚠️ Nota guardada localmente (sin sincronizar): ' + (request.error || '');
+                ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Nota guardada y sincronizada en la nube'
+                : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Nota guardada localmente (sin sincronizar): ' + (request.error || '');
             showSaveStatus(request.ok, msg);
         } else if (request && request.action === 'settingsChanged' && request.settings) {
             if (darkModeSwitch) darkModeSwitch.checked = !!request.settings.darkModeEnabled;
@@ -151,7 +197,11 @@ document.addEventListener('DOMContentLoaded', () => {
     if (btnSaveNote && noteTextInput) {
         btnSaveNote.addEventListener('click', () => {
             const content = noteTextInput.value.trim();
-            if (!content) return;
+            const title = noteTitleInput ? noteTitleInput.value.trim() : '';
+            const imgData = imgPreviewEl ? imgPreviewEl.src : '';
+            const image = (imgData && imgData.startsWith('data:image')) ? imgData : null;
+
+            if (!content && !title && !image) return;
 
             btnSaveNote.disabled = true;
             btnSaveNote.textContent = 'Guardando...';
@@ -159,17 +209,21 @@ document.addEventListener('DOMContentLoaded', () => {
 
             chrome.runtime.sendMessage({
                 action: 'addNote',
+                title: title,
                 content: content,
+                image: image,
                 category: selectedCategory
             }, (res) => {
                 btnSaveNote.disabled = false;
-                btnSaveNote.textContent = '✨ Guardar Nota Zen';
+                btnSaveNote.textContent = 'Guardar';
                 if (res && res.success) {
                     noteTextInput.value = '';
+                    if (noteTitleInput) noteTitleInput.value = '';
+                    if (btnRemoveImg) btnRemoveImg.click();
                     fetchAndRenderNotes();
-                    showSaveStatus(false, '⏳ Nota guardada localmente. Sincronizando...');
+                    showSaveStatus(false, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg> Nota guardada localmente. Sincronizando...');
                 } else {
-                    showSaveStatus(false, '⚠️ No se pudo guardar la nota. Revisa la extensión.');
+                    showSaveStatus(false, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> No se pudo guardar la nota. Revisa la extensión.');
                 }
             });
         });
@@ -213,10 +267,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
         if (filtered.length === 0) {
             notesGrid.innerHTML = `
-                <div style="grid-column: 1/-1; text-align:center; padding: 40px; background:var(--card-bg); border-radius:20px; border:1px solid var(--card-border);">
-                    <div style="font-size:2.5rem; margin-bottom:10px;">💡</div>
+                <div style="grid-column: 1/-1; text-align:center; padding: 40px; background:transparent;">
+                    <div style="margin-bottom:10px;"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color: var(--text-muted);"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></div>
                     <h3 style="font-size:1.1rem; color:var(--text-main); margin-bottom:6px;">No se encontraron notas</h3>
-                    <p style="font-size:0.85rem; color:var(--text-muted);">Escribe tu primera nota en el panel izquierdo para liberarte de las distracciones.</p>
+                    <p style="font-size:0.85rem; color:var(--text-muted);">Añade una nota para liberarte de las distracciones.</p>
                 </div>
             `;
             return;
@@ -224,40 +278,36 @@ document.addEventListener('DOMContentLoaded', () => {
 
         notesGrid.innerHTML = filtered.map(note => {
             const dateStr = note.timestamp ? new Date(note.timestamp).toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '';
-            const catLabel = getCatLabel(normalizeCategory(note.category));
-            const sourceBadge = note.deviceSource === 'android' ? '📱 Android' : '🌐 Chrome';
+            const sourceBadge = note.deviceSource === 'android' ? '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg>' : '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect><line x1="8" y1="21" x2="16" y2="21"></line><line x1="12" y1="17" x2="12" y2="21"></line></svg>';
+
+            let catText = note.category || 'general';
+            if(catText === 'tarea') catText = 'Tarea';
+            else if(catText === 'idea') catText = 'Idea';
+            else if(catText === 'reflexion') catText = 'Reflexión';
+            else catText = 'General';
+
+            const titleHtml = note.title ? `<div class="note-card-title">${escapeHtml(note.title)}</div>` : '';
+            const imgHtml = note.image ? `<img class="note-card-img" src="${note.image}" alt="Imagen adjunta">` : '';
 
             return `
-                <div class="note-card-full" data-id="${note.id}">
-                    <div class="note-header-row">
-                        <span class="cat-badge">${catLabel}</span>
-                        <span class="note-meta-info">${sourceBadge}</span>
-                    </div>
-                    <div class="note-body">${escapeHtml(note.content)}</div>
-                    <div class="note-footer-row">
-                        <span class="note-meta-info">${dateStr}</span>
-                        <div class="note-actions">
-                            <button class="btn-icon-action btn-copy" data-text="${escapeHtml(note.content)}" title="Copiar nota">📋</button>
-                            <button class="btn-icon-action btn-delete" data-id="${note.id}" title="Eliminar nota">🗑️</button>
+                <div class="note-card" data-id="${note.id}">
+                    ${imgHtml}
+                    ${titleHtml}
+                    ${note.content ? `<div class="note-card-text">${escapeHtml(note.content)}</div>` : ''}
+                    <div class="note-card-footer">
+                        <div>
+                            <span class="note-card-category">${catText}</span>
+                            <span class="note-card-meta" style="margin-left:6px;">${sourceBadge} ${dateStr}</span>
                         </div>
+                        <button class="btn-del-note" data-id="${note.id}" title="Eliminar nota"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path></svg></button>
                     </div>
                 </div>
             `;
         }).join('');
 
-        // Event listeners para copiar y eliminar
-        notesGrid.querySelectorAll('.btn-copy').forEach(btn => {
+        notesGrid.querySelectorAll('.btn-del-note').forEach(btn => {
             btn.addEventListener('click', (e) => {
-                const text = e.target.getAttribute('data-text');
-                navigator.clipboard.writeText(text);
-                e.target.textContent = '✅';
-                setTimeout(() => { e.target.textContent = '📋'; }, 1500);
-            });
-        });
-
-        notesGrid.querySelectorAll('.btn-delete').forEach(btn => {
-            btn.addEventListener('click', (e) => {
-                const noteId = e.target.getAttribute('data-id');
+                const noteId = e.currentTarget.getAttribute('data-id');
                 chrome.runtime.sendMessage({ action: 'deleteNote', noteId }, () => {
                     fetchAndRenderNotes();
                 });

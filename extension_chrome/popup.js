@@ -350,7 +350,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function showNotesSyncHint(show, text) {
         if (!notesSyncHint) return;
         if (show) {
-            notesSyncHint.textContent = text || '⚠️ Nota guardada localmente (sin sincronizar). Inicia sesión con Google.';
+            notesSyncHint.innerHTML = text || '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Nota guardada localmente (sin sincronizar). Inicia sesión con Google.';
             notesSyncHint.classList.remove('hidden');
         } else {
             notesSyncHint.classList.add('hidden');
@@ -361,7 +361,7 @@ document.addEventListener('DOMContentLoaded', () => {
     chrome.runtime.onMessage.addListener((request) => {
         if (request && request.action === 'noteCloudStatus') {
             if (!request.ok) {
-                showNotesSyncHint(true, '⚠️ Nota guardada localmente (sin sincronizar): ' + (request.error || 'inicia sesión con Google.'));
+                showNotesSyncHint(true, '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Nota guardada localmente (sin sincronizar): ' + (request.error || 'inicia sesión con Google.'));
             } else {
                 showNotesSyncHint(false);
             }
@@ -384,14 +384,6 @@ document.addEventListener('DOMContentLoaded', () => {
         } else if (request && request.action === 'treguaApproved') {
             // V24 (Propuesta 2): el teléfono aprobó la tregua
             if (mathModal) mathModal.classList.add('hidden');
-            updateUI();
-        } else if (request && request.action === 'treguaDenied') {
-            // V28: el teléfono denegó la tregua o no respondió a tiempo
-            if (mathModal) mathModal.classList.add('hidden');
-            const reason = (request.reason === 'timeout')
-                ? 'El teléfono no respondió a tiempo. Inténtalo de nuevo dentro de un momento.'
-                : 'El teléfono rechazó la tregua. Sigue concentrado y respeta tu enfoque.';
-            alert(reason);
             updateUI();
         }
     });
@@ -673,7 +665,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         // Verificación Anti-Pegado (Nadie escribe 150 palabras en menos de 10 segundos)
         if (timeTakenSeconds < 10) {
-            alert("⚠️ Intento de pegado detectado. Debes escribir el texto manualmente letra por letra para demostrar autodisciplina.");
+            alert("Intento de pegado detectado. Debes escribir el texto manualmente letra por letra para demostrar autodisciplina.");
             phraseInput.value = "";
             return;
         }

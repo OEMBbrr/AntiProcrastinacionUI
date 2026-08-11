@@ -27,17 +27,22 @@
         </div>
     </div>
 
-    <!-- Notes Panel Sincronizado -->
-    <div class="notes-box hidden" id="notes-box">
-        <div class="notes-header">
-            <span>📝 Apuntes Sincronizados</span>
+    <!-- Notes Panel Sincronizado (Google Keep Style) -->
+    <div class="keep-notes-box hidden" id="notes-box">
+        <div class="keep-header">
+            <span class="keep-title">Apuntes</span>
+            <button class="keep-close" id="btn-close-notes">✕</button>
         </div>
-        <div class="notes-input-row">
-            <input type="text" id="note-input" placeholder="Anota una idea o tarea rápida...">
-            <button id="btn-add-note">Guardar</button>
+        
+        <div class="keep-input-container">
+            <textarea id="note-input" placeholder="Añade una nota..." rows="1"></textarea>
+            <div class="keep-input-actions">
+                <span class="notes-sync-status hidden" id="notes-sync-hint"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg> Guardado local</span>
+                <button id="btn-add-note">Guardar</button>
+            </div>
         </div>
-        <div class="notes-sync-hint hidden" id="notes-sync-hint">⚠️ Sin sincronizar con la nube.</div>
-        <div class="notes-list" id="notes-list">
+        
+        <div class="keep-notes-grid" id="notes-list">
             <!-- Dynamic notes injected here -->
         </div>
     </div>
@@ -47,7 +52,7 @@
         <span class="timer-label">Tiempo de Enfoque Restante</span>
         <!-- V24: banner de descanso DESCANSOS (tregua libre) -->
         <div class="hidden pomodoro-rest-banner" id="pomodoro-rest-banner">
-            ⏱️ DESCANSO - Tregua libre activa
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg> DESCANSO - Tregua libre activa
         </div>
 
         <!-- Stepper de Horas y Minutos idéntico a Android -->
@@ -109,7 +114,7 @@
 
     <div class="sites-box">
         <div class="parental-toggle">
-            <span class="parental-label">🔞 Control Parental (+18)</span>
+            <span class="parental-label"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg> Control Parental (+18)</span>
             <label class="zen-switch">
                 <input type="checkbox" id="parental-switch">
                 <span class="zen-slider"></span>
@@ -146,7 +151,7 @@
             <p>Resuelve la siguiente operación matemática para obtener 5 minutos de acceso:</p>
             <div class="modal-text" id="math-problem-text"></div>
             <!-- V24 (Propuesta 2): estado de tregua verificada por el 2º dispositivo -->
-            <div class="tregua-pending hidden" id="tregua-pending">📱 Confirmación enviada a tu teléfono. Esperando aprobación...</div>
+            <div class="tregua-pending hidden" id="tregua-pending"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> Confirmación enviada a tu teléfono. Esperando aprobación...</div>
             <div id="math-challenge">
                 <textarea id="math-input" placeholder="Respuesta numérica..."></textarea>
                 <div class="modal-actions">
@@ -210,7 +215,7 @@
         <div class="modal-card">
             <h4><img src="emojis/sync_icon.svg" alt="" class="menu-icon"> Confirmar Bloqueo Cruzado</h4>
             <p>Se ha solicitado un código de verificación a tu teléfono. El teléfono lo generará y te llegará por notificación. Escríbelo aquí para continuar:</p>
-            <div class="auth-pending hidden" id="auth-pending">📱 Generando código en tu teléfono... Revisa la notificación de AntiProcrastinación.</div>
+            <div class="auth-pending hidden" id="auth-pending"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle;"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"></rect><line x1="12" y1="18" x2="12.01" y2="18"></line></svg> Generando código en tu teléfono... Revisa la notificación de AntiProcrastinación.</div>
             <input type="text" id="auth-code-input" maxlength="4" inputmode="numeric" placeholder="0000">
             <div class="auth-error hidden" id="auth-error">Código incorrecto o expirado. Intenta de nuevo.</div>
             <div class="modal-actions">

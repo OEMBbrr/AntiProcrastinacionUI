@@ -33,7 +33,9 @@ body {
     background-color: var(--bg-main);
     color: var(--text-main);
     font-family: var(--font-family);
-    padding: 16px;
+    padding: 18px;
+    letter-spacing: -0.01em;
+    line-height: 1.5;
 }
 
 .header {
@@ -89,10 +91,15 @@ body {
 /* Account Sync Box Styling */
 .account-box {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
     padding: 10px 12px;
     margin-bottom: 14px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.3s ease;
+}
+.account-box:hover {
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
 }
 .account-header {
     display: flex;
@@ -126,91 +133,146 @@ body {
     box-shadow: 0 6px 14px -2px rgba(59, 130, 246, 0.35);
 }
 
-/* Notes Box Panel Styling */
-.notes-box {
-    background: var(--card-bg);
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-md);
-    padding: 12px;
-    margin-bottom: 14px;
-}
-.notes-header {
-    font-size: 0.8rem;
-    font-weight: 700;
-    color: var(--text-main);
-    margin-bottom: 8px;
-}
-.notes-input-row {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 10px;
-}
-.notes-input-row input {
-    flex: 1;
-    padding: 6px 10px;
-    border: 1px solid var(--card-border);
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    outline: none;
-}
-.notes-input-row input:focus {
-    border-color: var(--zen-olive);
-}
-.notes-input-row button {
-    padding: 6px 12px;
-    background: var(--zen-olive);
-    color: #fff;
-    border: none;
-    border-radius: var(--radius-sm);
-    font-size: 0.75rem;
-    font-weight: 700;
-    cursor: pointer;
-}
-.notes-sync-hint {
-    font-size: 0.7rem;
-    font-weight: 600;
-    color: var(--warn-text);
-    background: var(--warn-bg);
-    border: 1px solid rgba(217, 125, 117, 0.4);
-    border-radius: var(--radius-sm);
-    padding: 6px 10px;
-    margin-bottom: 8px;
-    line-height: 1.4;
-}
-.notes-list {
-    max-height: 160px;
-    overflow-y: auto;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-}
-.note-item {
+/* Google Keep Style Notes */
+.keep-notes-box {
     background: var(--bg-main);
-    border: 1px solid var(--border-soft);
-    border-radius: var(--radius-sm);
-    padding: 8px;
+    border-radius: var(--radius-md);
+    padding: 0;
+    margin-bottom: 14px;
+    border: none;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+    overflow: hidden;
+}
+.keep-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-soft);
+    background: var(--card-bg);
 }
-.note-content {
-    font-size: 0.75rem;
+.keep-title {
+    font-size: 0.9rem;
+    font-weight: 600;
     color: var(--text-main);
-    word-break: break-word;
-    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 8px;
 }
-.note-meta {
-    font-size: 0.62rem;
-    color: var(--text-muted);
-    margin-top: 2px;
+.keep-title::before {
+    content: "📝";
 }
-.btn-del-note {
-    background: none;
+.keep-close {
+    background: transparent;
     border: none;
-    color: var(--zen-coral);
+    color: var(--text-muted);
     cursor: pointer;
+    font-size: 1.1rem;
+    padding: 4px;
+    border-radius: 50%;
+    transition: background 0.2s;
+    line-height: 1;
+}
+.keep-close:hover {
+    background: var(--bg-soft);
+    color: var(--text-main);
+}
+.keep-input-container {
+    padding: 12px 16px;
+    background: var(--card-bg);
+    border-bottom: 1px solid var(--border-soft);
+}
+.keep-input-container textarea {
+    width: 100%;
+    border: none;
+    resize: none;
+    font-family: inherit;
+    font-size: 0.85rem;
+    background: transparent;
+    color: var(--text-main);
+    outline: none;
+    min-height: 24px;
+}
+.keep-input-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 8px;
+}
+.keep-input-actions button {
+    background: transparent;
+    border: none;
+    color: var(--zen-olive);
+    font-weight: 600;
     font-size: 0.8rem;
-    padding: 2px 4px;
+    cursor: pointer;
+    padding: 6px 12px;
+    border-radius: 4px;
+    transition: background 0.2s;
+}
+.keep-input-actions button:hover {
+    background: rgba(85, 107, 47, 0.1);
+}
+.notes-sync-status {
+    font-size: 0.7rem;
+    color: var(--warn-text);
+    background: var(--warn-bg);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(217, 125, 117, 0.4);
+}
+.keep-notes-grid {
+    padding: 12px;
+    max-height: 300px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    background: var(--bg-main);
+}
+.keep-note-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border-soft);
+    border-radius: 8px;
+    padding: 12px;
+    position: relative;
+    transition: box-shadow 0.2s, transform 0.2s;
+}
+.keep-note-card:hover {
+    box-shadow: 0 1px 3px rgba(0,0,0,0.12), 0 1px 2px rgba(0,0,0,0.24);
+}
+.keep-note-content {
+    font-size: 0.85rem;
+    color: var(--text-main);
+    line-height: 1.4;
+    white-space: pre-wrap;
+    word-break: break-word;
+    margin-bottom: 12px;
+}
+.keep-note-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.7rem;
+    color: var(--text-muted);
+}
+.btn-del-keep {
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+    font-size: 0.8rem;
+    padding: 4px;
+    border-radius: 50%;
+    color: var(--text-muted);
+}
+.keep-note-card:hover .btn-del-keep {
+    opacity: 1;
+}
+.btn-del-keep:hover {
+    background: rgba(200, 0, 0, 0.1);
+    color: var(--zen-coral);
 }
 .btn-google-login {
     width: 100%;
@@ -239,12 +301,17 @@ body {
 
 .timer-box {
     background: var(--card-bg);
-    border: 1px solid var(--card-border);
+    border: 1px solid var(--border-soft);
     border-radius: var(--radius-md);
-    padding: 18px;
+    padding: 22px 18px;
     text-align: center;
     margin-bottom: 16px;
-    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+.timer-box:hover {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
+    transform: translateY(-1px);
 }
 
 .timer-digits {
@@ -415,16 +482,24 @@ body {
 
 #auth-code-input {
     width: 100%;
-    padding: 10px;
+    padding: 14px;
     margin-top: 8px;
-    border: 1px solid rgba(90, 110, 97, 0.3);
-    border-radius: 10px;
-    font-size: 1.2rem;
+    background: var(--bg-soft);
+    border: 1px solid transparent;
+    border-radius: var(--radius-md);
+    font-size: 1.3rem;
     text-align: center;
     letter-spacing: 8px;
     box-sizing: border-box;
-    background: var(--bg-card);
     color: var(--text-main);
+    transition: all 0.2s ease;
+    outline: none;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+}
+#auth-code-input:focus {
+    background: var(--surface);
+    border-color: var(--zen-olive);
+    box-shadow: 0 0 0 3px rgba(90, 110, 97, 0.15);
 }
 
 .colon-sep {
@@ -443,12 +518,15 @@ body {
     border-radius: var(--radius-sm);
     font-size: 0.9rem;
     font-weight: 600;
+    letter-spacing: 0.3px;
     cursor: pointer;
-    transition: transform 0.15s ease;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.2s ease;
 }
 
 .btn-main:hover {
-    transform: scale(1.02);
+    transform: translateY(-1px);
+    box-shadow: 0 6px 14px rgba(0,0,0,0.15);
 }
 
 .btn-outline {
@@ -474,6 +552,19 @@ body {
     font-size: 0.82rem;
     font-weight: 600;
     cursor: pointer;
+}
+
+.sites-box {
+    background: var(--surface);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    border: 1px solid var(--border-soft);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
+    transition: box-shadow 0.3s ease;
+    margin-bottom: 16px;
+}
+.sites-box:hover {
+    box-shadow: 0 12px 28px rgba(0, 0, 0, 0.06);
 }
 
 .box-header {
@@ -555,18 +646,21 @@ body {
 
 .add-site-form input {
     flex: 1;
-    padding: 7px 10px;
-    border: 1px solid rgba(90, 110, 97, 0.25);
-    border-radius: var(--radius-sm);
-    font-size: 0.78rem;
-    outline: none;
+    padding: 10px 14px;
     background: var(--bg-soft);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    font-size: 0.85rem;
     color: var(--text-main);
-    transition: border-color 0.2s ease;
+    transition: all 0.2s ease;
+    outline: none;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
 }
 
 .add-site-form input:focus {
+    background: var(--surface);
     border-color: var(--zen-olive);
+    box-shadow: 0 0 0 3px rgba(90, 110, 97, 0.15);
 }
 
 .add-site-form button {
@@ -630,9 +724,11 @@ body {
 .modal-card {
     background: var(--surface);
     border-radius: var(--radius-md);
-    padding: 16px;
+    padding: 24px;
     width: 100%;
     color: var(--text-main);
+    box-shadow: 0 12px 40px rgba(0,0,0,0.2);
+    border: 1px solid var(--border-soft);
 }
 
 .modal-card h4 {
@@ -664,12 +760,22 @@ body {
 .modal-card textarea {
     width: 100%;
     height: 70px;
-    border: 1px solid var(--border);
-    border-radius: 6px;
-    padding: 8px;
-    font-size: 0.75rem;
+    background: var(--bg-soft);
+    border: 1px solid transparent;
+    border-radius: var(--radius-sm);
+    padding: 10px 14px;
+    font-size: 0.85rem;
     margin-bottom: 10px;
     resize: none;
+    color: var(--text-main);
+    transition: all 0.2s ease;
+    outline: none;
+    box-shadow: inset 0 1px 2px rgba(0,0,0,0.02);
+}
+.modal-card textarea:focus {
+    background: var(--surface);
+    border-color: var(--zen-olive);
+    box-shadow: 0 0 0 3px rgba(90, 110, 97, 0.15);
 }
 
 .modal-actions {

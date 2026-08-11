@@ -170,7 +170,7 @@ function pollForAuthCode(requestId, expiresAt) {
 }
 
 // Cargar sesión guardada
-chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey', 'darkModeEnabled', 'crossDeviceLockEnabled', 'anonIdToken', 'anonRefreshToken', 'pomodoroEnabled', 'pomodoroWorkMinutes', 'pomodoroRestMinutes', 'pomodoroRestCount', 'pomodoroPhases', 'pendingAuth', 'pairedTargetKey', 'treguaUntil', 'treguaCooldownUntil'], (res) => {
+chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToken', 'userEmail', 'syncKey', 'darkModeEnabled', 'crossDeviceLockEnabled', 'anonIdToken', 'anonRefreshToken', 'pomodoroEnabled', 'pomodoroWorkMinutes', 'pomodoroRestMinutes', 'pomodoroRestCount', 'pomodoroPhases', 'pendingAuth', 'pairedTargetKey'], (res) => {
     if (res.firebaseUid) firebaseUid = res.firebaseUid;
     if (res.firebaseIdToken) firebaseIdToken = res.firebaseIdToken;
     if (res.firebaseRefreshToken) firebaseRefreshToken = res.firebaseRefreshToken;
@@ -188,9 +188,6 @@ chrome.storage.local.get(['firebaseUid', 'firebaseIdToken', 'firebaseRefreshToke
     if (typeof res.pomodoroRestCount === 'number') pomodoroRestCount = res.pomodoroRestCount;
     if (Array.isArray(res.pomodoroPhases)) pomodoroPhases = res.pomodoroPhases;
     if (res.pendingAuth && res.pendingAuth.code && res.pendingAuth.expiresAt > Date.now()) pendingAuth = res.pendingAuth;
-    // V28: restaurar la tregua persistida (sobrevive a la suspensión del worker)
-    if (typeof res.treguaUntil === 'number') treguaUntil = res.treguaUntil;
-    if (typeof res.treguaCooldownUntil === 'number') treguaCooldownUntil = res.treguaCooldownUntil;
     // V24 (Bug 4): si no hay sesión de Google ni token anónimo, crearlo como respaldo.
     if (!firebaseIdToken && !anonIdToken) ensureAnonymousAuth();
     pollFirebaseSync();
@@ -350,55 +347,10 @@ chrome.storage.local.get(['customDomains', 'parentalEnabled'], (res) => {
 
 let treguaUntil = 0;
 let treguaCooldownUntil = 0;
-const TREGUA_MINUTES = 5;
-const TREGUA_MS = TREGUA_MINUTES * 60 * 1000;
-const TREGUA_COOLDOWN_MS = 10 * 60 * 1000;
-const TREGUA_REQUEST_TIMEOUT_MS = 3 * 60 * 1000; // si el teléfono no responde en 3 min, caduca
-
-// V28: la tregua vive en chrome.storage.local para que sobreviva a la
-// suspensión del service worker (MV3), que borra toda la memoria.
-function persistTregua() {
-    chrome.storage.local.set({ treguaUntil, treguaCooldownUntil });
-}
-
-// V28: true durante una fase de DESCANSO del Pomodoro (tregua libre en el PC)
-function inPomodoroRest(now) {
-    const phase = currentPomodoroPhase(now);
-    return !!(phase && phase.type === 'rest');
-}
-
-// V28: conceder tregua local (desde el PC). Establece cooldown de 10 min.
-function grantTreguaLocal(minutes) {
-    treguaUntil = Date.now() + minutes * 60 * 1000;
-    treguaCooldownUntil = Date.now() + TREGUA_COOLDOWN_MS;
-    persistTregua();
-    updateNetRules();
-}
-
-// V28: reinicia toda la tregua (fin de bloqueo o nuevo inicio)
-function resetTregua() {
-    treguaUntil = 0;
-    treguaCooldownUntil = 0;
-    persistTregua();
-    updateNetRules();
-}
-
-// V28: si la tregua ya venció, limpiarla y arrancar el cooldown una sola vez.
-function clearExpiredTregua() {
-    if (treguaUntil > 0 && Date.now() >= treguaUntil) {
-        treguaUntil = 0;
-        if (treguaCooldownUntil < Date.now()) {
-            treguaCooldownUntil = Date.now() + TREGUA_COOLDOWN_MS;
-        }
-        persistTregua();
-        updateNetRules();
-    }
-}
 
 function getActiveRulesList() {
     let active = [];
-    // V28: durante un descanso Pomodoro también se liberan los sitios
-    if (isLocked && Date.now() >= treguaUntil && !inPomodoroRest(Date.now())) {
+    if (isLocked && Date.now() >= treguaUntil) {
         active = [...customDomains];
     }
     if (parentalEnabled) {
@@ -456,11 +408,6 @@ function isUrlBlocked(url) {
     
     // Si la tregua está activa, desbloquear todo el contenido del Modo Enfoque
     if (Date.now() < treguaUntil) {
-        return false;
-    }
-
-    // V28: descanso Pomodoro (tregua libre) en el PC
-    if (inPomodoroRest(Date.now())) {
         return false;
     }
 
@@ -557,7 +504,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         });
         return true;
     } else if (request.action === 'startTimer') {
-        resetTregua(); // una sesión nueva nunca hereda una tregua anterior
         isLocked = true;
         remainingSeconds = request.minutes * 60;
         // V24: construir las fases Pomodoro (trabajo/descanso) y persistirlas
@@ -570,7 +516,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         pushLockStateToFirebase(true, request.minutes);
         sendResponse({ success: true });
     } else if (request.action === 'stopTimer') {
-        resetTregua();
         isLocked = false;
         remainingSeconds = 0;
         clearInterval(lockInterval);
@@ -585,7 +530,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             sendResponse({ success: false, error: 'Cooldown activo' });
             return true;
         }
-        grantTreguaLocal(request.minutes || TREGUA_MINUTES);
+        treguaUntil = Date.now() + (request.minutes * 60 * 1000);
+        updateNetRules();
         sendResponse({ success: true });
     } else if (request.action === 'requestAuthCode') {
         // V24.1: la extensión SOLO SOLICITA el código; el TELÉFONO lo genera,
@@ -794,7 +740,9 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         const noteId = `note_${Date.now()}_${Math.floor(Math.random()*1000)}`;
         const payload = {
             id: noteId,
-            content: request.content,
+            title: request.title || null,
+            content: request.content || '',
+            image: request.image || null,
             category: normalizeCategory(request.category),
             timestamp: Date.now(),
             deviceSource: 'chrome_extension'
@@ -1020,8 +968,12 @@ function startBackgroundTimer() {
             updateNetRules();
             broadcastPhase('work', phase);
         }
-        // Finaliza tregua si aplica (limpia y activa el cooldown una sola vez)
-        clearExpiredTregua();
+        // Finaliza tregua si aplica
+        if (treguaUntil > 0 && Date.now() >= treguaUntil) {
+            treguaUntil = 0;
+            treguaCooldownUntil = Date.now() + (10 * 60 * 1000); // 10 mins cooldown
+            updateNetRules(); // Restaurar el bloqueo
+        }
 
         if (remainingSeconds > 0) {
             remainingSeconds--;
@@ -1159,13 +1111,6 @@ function connectLanWebSocket() {
                 pomodoroPhases = data.phases;
                 chrome.storage.local.set({ pomodoroPhases });
             }
-        }
-        // V28: tregua en tiempo real (el teléfono publica tregua_until; 0 = sin tregua).
-        // Se respeta el valor más largo (máximo) para no acortar una tregua local del PC.
-        if (typeof data.tregua_until === 'number' && data.tregua_until > Date.now() && data.tregua_until > treguaUntil) {
-            treguaUntil = data.tregua_until;
-            persistTregua();
-            updateNetRules();
         }
         // Solicitar el estado en cada latido del navegador (responderá el servidor)
         try { lanWebSocket.send('status'); } catch (e) {}
@@ -1324,9 +1269,6 @@ function pollFirebaseSync() {
     const target = getTargetKey();
     const now = Date.now();
 
-    // V28: si la tregua venció mientras el worker estaba dormido, limpiarla ya
-    clearExpiredTregua();
-
     // 1. Enviar latido de la Extensión (extension_last_ping)
     fetchDb(`/users/${target}/device_info/extension_last_ping.json`, {
         method: 'PUT',
@@ -1463,15 +1405,6 @@ function pollFirebaseSync() {
                 updateNetRules();
                 broadcastLockState(false, 0);
             }
-
-            // V28 (Reporte Tregua Sync): tregua activada DESDE EL TELÉFONO.
-            // La app publica tregua_until en lock_state; respetarla para no bloquear.
-            // Se toma el valor más largo (máximo) para no acortar una tregua local del PC.
-            if (lockState.tregua_until && lockState.tregua_until > now && lockState.tregua_until > treguaUntil) {
-                treguaUntil = lockState.tregua_until;
-                persistTregua();
-                updateNetRules();
-            }
         })
         .catch(() => {});
 
@@ -1482,32 +1415,20 @@ function pollFirebaseSync() {
         .then(treguaReq => {
             if (!treguaReq) return;
             if (treguaReq.requester === 'chrome_extension' && treguaReq.approved === true) {
-                grantTreguaLocal(TREGUA_MINUTES);
-
+                treguaUntil = Date.now() + (5 * 60 * 1000);
+                updateNetRules();
+                
                 if (!isLocked) {
                     isLocked = true;
                     updateNetRules();
                     startBackgroundTimer();
                 }
-
+                
                 broadcastLockState(true, remainingSeconds); // Retiene el timer original
                 try {
                     chrome.runtime.sendMessage({ action: 'treguaApproved' }, () => {});
                 } catch (e) {}
                 // Limpiar la solicitud para que no se re-procese
-                fetchDb(`/users/${target}/tregua_request.json`, { method: 'DELETE' }).catch(() => {});
-            } else if (treguaReq.requester === 'chrome_extension' && treguaReq.responded === true && treguaReq.approved !== true) {
-                // V28: el teléfono DENEGÓ la tregua: avisar al popup y limpiar la solicitud
-                try {
-                    chrome.runtime.sendMessage({ action: 'treguaDenied', reason: 'denied' }, () => {});
-                } catch (e) {}
-                fetchDb(`/users/${target}/tregua_request.json`, { method: 'DELETE' }).catch(() => {});
-            } else if (treguaReq.requester === 'chrome_extension' && treguaReq.responded !== true &&
-                       (Date.now() - (treguaReq.requested_at || 0)) > TREGUA_REQUEST_TIMEOUT_MS) {
-                // V28: el teléfono no respondió en 3 minutos: caducó
-                try {
-                    chrome.runtime.sendMessage({ action: 'treguaDenied', reason: 'timeout' }, () => {});
-                } catch (e) {}
                 fetchDb(`/users/${target}/tregua_request.json`, { method: 'DELETE' }).catch(() => {});
             }
         })

@@ -7,97 +7,107 @@
 </head>
 <body>
 
-    <div class="app-container">
-        <!-- Header Workspace -->
-        <header class="workspace-header">
-            <div class="brand">
-                <img src="app_logo.jpg" alt="Logo" class="logo">
-                <div>
-                    <h1><img src="emojis/memo_3d.png" alt="Notas" class="emoji-3d-lg"> Bloc de Notas</h1>
-                    <p class="subtitle">Sincronizado en tiempo real con tu Cuenta de Google</p>
-                </div>
+    <!-- Google Keep Style Header -->
+    <header class="keep-header">
+        <div class="keep-header-left">
+            <button class="icon-btn" id="menu-btn" title="Menú Principal">☰</button>
+            <img src="app_logo.jpg" alt="Logo" class="keep-logo">
+            <span class="keep-title">Notas</span>
+        </div>
+        
+        <div class="keep-header-center">
+            <div class="keep-search-box">
+                <span class="search-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: middle; color: var(--text-muted);"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg></span>
+                <input type="text" id="search-input" placeholder="Buscar notas...">
             </div>
-            
-            <div class="header-controls">
-                <!-- Control de Tamaño de Texto -->
-                <div class="font-size-control">
-                    <span class="ctrl-label">Tamaño de Texto:</span>
-                    <button class="btn-font-size" id="btn-font-sub" title="Disminuir texto">A-</button>
-                    <span class="font-size-value" id="font-size-display">14px</span>
-                    <button class="btn-font-size" id="btn-font-add" title="Aumentar texto">A+</button>
-                </div>
-
-                <div class="profile-menu-wrap">
-                    <button class="profile-trigger" id="btn-profile-menu">
-                        <span class="profile-avatar"><img src="emojis/account_icon.svg" alt="Perfil" class="menu-icon-white"></span>
-                        <span class="profile-text" id="user-email-text">Cargando cuenta...</span>
-                        <span class="profile-chevron">▾</span>
-                    </button>
-                    <div class="profile-dropdown hidden" id="profile-dropdown">
-                        <button class="dropdown-item" data-open-modal="account-modal"><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</button>
-                        <button class="dropdown-item" data-open-modal="settings-modal"><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</button>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Banner Motivacional e Invitación a Anotar Ideas con Emoji 3D -->
-        <div class="reflection-banner">
-            <img src="emojis/sparkles_3d.png" alt="Reflexión" class="emoji-3d">
-            <span class="reflection-text" id="reflection-text">Tu mente es para tener ideas, no para guardarlas. Anótalas aquí para liberar tu concentración.</span>
         </div>
 
-        <!-- Main Content Area -->
-        <main class="workspace-main">
-            <!-- Sidebar / Creator Section -->
-            <section class="editor-section">
-                <div class="card">
-                    <h2><img src="emojis/memo_3d.png" alt="Nueva Nota" class="emoji-3d"> Nueva Nota de Enfoque</h2>
-                    
-                    <div class="form-group">
-                        <label>Categoría</label>
-                        <div class="category-selector">
-                            <button class="cat-chip active" data-cat="general"><img src="emojis/light_bulb_3d.png" class="emoji-3d-sm"> General</button>
-                            <button class="cat-chip" data-cat="tarea"><img src="emojis/pushpin_3d.png" class="emoji-3d-sm"> Tarea</button>
-                            <button class="cat-chip" data-cat="idea"><img src="emojis/rocket_3d.png" class="emoji-3d-sm"> Idea</button>
-                            <button class="cat-chip" data-cat="reflexion"><img src="emojis/brain_3d.png" class="emoji-3d-sm"> Reflexión</button>
-                        </div>
-                    </div>
+        <div class="keep-header-right">
+            <div class="font-size-control">
+                <button class="icon-btn" id="btn-font-sub" title="Disminuir texto">A-</button>
+                <span class="font-size-value" id="font-size-display">14px</span>
+                <button class="icon-btn" id="btn-font-add" title="Aumentar texto">A+</button>
+            </div>
 
-                    <div class="form-group">
-                        <label>Contenido de la Nota</label>
-                        <textarea id="note-text-input" placeholder="Escribe aquí cualquier pensamiento, idea o pendiente para liberar tu mente..."></textarea>
-                    </div>
-
-                    <button class="btn-save-note" id="btn-save-note"><img src="emojis/sparkles_3d.png" class="emoji-3d-sm"> Guardar Nota</button>
-
-                    <div class="save-status" id="save-status"></div>
+            <div class="profile-menu-wrap">
+                <button class="profile-trigger icon-btn" id="btn-profile-menu">
+                    <img src="emojis/account_icon.svg" alt="Perfil">
+                </button>
+                <div class="profile-dropdown hidden" id="profile-dropdown">
+                    <div class="dropdown-header" id="user-email-text">Cargando cuenta...</div>
+                    <button class="dropdown-item" data-open-modal="account-modal"><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Sincronización</button>
+                    <button class="dropdown-item" data-open-modal="settings-modal"><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</button>
                 </div>
-            </section>
+            </div>
+        </div>
+    </header>
 
-            <!-- Notes List Section -->
-            <section class="notes-feed-section">
-                <div class="feed-header">
-                    <div class="search-box">
-                        <input type="text" id="search-input" placeholder="🔍 Buscar notas por texto...">
-                    </div>
-                    <div class="filter-chips">
-                        <button class="filter-chip active" data-filter="all">Todas</button>
-                        <button class="filter-chip" data-filter="general"><img src="emojis/light_bulb_3d.png" class="emoji-3d-sm"> General</button>
-                        <button class="filter-chip" data-filter="tarea"><img src="emojis/pushpin_3d.png" class="emoji-3d-sm"> Tareas</button>
-                        <button class="filter-chip" data-filter="idea"><img src="emojis/rocket_3d.png" class="emoji-3d-sm"> Ideas</button>
-                        <button class="filter-chip" data-filter="reflexion"><img src="emojis/brain_3d.png" class="emoji-3d-sm"> Reflexiones</button>
-                    </div>
+    <div class="keep-layout">
+        <!-- Sidebar Navigation -->
+        <nav class="keep-sidebar" id="sidebar">
+            <ul class="nav-links">
+                <li class="filter-chip active" data-filter="all">
+                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 14c.2-1 .7-1.7 1.5-2.5 1-.9 1.5-2.2 1.5-3.5A6 6 0 0 0 6 8c0 1 .2 2.2 1.5 3.5.7.9 1.2 1.5 1.5 2.5"/><path d="M9 18h6"/><path d="M10 22h4"/></svg></span> <span class="nav-text">Notas</span>
+                </li>
+                <li class="filter-chip" data-filter="general">
+                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path><polyline points="14 2 14 8 20 8"></polyline><line x1="16" y1="13" x2="8" y2="13"></line><line x1="16" y1="17" x2="8" y2="17"></line><polyline points="10 9 9 9 8 9"></polyline></svg></span> <span class="nav-text">General</span>
+                </li>
+                <li class="filter-chip" data-filter="tarea">
+                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 11 12 14 22 4"></polyline><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg></span> <span class="nav-text">Tareas</span>
+                </li>
+                <li class="filter-chip" data-filter="idea">
+                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg></span> <span class="nav-text">Ideas</span>
+                </li>
+                <li class="filter-chip" data-filter="reflexion">
+                    <span class="nav-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg></span> <span class="nav-text">Reflexiones</span>
+                </li>
+            </ul>
+        </nav>
+
+        <!-- Main Content (Editor + Grid) -->
+        <main class="keep-main">
+            
+            <div class="reflection-banner hidden" id="reflection-text">
+                Tu mente es para tener ideas, no para guardarlas.
+            </div>
+
+            <!-- Create Note (Keep Style) -->
+            <div class="keep-create-note">
+                <input type="text" id="note-title-input" class="keep-title-input" placeholder="Título">
+                <textarea id="note-text-input" placeholder="Añade una nota..."></textarea>
+                
+                <div id="note-img-preview" class="hidden">
+                    <img id="img-preview-el" src="" alt="Preview">
+                    <button id="btn-remove-img" class="btn-remove-img">✕</button>
                 </div>
 
-                <div class="notes-grid" id="notes-grid">
-                    <!-- Dynamic Notes Loaded Here -->
+                <div class="create-note-footer">
+                    <div class="category-chips">
+                        <button class="cat-chip active" data-cat="general">General</button>
+                        <button class="cat-chip" data-cat="tarea">Tarea</button>
+                        <button class="cat-chip" data-cat="idea">Idea</button>
+                        <button class="cat-chip" data-cat="reflexion">Reflexión</button>
+                    </div>
+                    <div class="save-actions">
+                        <label class="btn-icon-action" title="Añadir imagen" style="cursor:pointer; display:flex; align-items:center; font-size:1.1rem; padding: 4px; color: var(--text-muted);">
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg>
+                            <input type="file" id="note-img-input" accept="image/*" style="display:none;">
+                        </label>
+                        <span class="save-status" id="save-status"></span>
+                        <button class="btn-save-note" id="btn-save-note">Guardar</button>
+                    </div>
                 </div>
-            </section>
+            </div>
+
+            <!-- Notes Grid (Masonry logic via JS or Flex) -->
+            <div class="keep-notes-grid" id="notes-grid">
+                <!-- Dynamic Notes Loaded Here -->
+            </div>
+            
         </main>
     </div>
 
-    <!-- V23: Modal Mi Cuenta -->
+    <!-- Modals -->
     <div class="modal-overlay hidden" id="account-modal">
         <div class="modal-card">
             <h4><img src="emojis/account_icon.svg" alt="Mi Cuenta" class="menu-icon"> Mi Cuenta</h4>
@@ -111,7 +121,6 @@
         </div>
     </div>
 
-    <!-- V23: Modal Ajustes (Modo Oscuro + Bloqueo Cruzado, sincronizados) -->
     <div class="modal-overlay hidden" id="settings-modal">
         <div class="modal-card">
             <h4><img src="emojis/settings_icon.svg" alt="Ajustes" class="menu-icon"> Ajustes</h4>
