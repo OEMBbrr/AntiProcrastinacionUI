@@ -38,6 +38,60 @@ class _MainLockScreenState extends State<MainLockScreen> {
   int targetDurationMinutes = 10;
   int remainingSeconds = 0;
   Timer? timer;
+  Timer? workModeChecker;
+
+  bool isWorkModeActive = false;
+  Map<int, Map<String, TimeOfDay?>> workSchedule = {
+    1: {'start': null, 'end': null},
+    2: {'start': null, 'end': null},
+    3: {'start': null, 'end': null},
+    4: {'start': null, 'end': null},
+    5: {'start': null, 'end': null},
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _checkWorkModeStatus();
+    workModeChecker = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _checkWorkModeStatus();
+    });
+  }
+
+  @override
+  void dispose() {
+    workModeChecker?.cancel();
+    timer?.cancel();
+    super.dispose();
+  }
+
+  void _checkWorkModeStatus() {
+    DateTime now = DateTime.now();
+    int day = now.weekday; // 1 = Monday, 7 = Sunday
+    
+    if (day >= 1 && day <= 5) {
+      var schedule = workSchedule[day];
+      if (schedule != null && schedule['start'] != null && schedule['end'] != null) {
+        TimeOfDay start = schedule['start']!;
+        TimeOfDay end = schedule['end']!;
+        
+        int nowMinutes = now.hour * 60 + now.minute;
+        int startMinutes = start.hour * 60 + start.minute;
+        int endMinutes = end.hour * 60 + end.minute + 5; // 5 minutos de colchón
+        
+        bool shouldBeActive = nowMinutes >= startMinutes && nowMinutes < endMinutes;
+        if (shouldBeActive != isWorkModeActive) {
+          setState(() {
+            isWorkModeActive = shouldBeActive;
+          });
+        }
+      } else {
+        if (isWorkModeActive) setState(() => isWorkModeActive = false);
+      }
+    } else {
+      if (isWorkModeActive) setState(() => isWorkModeActive = false);
+    }
+  }
 
   // Frases largas para "Ya terminé mi actividad" (150-200 palabras)
   final List<String> longPhrases = [
@@ -121,19 +175,40 @@ class _MainLockScreenState extends State<MainLockScreen> {
   }
 
   Widget _buildHeader() {
-    return Column(
+    return Stack(
+      alignment: Alignment.center,
       children: [
-        const Icon(CupertinoIcons.leaf_arrow_circlepath, size: 42, color: Color(0xFF556B2F)),
-        const SizedBox(height: 12),
-        Text(
-          isLocked ? 'Modo Enfoque' : 'Zen Hub',
-          style: const TextStyle(
-            fontSize: 22,
-            fontWeight: FontWeight.w500,
-            letterSpacing: -0.5,
-            color: Color(0xFF2C3539),
-          ),
+        Column(
+          children: [
+            const Icon(CupertinoIcons.leaf_arrow_circlepath, size: 42, color: Color(0xFF556B2F)),
+            const SizedBox(height: 12),
+            Text(
+              isLocked ? 'Modo Enfoque' : 'Zen Hub',
+              style: const TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w500,
+                letterSpacing: -0.5,
+                color: Color(0xFF2C3539),
+              ),
+            ),
+            if (isWorkModeActive && !isLocked)
+              Container(
+                margin: const EdgeInsets.only(top: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(color: const Color(0xFFE57373).withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                child: const Text('Modo Trabajo Activo', style: TextStyle(color: Color(0xFFE57373), fontSize: 12, fontWeight: FontWeight.bold)),
+              )
+          ],
         ),
+        if (!isLocked)
+          Positioned(
+            right: 0,
+            top: 0,
+            child: IconButton(
+              icon: const Icon(CupertinoIcons.settings, color: Colors.grey),
+              onPressed: _showWorkModeSettings,
+            ),
+          )
       ],
     );
   }
@@ -430,6 +505,10 @@ class _MainLockScreenState extends State<MainLockScreen> {
   Widget _buildAppleAppRow(IconData icon, String name, {bool isDopamine = false, bool isFirst = false, bool isLast = false}) {
     return InkWell(
       onTap: () {
+        if (isDopamine && isWorkModeActive) {
+          _showWorkModeBlockedDialog(name);
+          return;
+        }
         if (isDopamine) {
           _showIntentionalityDialog(name);
         } else {
@@ -461,6 +540,124 @@ class _MainLockScreenState extends State<MainLockScreen> {
             Icon(CupertinoIcons.chevron_right, color: Colors.black.withOpacity(0.2), size: 16),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showWorkModeBlockedDialog(String appName) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Bloqueado', style: TextStyle(fontWeight: FontWeight.bold)),
+        content: Text('Estás en tu horario de Trabajo/Estudio.\n\n$appName se desbloqueará 5 minutos después de tu hora de salida.'),
+        actions: [
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx),
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF2C3539), foregroundColor: Colors.white),
+            child: const Text('Entendido'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showWorkModeSettings() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setModalState) {
+          return Container(
+            height: MediaQuery.of(ctx).size.height * 0.8,
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Row(
+                  children: [
+                    Icon(CupertinoIcons.briefcase, color: Color(0xFF556B2F), size: 28),
+                    SizedBox(width: 12),
+                    Text('Horario de Trabajo', style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: -0.5)),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                const Text('Configura tus clases o trabajo. Las apps distractoras se bloquearán automáticamente.', style: TextStyle(color: Colors.grey)),
+                const SizedBox(height: 24),
+                Expanded(
+                  child: ListView.separated(
+                    itemCount: 5,
+                    separatorBuilder: (_, __) => const Divider(),
+                    itemBuilder: (ctx, i) {
+                      int day = i + 1;
+                      List<String> dias = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes'];
+                      var sched = workSchedule[day]!;
+                      
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Row(
+                          children: [
+                            SizedBox(
+                              width: 80,
+                              child: Text(dias[i], style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                            ),
+                            Expanded(
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.end,
+                                children: [
+                                  _buildTimeSelector(ctx, sched['start'], (time) {
+                                    setModalState(() => sched['start'] = time);
+                                    setState(() {});
+                                    _checkWorkModeStatus();
+                                  }),
+                                  const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('-')),
+                                  _buildTimeSelector(ctx, sched['end'], (time) {
+                                    setModalState(() => sched['end'] = time);
+                                    setState(() {});
+                                    _checkWorkModeStatus();
+                                  }),
+                                ],
+                              ),
+                            )
+                          ],
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF2C3539),
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size.fromHeight(56),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+                  ),
+                  child: const Text('Guardar Horarios'),
+                )
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  Widget _buildTimeSelector(BuildContext context, TimeOfDay? time, Function(TimeOfDay) onSelected) {
+    String formatted = time != null ? "${time.hour.toString().padLeft(2,'0')}:${time.minute.toString().padLeft(2,'0')}" : "--:--";
+    return GestureDetector(
+      onTap: () async {
+        TimeOfDay? picked = await showTimePicker(context: context, initialTime: time ?? const TimeOfDay(hour: 8, minute: 0));
+        if (picked != null) onSelected(picked);
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Text(formatted, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF556B2F))),
       ),
     );
   }
