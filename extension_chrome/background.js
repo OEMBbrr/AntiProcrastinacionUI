@@ -463,7 +463,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
                 currentPhase: phase,
                 phaseType: phase ? phase.type : 'none',
                 phaseEnd: phase ? phase.end_ms : 0,
-                pendingAuthActive: !!(pendingAuth && pendingAuth.expiresAt > now)
+                pendingAuthActive: !!(pendingAuth && pendingAuth.expiresAt > now),
+                treguaUntil: treguaUntil || 0
             });
         });
         return true;

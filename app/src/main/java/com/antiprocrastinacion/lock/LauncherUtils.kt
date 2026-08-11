@@ -133,6 +133,21 @@ object LauncherUtils {
         context.startActivity(intent)
     }
 
+    /**
+     * V26: pedir al sistema convertirse en el inicio predeterminado.
+     * Android 10+ usa RoleManager (diálogo oficial "Usar siempre/Una vez");
+     * en versiones anteriores se abre la configuración del launcher.
+     */
+    fun requestHomeRole(context: Context) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            val roleManager = context.getSystemService(android.app.role.RoleManager::class.java)
+            val intent = roleManager.createRequestRoleIntent(android.app.role.RoleManager.ROLE_HOME)
+            context.startActivity(intent)
+        } else {
+            openHomeSettings(context)
+        }
+    }
+
     /** ¿Es nuestra app el inicio predeterminado del sistema (HOME)? */
     fun isDefaultHome(context: Context): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {

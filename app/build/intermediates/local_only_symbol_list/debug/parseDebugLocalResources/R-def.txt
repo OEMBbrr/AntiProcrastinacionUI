@@ -1,5 +1,11 @@
 R_DEF: Internal format may change without notice
 local
+color widget_accent
+color widget_bg
+color widget_border
+color widget_muted
+color widget_on_accent
+color widget_text
 drawable app_logo
 drawable brain_3d
 drawable ic_launcher_foreground
@@ -8,6 +14,16 @@ drawable memo_3d
 drawable pushpin_3d
 drawable rocket_3d
 drawable sparkles_3d
+drawable zen_widget_bg
+drawable zen_widget_btn_bg
+id widget_btn_25
+id widget_btn_45
+id widget_btn_90
+id widget_open_notes
+id widget_phrase
+id widget_subtitle
+id widget_title
+layout zen_widget
 string app_name
 string default_web_client_id
 string gcm_defaultSenderId
@@ -17,4 +33,12 @@ string google_crash_reporting_api_key
 string google_storage_bucket
 string project_id
 string wallpaper_description
+string widget_btn_25
+string widget_btn_45
+string widget_btn_90
+string widget_default_phrase
+string widget_open_notes
+string widget_subtitle
+string widget_title
 xml wallpaper
+xml zen_widget_info

@@ -63,6 +63,19 @@
             </intent-filter>
         </receiver>
 
+        <!-- V26: widget de escritorio (Modo Enfoque + notas) -->
+        <receiver
+            android:name=".ZenWidgetProvider"
+            android:exported="true"
+            android:label="@string/widget_title">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/zen_widget_info" />
+        </receiver>
+
     </application>
 
 </manifest>

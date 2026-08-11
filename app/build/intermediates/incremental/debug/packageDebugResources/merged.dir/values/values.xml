@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <color name="widget_accent">#7C8B5B</color>
+    <color name="widget_bg">#F6F1E7</color>
+    <color name="widget_border">#D9D2C3</color>
+    <color name="widget_muted">#7A7A70</color>
+    <color name="widget_on_accent">#FFFFFF</color>
+    <color name="widget_text">#2A2A28</color>
     <string name="app_name">AntiProcrastinación</string>
     <string name="default_web_client_id" translatable="false">927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com</string>
     <string name="gcm_defaultSenderId" translatable="false">927134130052</string>
@@ -9,4 +15,11 @@
     <string name="google_storage_bucket" translatable="false">antiprocrastinacion-26975.firebasestorage.app</string>
     <string name="project_id" translatable="false">antiprocrastinacion-26975</string>
     <string name="wallpaper_description">Sistema de enfoque profundo y bloqueo contra distracciones.</string>
+    <string name="widget_btn_25">25 min</string>
+    <string name="widget_btn_45">45 min</string>
+    <string name="widget_btn_90">90 min</string>
+    <string name="widget_default_phrase">Haz una cosa a la vez. Estás donde estás.</string>
+    <string name="widget_open_notes">Abrir mis notas</string>
+    <string name="widget_subtitle">Inicia una sesión sin distracciones</string>
+    <string name="widget_title">Modo Enfoque</string>
 </resources>

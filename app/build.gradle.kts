@@ -13,8 +13,8 @@ android {
         applicationId = "com.antiprocrastinacion.lock"
         minSdk = 26
         targetSdk = 35
-        versionCode = 241
-        versionName = "24.1.0"
+        versionCode = 242
+        versionName = "26.0.0"
     }
 
     buildTypes {

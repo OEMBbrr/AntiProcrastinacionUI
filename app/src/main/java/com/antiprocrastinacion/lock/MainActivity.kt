@@ -52,9 +52,41 @@ class MainActivity : FragmentActivity() {
         String(android.util.Base64.decode("OTI3MTM0MTMwMDUyLTNsbWVsdnZuZnVrMWRnOG83MXZvc2pka2Y4czhrM3A1LmFwcHMuZ29vZ2xldXNlcmNvbnRlbnQuY29t", android.util.Base64.DEFAULT), Charsets.UTF_8).trim()
     }
 
+    // V26: acciones del widget de escritorio (Modo Enfoque y Notas)
+    private fun handleWidgetIntent(intent: Intent?) {
+        when (intent?.action) {
+            ZenWidgetProvider.ACTION_START_FOCUS -> {
+                val minutes = intent.getIntExtra(ZenWidgetProvider.EXTRA_DURATION, 25)
+                lockManager.startLock(minutes)
+                isLockedState = true
+                isTempUnlockedState = false
+                LockMonitoringService.startService(this)
+                currentScreen = "zen"
+            }
+            ZenWidgetProvider.ACTION_OPEN_NOTES -> {
+                currentScreen = "notes"
+            }
+        }
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        // V26: al pulsar Inicio estando en otra pantalla (Notas, Organizador...),
+        // el launcher debe volver a su pantalla principal.
+        if (intent.action == Intent.ACTION_MAIN && intent.hasCategory(Intent.CATEGORY_HOME)) {
+            currentScreen =
+                if (lockManager.isLocked && !lockManager.isTempUnlocked) "zen" else "launcher"
+            return
+        }
+        handleWidgetIntent(intent)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         lockManager = LockManager(this)
+        // V26: acciones lanzadas desde el widget de escritorio
+        handleWidgetIntent(intent)
 
         onBackPressedDispatcher.addCallback(this) {
             if (lockManager.isLocked && !lockManager.isTempUnlocked) {

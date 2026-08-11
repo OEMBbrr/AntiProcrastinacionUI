@@ -174,7 +174,7 @@ fun LauncherScreen(
                             color = LchMuted
                         )
                         Button(
-                            onClick = { LauncherUtils.openHomeSettings(context) },
+                            onClick = { LauncherUtils.requestHomeRole(context) },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(containerColor = LchAccent),

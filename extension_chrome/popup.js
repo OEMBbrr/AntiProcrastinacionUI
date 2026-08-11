@@ -539,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateUI() {
         chrome.runtime.sendMessage({ action: 'getState' }, (response) => {
             if (!response) return;
-            const { isLocked, remainingSeconds, customDomains, parentalEnabled, firebaseUid, userEmail, syncKey, connectedDeviceInfo, phaseType } = response;
+            const { isLocked, remainingSeconds, customDomains, parentalEnabled, firebaseUid, userEmail, syncKey, connectedDeviceInfo, phaseType, treguaUntil } = response;
 
             // V24: banner de descanso Pomodoro (tregua libre)
             const restBanner = document.getElementById('pomodoro-rest-banner');
@@ -578,15 +578,29 @@ document.addEventListener('DOMContentLoaded', () => {
             });
 
             if (isLocked) {
-                statusPill.textContent = "MODO ENFOQUE ACTIVO";
-                statusPill.classList.add("status-locked");
+                const now = Date.now();
+                if (treguaUntil && treguaUntil > now) {
+                    statusPill.textContent = "TREGUA ACTIVA";
+                    statusPill.classList.remove("status-locked");
+                    statusPill.style.backgroundColor = "#EAB308"; // Amarillo para destacar
+                    statusPill.style.color = "#FFFFFF";
+                    timerText.textContent = formatTime(Math.floor((treguaUntil - now) / 1000));
+                } else {
+                    statusPill.textContent = "MODO ENFOQUE ACTIVO";
+                    statusPill.classList.add("status-locked");
+                    statusPill.style.backgroundColor = "";
+                    statusPill.style.color = "";
+                    timerText.textContent = formatTime(remainingSeconds);
+                }
+                
                 setupControls.classList.add("hidden");
                 btnStart.classList.add("hidden");
                 lockedControls.classList.remove("hidden");
-                timerText.textContent = formatTime(remainingSeconds);
             } else {
                 statusPill.textContent = "MODO LIBRE";
                 statusPill.classList.remove("status-locked");
+                statusPill.style.backgroundColor = "";
+                statusPill.style.color = "";
                 setupControls.classList.remove("hidden");
                 btnStart.classList.remove("hidden");
                 lockedControls.classList.add("hidden");
