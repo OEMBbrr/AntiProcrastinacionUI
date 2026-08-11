@@ -28,6 +28,8 @@ import com.antiprocrastinacion.lock.ui.launcher.NotesAppScreen
 import com.antiprocrastinacion.lock.ui.launcher.OrganizerScreen
 import com.antiprocrastinacion.lock.ui.launcher.SleepCycleScreen
 import com.antiprocrastinacion.lock.ui.theme.AntiProcrastinacionTheme
+import com.antiprocrastinacion.lock.ui.theme.AccentPresets
+import com.antiprocrastinacion.lock.ui.theme.ZenTheme
 import kotlinx.coroutines.launch
 
 // V24 (Propuesta 4): FragmentActivity para poder usar BiometricPrompt (biometría/PIN)
@@ -69,6 +71,8 @@ class MainActivity : FragmentActivity() {
         isLockedState = lockManager.isLocked
         isTempUnlockedState = lockManager.isTempUnlocked
         darkTheme = lockManager.darkModeEnabled
+        // V26: cargar el acento del sistema elegido en Ajustes -> Colores
+        ZenTheme.accent = AccentPresets.byKey(lockManager.accentPresetKey)
 
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             if (checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
@@ -171,6 +175,10 @@ class MainActivity : FragmentActivity() {
                             onDarkThemeChange = { newValue ->
                                 darkTheme = newValue
                                 lockManager.darkModeEnabled = newValue
+                            },
+                            onAccentChange = { key ->
+                                lockManager.accentPresetKey = key
+                                ZenTheme.accent = AccentPresets.byKey(key)
                             },
                             onBackToLauncher = { currentScreen = "launcher" }
                         )

@@ -259,6 +259,18 @@ object LauncherUtils {
         }
     }
 
+    // V26: caché en memoria de iconos para eliminar el jank del cajón.
+    // Cada icono se decodifica UNA sola vez y se reutiliza en recomposiciones/scrolls.
+    private val iconCache = java.util.concurrent.ConcurrentHashMap<String, androidx.compose.ui.graphics.ImageBitmap?>()
+
+    fun getAppIconBitmapCached(context: Context, packageName: String): androidx.compose.ui.graphics.ImageBitmap? {
+        return iconCache.getOrPut(packageName) { getAppIconBitmap(context, packageName) }
+    }
+
+    fun clearIconCache() {
+        iconCache.clear()
+    }
+
     /** Lanza la app por su packageName. */
     fun launchApp(context: Context, packageName: String) {
         try {

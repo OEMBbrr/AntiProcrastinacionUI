@@ -41,7 +41,11 @@ fun AppDrawerScreen(
 
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
-            apps = LauncherUtils.getHealthUtilityApps(context)
+            val loaded = LauncherUtils.getHealthUtilityApps(context)
+            apps = loaded
+            // V26: precargar TODOS los iconos en un solo hilo de IO para que
+            // el scroll del cajón sea fluido (sin decodificaciones por item).
+            loaded.forEach { LauncherUtils.getAppIconBitmapCached(context, it.packageName) }
         }
     }
 
@@ -153,12 +157,11 @@ private fun AppLogo(
     onClick: () -> Unit
 ) {
     val context = LocalContext.current
-    var bitmap by remember(app.packageName) { mutableStateOf<androidx.compose.ui.graphics.ImageBitmap?>(null) }
 
-    LaunchedEffect(app.packageName) {
-        withContext(Dispatchers.IO) {
-            bitmap = LauncherUtils.getAppIconBitmap(context, app.packageName)
-        }
+    // V26: icono desde caché en memoria -> sin LaunchedEffect por item,
+    // la cuadrícula scrollea fluida sin "golpes".
+    val bitmap = remember(app.packageName) {
+        LauncherUtils.getAppIconBitmapCached(context, app.packageName)
     }
 
     Column(
@@ -177,7 +180,7 @@ private fun AppLogo(
         ) {
             if (bitmap != null) {
                 Image(
-                    bitmap = bitmap!!,
+                    bitmap = bitmap,
                     contentDescription = app.label,
                     modifier = Modifier
                         .size(40.dp)

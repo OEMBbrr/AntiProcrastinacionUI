@@ -77,6 +77,9 @@ class LockManager(context: Context) {
         private const val KEY_DARK_MODE = "dark_mode_enabled"
         private const val KEY_CROSS_DEVICE_LOCK = "cross_device_lock_enabled"
 
+        // V26: acento del sistema (preset de color elegido en Ajustes -> Colores)
+        private const val KEY_ACCENT_PRESET = "accent_preset_key"
+
         // V24 (Propuesta 1): Pomodoro sincronizado entre dispositivos
         private const val KEY_POMODORO_ENABLED = "pomodoro_enabled"
         private const val KEY_POMODORO_WORK_MINUTES = "pomodoro_work_minutes"
@@ -281,6 +284,14 @@ class LockManager(context: Context) {
         get() = prefs.getBoolean(KEY_DARK_MODE, false)
         set(value) {
             prefs.edit().putBoolean(KEY_DARK_MODE, value).apply()
+        }
+
+    // V26: clave del preset de acento elegido en Ajustes -> Colores.
+    // Se aplica a TODO el sistema (launcher, notas, organizador, modo enfoque).
+    var accentPresetKey: String
+        get() = prefs.getString(KEY_ACCENT_PRESET, "oliva") ?: "oliva"
+        set(value) {
+            prefs.edit().putString(KEY_ACCENT_PRESET, value).apply()
         }
 
     // V20: Bloqueo cruzado entre dispositivos (activo por defecto)

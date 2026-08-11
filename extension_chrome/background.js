@@ -345,9 +345,11 @@ chrome.storage.local.get(['customDomains', 'parentalEnabled'], (res) => {
     updateNetRules();
 });
 
+let treguaUntil = 0;
+
 function getActiveRulesList() {
     let active = [];
-    if (isLocked) {
+    if (isLocked && Date.now() >= treguaUntil) {
         active = [...customDomains];
     }
     if (parentalEnabled) {
@@ -402,6 +404,12 @@ function isUrlBlocked(url) {
     if (!url || url.includes('/blocked.html') || url.startsWith('chrome://') || url.startsWith('chrome-extension://')) {
         return false;
     }
+    
+    // Si la tregua está activa, desbloquear todo el contenido del Modo Enfoque
+    if (Date.now() < treguaUntil) {
+        return false;
+    }
+
     const lowerUrl = url.toLowerCase();
 
     if (isLocked) {
@@ -515,7 +523,8 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         broadcastPhase('none', null);
         sendResponse({ success: true });
     } else if (request.action === 'grantTregua') {
-        remainingSeconds = request.minutes * 60;
+        treguaUntil = Date.now() + (request.minutes * 60 * 1000);
+        updateNetRules();
         sendResponse({ success: true });
     } else if (request.action === 'requestAuthCode') {
         // V24.1: la extensión SOLO SOLICITA el código; el TELÉFONO lo genera,
@@ -945,6 +954,11 @@ function startBackgroundTimer() {
             wasInRest = false;
             updateNetRules();
             broadcastPhase('work', phase);
+        }
+        // Finaliza tregua si aplica
+        if (treguaUntil > 0 && Date.now() >= treguaUntil) {
+            treguaUntil = 0;
+            updateNetRules(); // Restaurar el bloqueo
         }
 
         if (remainingSeconds > 0) {
@@ -1387,13 +1401,16 @@ function pollFirebaseSync() {
         .then(treguaReq => {
             if (!treguaReq) return;
             if (treguaReq.requester === 'chrome_extension' && treguaReq.approved === true) {
-                remainingSeconds = 5 * 60;
+                treguaUntil = Date.now() + (5 * 60 * 1000);
+                updateNetRules();
+                
                 if (!isLocked) {
                     isLocked = true;
                     updateNetRules();
                     startBackgroundTimer();
                 }
-                broadcastLockState(true, remainingSeconds);
+                
+                broadcastLockState(true, remainingSeconds); // Retiene el timer original
                 try {
                     chrome.runtime.sendMessage({ action: 'treguaApproved' }, () => {});
                 } catch (e) {}

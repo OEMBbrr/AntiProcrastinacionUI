@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.Timer
 import androidx.compose.material.icons.filled.Person
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
 import androidx.compose.material.icons.filled.Settings
@@ -64,7 +65,8 @@ fun ConfigScreen(
     darkTheme: Boolean = false,
     onDarkThemeChange: (Boolean) -> Unit = {},
     configVersion: Int = 0,
-    onBackToLauncher: (() -> Unit)? = null
+    onBackToLauncher: (() -> Unit)? = null,
+    onAccentChange: (String) -> Unit = {}
 ) {
     val context = LocalContext.current
     
@@ -873,6 +875,92 @@ fun ConfigScreen(
                             contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
                         ) {
                             Text("Establecer como Inicio Predeterminado", fontSize = 11.sp, color = ZenOlive)
+                        }
+                    }
+                }
+
+                // V26: Colores del sistema (presets de acento que cambian TODO)
+                val currentAccent = com.antiprocrastinacion.lock.ui.theme.ZenTheme.accent
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                    border = BorderStroke(1.dp, ZenSage.copy(alpha = 0.2f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(12.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.Settings, contentDescription = null, tint = ZenOlive)
+                            Column {
+                                Text(
+                                    text = "COLORES DEL SISTEMA",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = ZenOlive,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "El acento se aplica a todo: launcher, notas, organizador y modo enfoque.",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    color = ZenSage
+                                )
+                            }
+                        }
+
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            com.antiprocrastinacion.lock.ui.theme.AccentPresets.all.forEach { preset ->
+                                val selected = preset.key == currentAccent.key
+                                Column(
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.clickable {
+                                        executeWithAuthIfNeeded {
+                                            lockManager.accentPresetKey = preset.key
+                                            com.antiprocrastinacion.lock.ui.theme.ZenTheme.accent = preset
+                                            onAccentChange(preset.key)
+                                        }
+                                    }
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(if (selected) 44.dp else 40.dp)
+                                            .clip(CircleShape)
+                                            .background(
+                                                if (darkTheme) preset.dark else preset.light,
+                                                CircleShape
+                                            )
+                                            .border(
+                                                width = if (selected) 3.dp else 1.dp,
+                                                color = if (selected) ZenCharcoal else ZenSage.copy(alpha = 0.4f),
+                                                shape = CircleShape
+                                            ),
+                                        contentAlignment = Alignment.Center
+                                    ) {
+                                        if (selected) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = null,
+                                                tint = Color.White,
+                                                modifier = Modifier.size(16.dp)
+                                            )
+                                        }
+                                    }
+                                    Spacer(modifier = Modifier.height(4.dp))
+                                    Text(
+                                        text = preset.name,
+                                        fontSize = 10.sp,
+                                        fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
+                                        color = if (selected) ZenCharcoal else ZenSage
+                                    )
+                                }
+                            }
                         }
                     }
                 }

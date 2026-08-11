@@ -4,70 +4,58 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
+import com.antiprocrastinacion.lock.ui.theme.CreamBackground
+import com.antiprocrastinacion.lock.ui.theme.ZenBorderLight
+import com.antiprocrastinacion.lock.ui.theme.ZenCharcoal
+import com.antiprocrastinacion.lock.ui.theme.ZenCoral
+import com.antiprocrastinacion.lock.ui.theme.ZenOlive
+import com.antiprocrastinacion.lock.ui.theme.ZenSage
+import com.antiprocrastinacion.lock.ui.theme.ZenSurfaceElevated
+import com.antiprocrastinacion.lock.ui.theme.ZenTheme
+import com.antiprocrastinacion.lock.ui.theme.ZenWhite
 
 // ---------------------------------------------------------------------------
-// PALETA DESATURADA DEL NUEVO LAUNCHER (V25)
-// Colores apagados, fríos y cálidos cercanos a la escala de grises para evitar
-// la estimulación dopamínica por color. Sin colores saturados.
+// LAUNCHER (V25) — V26: colores unificados con el modo ENFOQUE (paleta Zen).
+// El launcher ya NO usa su propia paleta desaturada: delega en la paleta Zen
+// del sistema y en el ACENTO configurable elegido en Ajustes (Colores).
+// Así el acento cambia TODO el sistema a la vez (launcher, notas, modo enfoque).
 // ---------------------------------------------------------------------------
 
-// Fondo principal (gris cálido apagado)
-val LchBgLight = Color(0xFFE9E8E5)
-val LchBgDark = Color(0xFF121212)
-
-// Superficies / tarjetas (apenas un paso sobre el fondo)
-val LchSurfaceLight = Color(0xFFF3F2EF)
-val LchSurfaceDark = Color(0xFF1D1D1C)
-
-// Superficie elevada / header
-val LchSurfaceHiLight = Color(0xFFFAF9F7)
-val LchSurfaceHiDark = Color(0xFF262626)
-
-// Texto principal y secundario (grises neutros)
-val LchTextLight = Color(0xFF33302E)
-val LchTextDark = Color(0xFFEDEDEA)
-
-val LchMutedLight = Color(0xFF7A7874)
-val LchMutedDark = Color(0xFFA3A29E)
-
-// Acento desaturado (verde oliva/gris frío, único tono ligeramente cálido)
-val LchAccentLight = Color(0xFF5E6159)
-val LchAccentDark = Color(0xFF8F9488)
-
-// Acento secundario (gris cálido tipo coral apagado para énfasis suave)
-val LchWarmLight = Color(0xFF7A6F66)
-val LchWarmDark = Color(0xFFB0A396)
-
-// Bordes
-val LchBorderLight = Color(0xFFD6D4D0)
-val LchBorderDark = Color(0xFF343432)
-
-// Estado global del launcher (claro / oscuro)
+// Estado global del launcher (claro / oscuro) delegado al tema Zen
 object LauncherTheme {
     var isDark by mutableStateOf(false)
 }
 
-// Colores expuestos a las pantallas del launcher según el tema
+// Colores expuestos a las pantallas del launcher (misma paleta que modo enfoque)
 val LchBg: Color
-    get() = if (LauncherTheme.isDark) LchBgDark else LchBgLight
+    get() = CreamBackground
 
 val LchSurface: Color
-    get() = if (LauncherTheme.isDark) LchSurfaceDark else LchSurfaceLight
+    get() = ZenWhite
 
 val LchSurfaceHi: Color
-    get() = if (LauncherTheme.isDark) LchSurfaceHiDark else LchSurfaceHiLight
+    get() = ZenSurfaceElevated
 
 val LchText: Color
-    get() = if (LauncherTheme.isDark) LchTextDark else LchTextLight
+    get() = ZenCharcoal
 
 val LchMuted: Color
-    get() = if (LauncherTheme.isDark) LchMutedDark else LchMutedLight
+    get() = ZenSage
 
 val LchAccent: Color
-    get() = if (LauncherTheme.isDark) LchAccentDark else LchAccentLight
+    get() = ZenOlive
 
 val LchWarm: Color
-    get() = if (LauncherTheme.isDark) LchWarmDark else LchWarmLight
+    get() = ZenCoral
 
 val LchBorder: Color
-    get() = if (LauncherTheme.isDark) LchBorderDark else LchBorderLight
+    get() = ZenBorderLight
+
+val LchGradientStart: Color
+    get() = ZenSurfaceElevated
+
+val LchGradientEnd: Color
+    get() = CreamBackground
+
+val LchOnAccent: Color
+    get() = if (ZenTheme.isDark) Color(0xFF0F171E) else Color.White

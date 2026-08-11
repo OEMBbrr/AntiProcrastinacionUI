@@ -32,16 +32,18 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.antiprocrastinacion.lock.LauncherUtils
 import com.antiprocrastinacion.lock.LockManager
 import com.antiprocrastinacion.lock.MotivationalPhrases
 import com.antiprocrastinacion.lock.ZenNote
 import kotlinx.coroutines.delay
 
 /**
- * V25: Pantalla principal del nuevo launcher.
+ * V26: Pantalla principal del nuevo launcher.
  * - Barra superior con las apps propias (Notas, Ciclo de Sueño, Organizador).
- * - Pantalla principal SIN apps: frases de motivación + widgets de tareas,
- *   hora de dormir y notas más recientes.
+ * - Inicio rápido de Modo Enfoque (25/45/90 min).
+ * - Frases de motivación + widgets de tareas, hora de dormir y notas recientes.
+ * - Aviso para establecer la app como inicio predeterminado (HOME real).
  * - Acceso al cajón de aplicaciones (solo logos) y a los ajustes.
  */
 @Composable
@@ -51,10 +53,20 @@ fun LauncherScreen(
     onOpenSleepCycle: () -> Unit,
     onOpenOrganizer: () -> Unit,
     onOpenAppDrawer: () -> Unit,
-    onOpenSettings: () -> Unit
+    onOpenSettings: () -> Unit,
+    onStartFocus: (Int) -> Unit
 ) {
     val currentPhrase = remember { MotivationalPhrases.getRandomPhrase() }
     var recentNotes by remember { mutableStateOf<List<ZenNote>>(emptyList()) }
+    val context = androidx.compose.ui.platform.LocalContext.current
+
+    // V26: launcher como inicio real -> comprobar si es HOME predeterminado
+    var isDefaultHome by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        isDefaultHome = withContext(kotlinx.coroutines.Dispatchers.IO) {
+            LauncherUtils.isDefaultHome(context)
+        }
+    }
 
     // V25: escuchar notas para el widget "Notas más recientes"
     LaunchedEffect(Unit) {
@@ -120,6 +132,109 @@ fun LauncherScreen(
                 onOpenSleepCycle = onOpenSleepCycle,
                 onOpenOrganizer = onOpenOrganizer
             )
+
+            // V26: aviso para convertir la app en el Inicio real del dispositivo
+            if (!isDefaultHome) {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(20.dp),
+                    colors = CardDefaults.cardColors(containerColor = LchSurfaceHi),
+                    border = BorderStroke(1.dp, LchBorder)
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(
+                                imageVector = Icons.Default.Home,
+                                contentDescription = null,
+                                tint = LchAccent,
+                                modifier = Modifier.size(20.dp)
+                            )
+                            Text(
+                                text = "Hazme tu Inicio",
+                                fontSize = 14.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = LchText
+                            )
+                        }
+                        Text(
+                            text = "Pulsa Inicio en tu teléfono y este launcher (notas, frases y modos) aparecerá de inmediato, sin distracciones.",
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                            color = LchMuted
+                        )
+                        Button(
+                            onClick = { LauncherUtils.openHomeSettings(context) },
+                            modifier = Modifier.fillMaxWidth(),
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = LchAccent),
+                            contentPadding = PaddingValues(vertical = 10.dp)
+                        ) {
+                            Text(
+                                text = "Establecer como Inicio",
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+            }
+
+            // V26: inicio rápido del Modo Enfoque
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = RoundedCornerShape(20.dp),
+                colors = CardDefaults.cardColors(containerColor = LchSurface),
+                border = BorderStroke(1.dp, LchBorder),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+            ) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(16.dp),
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Timer,
+                            contentDescription = null,
+                            tint = LchAccent,
+                            modifier = Modifier.size(20.dp)
+                        )
+                        Column {
+                            Text(
+                                text = "Modo Enfoque",
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = LchText
+                            )
+                            Text(
+                                text = "Inicia una sesión de concentración sin distracciones",
+                                fontSize = 11.sp,
+                                color = LchMuted
+                            )
+                        }
+                    }
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FocusQuickButton(label = "25 min", duration = 25, onClick = onStartFocus)
+                        FocusQuickButton(label = "45 min", duration = 45, onClick = onStartFocus)
+                        FocusQuickButton(label = "90 min", duration = 90, onClick = onStartFocus)
+                    }
+                }
+            }
 
             // Tarjeta de frase motivacional
             Card(
