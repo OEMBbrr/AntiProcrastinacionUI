@@ -1,4 +1,4 @@
-#Tue Aug 11 22:31:19 VET 2026
+#Tue Aug 11 22:36:30 VET 2026
 base.0=C\:\\Users\\USUARIO\\Documents\\AntiProcrastinacion-NuevoUI\\app\\build\\intermediates\\dex\\debug\\mergeExtDexDebug\\classes.dex
 base.1=C\:\\Users\\USUARIO\\Documents\\AntiProcrastinacion-NuevoUI\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\0\\classes.dex
 base.2=C\:\\Users\\USUARIO\\Documents\\AntiProcrastinacion-NuevoUI\\app\\build\\intermediates\\dex\\debug\\mergeProjectDexDebug\\14\\classes.dex

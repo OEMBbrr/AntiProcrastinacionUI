@@ -451,6 +451,56 @@ private fun FocusPlanEditor(
     }
 }
 
+/** Control compacto "− valor +" con etiqueta, para steppers de duración y descansos. */
+@Composable
+private fun MiniStepper(
+    label: String,
+    value: Int,
+    tint: Color,
+    onDec: () -> Unit,
+    onInc: () -> Unit,
+    unit: String = "min",
+    decEnabled: Boolean = true,
+    incEnabled: Boolean = true
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(text = label, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = ZenSage, maxLines = 1)
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            modifier = Modifier
+                .clip(RoundedCornerShape(9.dp))
+                .background(tint.copy(alpha = 0.10f))
+        ) {
+            IconButton(onClick = onDec, enabled = decEnabled, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Default.Remove,
+                    contentDescription = "Quitar",
+                    tint = if (decEnabled) tint else ZenSage.copy(alpha = 0.4f),
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+            Text(
+                text = if (unit.isEmpty()) "$value" else "$value $unit",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = ZenCharcoal,
+                modifier = Modifier.padding(horizontal = 2.dp)
+            )
+            IconButton(onClick = onInc, enabled = incEnabled, modifier = Modifier.size(30.dp)) {
+                Icon(
+                    Icons.Default.Add,
+                    contentDescription = "Añadir",
+                    tint = if (incEnabled) tint else ZenSage.copy(alpha = 0.4f),
+                    modifier = Modifier.size(15.dp)
+                )
+            }
+        }
+    }
+}
+
 /** Fila de actividad: título, duración total, descansos internos y vista previa de bloques. */
 @Composable
 private fun FocusActivityRow(
@@ -463,73 +513,76 @@ private fun FocusActivityRow(
     val bm = seg.internalBreakMinutes.coerceIn(1, 60)
     val workPerBlock = if (n == 0) seg.durationMinutes else (seg.durationMinutes - n * bm) / (n + 1)
 
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(accent.copy(alpha = 0.06f))
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(9.dp)
-                .clip(CircleShape)
-                .background(accent)
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(accent)
+            )
             OutlinedTextField(
                 value = seg.title,
                 onValueChange = { onUpdate(seg.copy(title = it)) },
                 modifier = Modifier
-                    .fillMaxWidth()
+                    .weight(1f)
                     .height(42.dp),
                 textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
                 singleLine = true,
                 placeholder = { Text("Nombre de la actividad", fontSize = 12.sp) },
                 shape = RoundedCornerShape(10.dp)
             )
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes - 1).coerceAtLeast(1))) }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Menos tiempo", tint = accent, modifier = Modifier.size(16.dp))
-                }
-                Text(text = "${seg.durationMinutes} min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenCharcoal)
-                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(480))) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Más tiempo", tint = accent, modifier = Modifier.size(16.dp))
-                }
-                Text(text = "Descansos dentro:", fontSize = 11.sp, color = ZenSage, modifier = Modifier.padding(start = 6.dp))
-                IconButton(onClick = { onUpdate(seg.copy(internalBreakCount = (n - 1).coerceAtLeast(0))) }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Menos descansos", tint = ZenGreen, modifier = Modifier.size(16.dp))
-                }
-                Text(text = "$n", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenGreen)
-                IconButton(onClick = { onUpdate(seg.copy(internalBreakCount = (n + 1).coerceAtMost(6))) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Más descansos", tint = ZenGreen, modifier = Modifier.size(16.dp))
-                }
-                if (n > 0) {
-                    IconButton(onClick = { onUpdate(seg.copy(internalBreakMinutes = (bm - 1).coerceAtLeast(1))) }) {
-                        Icon(Icons.Default.Remove, contentDescription = "Menos duración", tint = ZenGreen, modifier = Modifier.size(16.dp))
-                    }
-                    Text(text = "$bm min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenGreen)
-                    IconButton(onClick = { onUpdate(seg.copy(internalBreakMinutes = (bm + 1).coerceAtMost(30))) }) {
-                        Icon(Icons.Default.Add, contentDescription = "Más duración", tint = ZenGreen, modifier = Modifier.size(16.dp))
-                    }
-                }
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Eliminar actividad", tint = ZenSage, modifier = Modifier.size(18.dp))
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            MiniStepper(
+                label = "DURACIÓN",
+                value = seg.durationMinutes,
+                tint = accent,
+                onDec = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes - 1).coerceAtLeast(1))) },
+                onInc = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(480))) }
+            )
+            MiniStepper(
+                label = "DESCANSOS DENTRO",
+                value = n,
+                unit = "",
+                tint = ZenGreen,
+                onDec = { onUpdate(seg.copy(internalBreakCount = (n - 1).coerceAtLeast(0))) },
+                onInc = { onUpdate(seg.copy(internalBreakCount = (n + 1).coerceAtMost(6))) }
+            )
             if (n > 0) {
-                Text(
-                    text = "→ ${n + 1} bloques de ~${workPerBlock} min, separados por $n descanso(s) de $bm min",
-                    fontSize = 10.sp,
-                    color = ZenSage
+                MiniStepper(
+                    label = "CADA DESCANSO",
+                    value = bm,
+                    tint = ZenGreen,
+                    onDec = { onUpdate(seg.copy(internalBreakMinutes = (bm - 1).coerceAtLeast(1))) },
+                    onInc = { onUpdate(seg.copy(internalBreakMinutes = (bm + 1).coerceAtMost(30))) }
                 )
             }
         }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Close, contentDescription = "Eliminar actividad", tint = ZenSage, modifier = Modifier.size(18.dp))
+
+        if (n > 0) {
+            Text(
+                text = "→ ${n + 1} bloques de ~${workPerBlock} min, separados por $n descanso(s) de $bm min",
+                fontSize = 11.sp,
+                color = ZenSage,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.fillMaxWidth()
+            )
         }
     }
 }
@@ -541,44 +594,44 @@ private fun FocusBreakRow(
     onUpdate: (FocusSegment) -> Unit,
     onDelete: () -> Unit
 ) {
-    Row(
+    Column(
         modifier = Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(12.dp))
             .background(ZenSoftGreen)
             .border(1.dp, ZenGreen.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
-            .padding(8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-        horizontalArrangement = Arrangement.spacedBy(8.dp)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        Box(
-            modifier = Modifier
-                .size(9.dp)
-                .clip(CircleShape)
-                .background(ZenGreen)
-        )
-        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Box(
+                modifier = Modifier
+                    .size(9.dp)
+                    .clip(CircleShape)
+                    .background(ZenGreen)
+            )
             Text(
                 text = "Descanso (entre actividades)",
-                fontSize = 12.sp,
+                fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
-                color = ZenCharcoal
+                color = ZenCharcoal,
+                modifier = Modifier.weight(1f)
             )
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes - 1).coerceAtLeast(1))) }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Menos", tint = ZenGreen, modifier = Modifier.size(16.dp))
-                }
-                Text(text = "${seg.durationMinutes} min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenCharcoal)
-                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(120))) }) {
-                    Icon(Icons.Default.Add, contentDescription = "Más", tint = ZenGreen, modifier = Modifier.size(16.dp))
-                }
+            IconButton(onClick = onDelete, modifier = Modifier.size(36.dp)) {
+                Icon(Icons.Default.Close, contentDescription = "Eliminar descanso", tint = ZenSage, modifier = Modifier.size(18.dp))
             }
         }
-        IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Close, contentDescription = "Eliminar descanso", tint = ZenSage, modifier = Modifier.size(18.dp))
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly
+        ) {
+            MiniStepper(
+                label = "DURACIÓN",
+                value = seg.durationMinutes,
+                tint = ZenGreen,
+                onDec = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes - 1).coerceAtLeast(1))) },
+                onInc = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(120))) }
+            )
         }
     }
 }
