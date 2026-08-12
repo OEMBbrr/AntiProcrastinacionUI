@@ -50,6 +50,8 @@ fun ZenScreen(
     // V24: cuenta regresiva de la fase de descanso Pomodoro (tregua libre)
     var restTimeRemaining by remember { mutableStateOf(0L) }
     var isRestPhase by remember { mutableStateOf(lockManager.isPomodoroRestPhase) }
+    // V32: actividad actual del plan (título que el usuario definió)
+    var activityTitle by remember { mutableStateOf("") }
 
     // Índice para carrusel de 150 frases motivacionales y de reflexión (60 segundos por frase)
     var phraseIndex by remember { mutableIntStateOf((0..149).random()) }
@@ -96,6 +98,7 @@ fun ZenScreen(
             // V24: fase de descanso Pomodoro = tregua libre automática
             val now = System.currentTimeMillis()
             val phase = lockManager.currentPomodoroPhase(now)
+            activityTitle = phase?.title ?: ""
             isRestPhase = phase?.type == "rest"
             if (isRestPhase) {
                 restTimeRemaining = phase?.endTime?.minus(now) ?: 0L
@@ -281,6 +284,42 @@ fun ZenScreen(
                 modifier = Modifier.fillMaxWidth()
             ) {
                 if (timeRemaining > 0) {
+                    // V32: píldora con la actividad actual del plan
+                    if (activityTitle.isNotBlank() && !isRestPhase) {
+                        Card(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            colors = CardDefaults.cardColors(containerColor = ZenSoftBlue),
+                            border = BorderStroke(1.dp, ZenOlive.copy(alpha = 0.4f))
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Icon(
+                                    Icons.Default.Timer,
+                                    contentDescription = null,
+                                    tint = ZenOlive,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(modifier = Modifier.width(8.dp))
+                                Text(
+                                    text = "ACTIVIDAD ACTUAL: ${activityTitle.uppercase()}",
+                                    style = MaterialTheme.typography.labelLarge.copy(
+                                        color = ZenOlive,
+                                        fontWeight = FontWeight.Bold,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                )
+                            }
+                        }
+                    }
+
                     // V24: Banner de Descanso Pomodoro (Tregua libre durante la fase de descanso)
                     if (isRestPhase) {
                         Card(

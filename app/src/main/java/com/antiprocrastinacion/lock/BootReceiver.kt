@@ -7,7 +7,7 @@ import android.content.Intent
 class BootReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            val lockManager = LockManager(context)
+            val lockManager = LockManager.getInstance(context)
             // Si estaba bloqueado y aun queda tiempo en el temporizador, relanzamos la app
             if (lockManager.isLocked && lockManager.timeRemaining > 0) {
                 val launchIntent = Intent(context, MainActivity::class.java).apply {

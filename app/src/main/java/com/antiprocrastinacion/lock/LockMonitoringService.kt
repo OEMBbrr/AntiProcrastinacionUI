@@ -22,6 +22,12 @@ class LockMonitoringService : Service() {
     private var paseoTrackedPkg: String? = null
     private var paseoTrackedSince = 0L
     private var lastPaseoBlockTime = 0L
+    // V28: Modo Escuela/Trabajo — expulsión de apps distractoras (debounce)
+    private var lastWorkBlockTime = 0L
+    // V30: Modo Sin Redes — seguimiento de uso de WhatsApp (límite 30 min) y debounce
+    private var noSocialTrackedPkg: String? = null
+    private var noSocialTrackedSince = 0L
+    private var lastNoSocialBlockTime = 0L
 
     companion object {
         const val CHANNEL_ID = "anti_proc_lock_channel"
@@ -46,7 +52,7 @@ class LockMonitoringService : Service() {
 
     override fun onCreate() {
         super.onCreate()
-        lockManager = LockManager(this)
+        lockManager = LockManager.getInstance(this)
         lockManager.startPeriodicHeartbeat(serviceScope)
         // V20: escuchar bloqueo cruzado desde la extensión de Chrome aunque la app
         // esté en segundo plano o cerrada
@@ -66,6 +72,9 @@ class LockMonitoringService : Service() {
         }
         createNotificationChannel()
         startForeground(NOTIFICATION_ID, buildNotification(lockManager.isLocked))
+        // V31: al arrancar, alinear ahorro de batería y barrer notificaciones bloqueables
+        lockManager.syncBatterySaver()
+        ZenNotificationListenerService.requestRefresh(this)
         startMonitoringLoop()
     }
 
@@ -146,22 +155,41 @@ class LockMonitoringService : Service() {
     }
 
     private fun buildNotification(isLocked: Boolean): android.app.Notification {
+        val noSocial = lockManager.isNoSocialModeActive() && !isLocked
+        val workActive = lockManager.isWorkModeActive() && !isLocked
         val paseo = lockManager.paseoModeEnabled && !isLocked
+        val contentText: String = when {
+            isLocked -> "Protección activa ininterrumpida contra distracciones"
+            noSocial -> {
+                val mins = (lockManager.noSocialRemainingMs() / 60_000L).coerceAtLeast(1)
+                when {
+                    lockManager.isNoSocialAllBlocked() ->
+                        "Cooldown de ${LockManager.NOSOCIAL_ALL_BLOCKED_MINUTES} min: TODAS las apps bloqueadas."
+                    lockManager.isNoSocialTempUnlocked() ->
+                        "Tregua activa (${LockManager.NOSOCIAL_TREGUA_MINUTES} min): todo abierto."
+                    else ->
+                        "RRSS, juegos y navegadores bloqueados. Termina en ~$mins min."
+                }
+            }
+            workActive -> {
+                val end = lockManager.workModeEndMillis()
+                val mins = if (end > 0) ((end - System.currentTimeMillis()) / 60_000L).coerceAtLeast(1) else 0
+                "Distracciones bloqueadas automáticamente. Termina en ~$mins min."
+            }
+            paseo -> "Vive el momento: RRSS y juegos con límite, WhatsApp 20 min, música bloqueada."
+            else -> "Sincronización activa. Esperando modo enfoque..."
+        }
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(
                 when {
                     isLocked -> "Modo Enfoque Máxima Seguridad 🧘"
+                    noSocial -> "Modo Sin Redes 📵"
+                    workActive -> "Modo Escuela/Trabajo activo 🏫"
                     paseo -> "Modo Paseo activo 🚶"
                     else -> "AntiProcrastinación 🧘"
                 }
             )
-            .setContentText(
-                when {
-                    isLocked -> "Protección activa ininterrumpida contra distracciones"
-                    paseo -> "Vive el momento: RRSS y juegos con límite, WhatsApp 20 min, música bloqueada."
-                    else -> "Sincronización activa. Esperando modo enfoque..."
-                }
-            )
+            .setContentText(contentText)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setOngoing(true)
             .setPriority(NotificationCompat.PRIORITY_LOW)
@@ -187,20 +215,78 @@ class LockMonitoringService : Service() {
         }
     }
 
+    /** V31: tras un cambio de modo, refrescar la notificación Y el bloqueo de notificaciones. */
+    private fun refreshUi() {
+        updateNotification()
+        ZenNotificationListenerService.requestRefresh(this)
+    }
+
     private fun startMonitoringLoop() {
         serviceScope.launch {
             var wasTempUnlocked = lockManager.isTempUnlocked
             var wasLocked = lockManager.isLocked
             var wasPaseoOn = lockManager.paseoModeEnabled
+            var wasWorkOn = lockManager.isWorkModeActive()
+            var wasNoSocialOn = lockManager.isNoSocialModeActive()
 
             while (isActive) {
+                // V31: AHORRO DE BATERÍA — con cualquier modo activo se enciende solo;
+                // solo escribe cuando cambia el estado (barato llamarlo cada pasada).
+                lockManager.syncBatterySaver()
+
+                // V32: alarma de cambio de segmento del plan de actividades (solo en enfoque)
+                lockManager.pollSegmentAlarm()
+
+                // V30: MODO SIN REDES — prioridad máxima. Bloquea RRSS/juegos/navegadores
+                // salvo WhatsApp (límite 30 min seguidos). Tregua propia de 5 min.
+                val noSocialOn = lockManager.isNoSocialModeActive()
+                if (noSocialOn && !lockManager.isLocked) {
+                    if (!wasNoSocialOn) {
+                        wasNoSocialOn = true
+                        wasWorkOn = false
+                        wasPaseoOn = false
+                        wasLocked = false
+                        refreshUi()
+                    }
+                    monitorNoSocialLoop()
+                    delay(500)
+                    continue
+                }
+                if (wasNoSocialOn) {
+                    wasNoSocialOn = false
+                    // Al terminar el tiempo, limpiar el estado del Modo Sin Redes.
+                    lockManager.stopNoSocialMode()
+                    refreshUi()
+                }
+
+                // V28: MODO ESCUELA/TRABAJO — bloqueo automático dentro del horario
+                // (L-V, con colchón de 5 min tras la hora de salida). Sin botón físico.
+                val workOn = lockManager.isWorkModeActive()
+                if (workOn && !lockManager.isLocked) {
+                    if (!wasWorkOn) {
+                        wasWorkOn = true
+                        wasPaseoOn = false
+                        wasLocked = false
+                        refreshUi()
+                    }
+                    monitorWorkModeLoop()
+                    delay(500)
+                    continue
+                }
+                if (wasWorkOn) {
+                    wasWorkOn = false
+                    // Al salir del horario, reiniciar el límite de WhatsApp para el próximo bloque
+                    lockManager.clearWorkWhatsAppSession()
+                    refreshUi()
+                }
+
                 // V29: MODO PASEO — vigilancia de uso continuo (RRSS/juegos 15 min, WhatsApp 20 min,
                 // música bloqueada). Solo bloquea la app en uso; el resto queda disponible.
                 if (lockManager.paseoModeEnabled && !lockManager.isLocked) {
                     if (!wasPaseoOn) {
                         wasPaseoOn = true
                         wasLocked = false
-                        updateNotification()
+                        refreshUi()
                     }
                     monitorPaseoLoop()
                     delay(500)
@@ -208,7 +294,7 @@ class LockMonitoringService : Service() {
                 }
                 if (wasPaseoOn) {
                     wasPaseoOn = false
-                    updateNotification()
+                    refreshUi()
                 }
 
                 if (!lockManager.isLocked) {
@@ -216,7 +302,7 @@ class LockMonitoringService : Service() {
                     // un posible bloqueo cruzado desde la extensión de Chrome
                     if (wasLocked) {
                         wasLocked = false
-                        updateNotification()
+                        refreshUi()
                     }
                     wasTempUnlocked = false
                     delay(500)
@@ -225,7 +311,7 @@ class LockMonitoringService : Service() {
 
                 if (!wasLocked) {
                     wasLocked = true
-                    updateNotification()
+                    refreshUi()
                 }
 
                 val remaining = lockManager.timeRemaining
@@ -366,6 +452,152 @@ class LockMonitoringService : Service() {
         val now = System.currentTimeMillis()
         if (now - lastPaseoBlockTime < 1500) return
         lastPaseoBlockTime = now
+        try {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+        }
+        val launchIntent = Intent(applicationContext, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
+        }
+        startActivity(launchIntent)
+    }
+
+    /**
+     * V28: una pasada del vigilante del Modo Escuela/Trabajo.
+     * Dentro del horario configurado (con colchón de 5 min tras la salida):
+     * - Llamadas/SMS y videollamadas (Meet, Zoom, Teams...) quedan libres.
+     * - WhatsApp queda exento pero con límite de minutos seguidos.
+     * - Cualquier otra app distractora (RRSS, juegos, navegadores...) se bloquea de inmediato.
+     */
+    private fun monitorWorkModeLoop() {
+        val fg = LauncherUtils.getForegroundPackage(applicationContext)
+        if (fg == null || fg == packageName) return
+
+        // Llamadas y mensajes de texto: siempre disponibles.
+        if (isEmergencyPackage(fg)) return
+
+        // WhatsApp exento con límite de minutos seguidos (el inicio de sesión lo registra LockManager).
+        if (LauncherUtils.isWhatsApp(fg)) {
+            lockManager.startWorkWhatsAppSessionIfNeeded()
+            if (!lockManager.isWorkWhatsAppAvailable()) {
+                relaunchWorkBlock("Agotaste el tiempo de WhatsApp en el Modo Escuela/Trabajo.")
+            }
+            return
+        }
+
+        // Apps distractoras no exentas (incluye navegadores y juegos): bloqueo automático.
+        if (LauncherUtils.isDistractionPackage(fg) && !LauncherUtils.isWorkModeAppAllowed(fg)) {
+            relaunchWorkBlock("App bloqueada durante el Modo Escuela/Trabajo.")
+        }
+    }
+
+    /** Expulsa al usuario de la app bloqueada y avisa con un Toast (debounce anti-spam). */
+    private fun relaunchWorkBlock(message: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastWorkBlockTime < 1500) return
+        lastWorkBlockTime = now
+        try {
+            Toast.makeText(this, message, Toast.LENGTH_LONG).show()
+        } catch (_: Exception) {
+        }
+        val launchIntent = Intent(applicationContext, MainActivity::class.java).apply {
+            addFlags(
+                Intent.FLAG_ACTIVITY_NEW_TASK or
+                Intent.FLAG_ACTIVITY_REORDER_TO_FRONT or
+                Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                Intent.FLAG_ACTIVITY_NO_ANIMATION
+            )
+        }
+        startActivity(launchIntent)
+    }
+
+    /**
+     * V30: una pasada del vigilante del Modo Sin Redes.
+     * - Llamadas/SMS: siempre libres.
+     * - Tregua (5 min): todo abierto (con cooldown de 10 min entre treguas).
+     * - Cooldown de bloqueo total (5 min): TODAS las apps bloqueadas, sin tregua.
+     * - WhatsApp: permitida pero con límite de 30 min seguidos; al superarlo,
+     *   se activa el cooldown de bloqueo total.
+     * - RRSS, juegos, navegadores y apps de dopamina: expulsión inmediata.
+     */
+    private fun monitorNoSocialLoop() {
+        val fg = LauncherUtils.getForegroundPackage(applicationContext)
+        if (fg == null || fg == packageName) {
+            // Al volver al launcher se corta el "uso seguido" de WhatsApp.
+            noSocialTrackedPkg?.let { lockManager.resetNoSocialUsage() }
+            noSocialTrackedPkg = null
+            noSocialTrackedSince = 0L
+            return
+        }
+
+        // Al cambiar a otra app, el límite "seguido" de WhatsApp se reinicia.
+        if (noSocialTrackedPkg != null && fg != noSocialTrackedPkg) {
+            lockManager.resetNoSocialUsage()
+        }
+
+        // Llamadas y mensajes de texto: siempre disponibles.
+        if (isEmergencyPackage(fg)) return
+
+        // Tregua propia: todo lo bloqueado queda abierto durante 5 min.
+        if (lockManager.isNoSocialTempUnlocked()) {
+            noSocialTrackedPkg = null
+            noSocialTrackedSince = 0L
+            return
+        }
+
+        // Cooldown de bloqueo total: ni siquiera WhatsApp está disponible.
+        if (lockManager.isNoSocialAllBlocked()) {
+            relaunchNoSocialBlock(
+                "Cooldown de ${LockManager.NOSOCIAL_ALL_BLOCKED_MINUTES} min: TODAS las apps bloqueadas por exceder el límite de 30 min."
+            )
+            noSocialTrackedPkg = null
+            noSocialTrackedSince = 0L
+            return
+        }
+
+        // Apps libres (no sociales): pausar el contador.
+        if (!lockManager.isNoSocialAppBlocked(fg)) {
+            noSocialTrackedPkg = null
+            noSocialTrackedSince = 0L
+            return
+        }
+
+        // WhatsApp: permitida con límite de 30 min seguidos.
+        if (LauncherUtils.isWhatsApp(fg)) {
+            val now = System.currentTimeMillis()
+            if (fg == noSocialTrackedPkg && noSocialTrackedSince > 0L) {
+                lockManager.addNoSocialUsage(fg, now - noSocialTrackedSince)
+                if (lockManager.noSocialUsageMs(fg) >= LockManager.NOSOCIAL_APP_LIMIT_MINUTES * 60_000L) {
+                    lockManager.activateNoSocialAllBlocked()
+                    relaunchNoSocialBlock(
+                        "Límite de ${LockManager.NOSOCIAL_APP_LIMIT_MINUTES} min de WhatsApp alcanzado. Cooldown de 5 min con todas las apps bloqueadas."
+                    )
+                    noSocialTrackedPkg = null
+                    noSocialTrackedSince = 0L
+                    return
+                }
+            }
+            noSocialTrackedPkg = fg
+            noSocialTrackedSince = now
+            return
+        }
+
+        // Cualquier otra app bloqueada (RRSS, juegos, navegadores, dopamina): expulsión inmediata.
+        relaunchNoSocialBlock("App no disponible durante el Modo Sin Redes.")
+        noSocialTrackedPkg = null
+        noSocialTrackedSince = 0L
+    }
+
+    /** Expulsa al usuario de la app bloqueada en el Modo Sin Redes (debounce anti-spam). */
+    private fun relaunchNoSocialBlock(message: String) {
+        val now = System.currentTimeMillis()
+        if (now - lastNoSocialBlockTime < 1500) return
+        lastNoSocialBlockTime = now
         try {
             Toast.makeText(this, message, Toast.LENGTH_LONG).show()
         } catch (_: Exception) {

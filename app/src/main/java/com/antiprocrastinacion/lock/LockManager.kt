@@ -1,7 +1,18 @@
 package com.antiprocrastinacion.lock
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.content.SharedPreferences
+import android.media.MediaPlayer
+import android.net.Uri
+import android.os.Build
+import android.os.Handler
+import android.os.Looper
+import android.provider.Settings
+import androidx.core.app.NotificationCompat
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.database.DataSnapshot
 import com.google.firebase.database.DatabaseError
@@ -12,9 +23,14 @@ import com.google.gson.reflect.TypeToken
 import kotlinx.coroutines.*
 
 // V24: fase del Pomodoro sincronizado (trabajo o descanso) con tiempos absolutos
-data class PomodoroPhase(val type: String, val startTime: Long, val endTime: Long)
+data class PomodoroPhase(val type: String, val startTime: Long, val endTime: Long, val title: String = "")
 
-class LockManager(context: Context) {
+// V32: segmento del plan de actividades (trabajo con título o descanso) del Modo Enfoque
+data class FocusSegment(val type: String, val title: String, val durationMinutes: Int)
+
+class LockManager private constructor(context: Context) {
+    // V31: contexto de aplicación (para WRITE_SETTINGS, dialer/SMS y clasificación de apps)
+    private val appContext: Context = context.applicationContext
     private val prefs: SharedPreferences = context.getSharedPreferences("anti_procrastinacion_prefs", Context.MODE_PRIVATE)
 
     // Servidor LAN para descubrimiento local por Wi-Fi
@@ -63,6 +79,17 @@ class LockManager(context: Context) {
     }
 
     companion object {
+        // V31: SINGLETON — el servicio, la activity, el widget y el listener de
+        // notificaciones comparten UNA sola instancia (un solo LanServer y latido).
+        @Volatile private var instance: LockManager? = null
+
+        fun getInstance(context: Context): LockManager {
+            val app = context.applicationContext
+            return instance ?: synchronized(this) {
+                instance ?: LockManager(app).also { instance = it }
+            }
+        }
+
         private const val KEY_IS_LOCKED = "is_locked"
         private const val KEY_LOCK_END_TIME = "lock_end_time"
         private const val KEY_LONG_PHRASE = "long_phrase"
@@ -81,13 +108,10 @@ class LockManager(context: Context) {
         private const val KEY_ACCENT_PRESET = "accent_preset_key"
 
         // V24 (Propuesta 1): Pomodoro sincronizado entre dispositivos
-        private const val KEY_POMODORO_ENABLED = "pomodoro_enabled"
-        private const val KEY_POMODORO_WORK_MINUTES = "pomodoro_work_minutes"
-        private const val KEY_POMODORO_REST_MINUTES = "pomodoro_rest_minutes"
-        private const val KEY_POMODORO_REST_COUNT = "pomodoro_rest_count"
         private const val KEY_POMODORO_PHASES = "pomodoro_phases_json"
-        const val POMODORO_MAX_WORK_MINUTES = 60
-        const val POMODORO_MAX_REST_MINUTES = 30
+        // V32: plan de actividades del Modo Enfoque + anuncio de segmento
+        private const val KEY_FOCUS_ACTIVITY_PLAN = "focus_activity_plan_json"
+        private const val KEY_FOCUS_LAST_ANNOUNCED = "focus_last_announced_segment"
 
         // V28: Modo Escuela/Trabajo (activación + horario L-V)
         private const val KEY_WORK_MODE_ENABLED = "work_mode_enabled"
@@ -110,6 +134,32 @@ class LockManager(context: Context) {
         private const val KEY_NOSOCIAL_DEFAULT_MINUTES = "nosocial_default_minutes"
         private const val KEY_NOSOCIAL_GRAYSCALE = "nosocial_grayscale"
         private const val KEY_FOCUS_DEFAULT_MINUTES = "focus_default_minutes"
+
+        // V30: Modo Sin Redes — estado activo, límite de uso y tregua propia
+        private const val KEY_NOSOCIAL_MODE_ENABLED = "nosocial_mode_enabled"
+        private const val KEY_NOSOCIAL_START_TIME = "nosocial_start_time"
+        private const val KEY_NOSOCIAL_END_TIME = "nosocial_end_time"
+        private const val KEY_NOSOCIAL_USAGE_JSON = "nosocial_usage_json"
+        private const val KEY_NOSOCIAL_ALL_BLOCKED_UNTIL = "nosocial_all_blocked_until"
+        private const val KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL = "nosocial_temp_unlock_until"
+        private const val KEY_NOSOCIAL_TREGUA_COOLDOWN_UNTIL = "nosocial_tregua_cooldown_until"
+        // V30: toggle manual de la escala de grises PROPIA de la app
+        private const val KEY_APP_GRAYSCALE_MANUAL = "app_grayscale_manual_enabled"
+
+        // V31: AHORRO DE BATERÍA AUTOMÁTICO (se activa con cualquier modo activo)
+        private const val KEY_BATTERY_SAVER_BY_APP = "battery_saver_enabled_by_app"
+        private const val KEY_BATTERY_SAVER_PREV_STATE = "battery_saver_prev_state"
+        private const val KEY_BATTERY_SAVER_NUDGE_SHOWN = "battery_saver_nudge_shown"
+        // V31: BLOQUEO DE NOTIFICACIONES (NotificationListenerService)
+        private const val KEY_NOTIF_BLOCKING_ENABLED = "notif_blocking_enabled"
+        private const val KEY_NOTIF_BLOCKING_ALWAYS = "notif_blocking_always"
+        private const val KEY_PASEO_NOTIF_ALLOWED = "paseo_notifications_allowed"
+
+        // V30: constantes del Modo Sin Redes según la visión del usuario
+        const val NOSOCIAL_APP_LIMIT_MINUTES = 30      // límite seguido por app permitida
+        const val NOSOCIAL_ALL_BLOCKED_MINUTES = 5      // cooldown con TODAS las apps bloqueadas
+        const val NOSOCIAL_TREGUA_MINUTES = 5           // tregua de 5 minutos
+        const val NOSOCIAL_TREGUA_COOLDOWN_MINUTES = 10 // cooldown de la tregua
         
         // 1. Frases MUY LARGAS (150 a 200 palabras) para "Ya terminé mi actividad"
         val LONG_FINISH_EARLY_PHRASES = listOf(
@@ -336,55 +386,8 @@ class LockManager(context: Context) {
             }
         }
 
-    // V24 (Propuesta 1): Pomodoro sincronizado (trabajo/descanso) compartido
-    // con la extensión de Chrome a través de /config.
-    var pomodoroEnabled: Boolean
-        get() = prefs.getBoolean(KEY_POMODORO_ENABLED, false)
-        set(value) {
-            prefs.edit().putBoolean(KEY_POMODORO_ENABLED, value).apply()
-            try {
-                userRef()?.child("config")?.child("pomodoro_enabled")?.setValue(value)
-            } catch (e: Exception) {
-                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_enabled: ${e.message}")
-            }
-        }
-
-    var pomodoroWorkMinutes: Int
-        get() = prefs.getInt(KEY_POMODORO_WORK_MINUTES, 25).coerceIn(1, POMODORO_MAX_WORK_MINUTES)
-        set(value) {
-            val clamped = value.coerceIn(1, POMODORO_MAX_WORK_MINUTES)
-            prefs.edit().putInt(KEY_POMODORO_WORK_MINUTES, clamped).apply()
-            try {
-                userRef()?.child("config")?.child("pomodoro_work_minutes")?.setValue(clamped)
-            } catch (e: Exception) {
-                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_work: ${e.message}")
-            }
-        }
-
-    var pomodoroRestMinutes: Int
-        get() = prefs.getInt(KEY_POMODORO_REST_MINUTES, 5).coerceIn(1, POMODORO_MAX_REST_MINUTES)
-        set(value) {
-            val clamped = value.coerceIn(1, POMODORO_MAX_REST_MINUTES)
-            prefs.edit().putInt(KEY_POMODORO_REST_MINUTES, clamped).apply()
-            try {
-                userRef()?.child("config")?.child("pomodoro_rest_minutes")?.setValue(clamped)
-            } catch (e: Exception) {
-                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_rest: ${e.message}")
-            }
-        }
-
-    // V24: número de descansos del Pomodoro (se configura según la duración del enfoque)
-    var pomodoroRestCount: Int
-        get() = prefs.getInt(KEY_POMODORO_REST_COUNT, 1).coerceIn(1, 6)
-        set(value) {
-            val clamped = value.coerceIn(1, 6)
-            prefs.edit().putInt(KEY_POMODORO_REST_COUNT, clamped).apply()
-            try {
-                userRef()?.child("config")?.child("pomodoro_rest_count")?.setValue(clamped)
-            } catch (e: Exception) {
-                android.util.Log.e("ZEN_SYNC", "Error publicando config pomodoro_rest_count: ${e.message}")
-            }
-        }
+    // V32: el pomodoro automático se eliminó — los descansos se configuran en el
+    // plan de actividades del Modo Enfoque (FocusSegment).
 
     // ================================================================================
     // V28: MODO ESCUELA / TRABAJO (activación + horario de Lunes a Viernes)
@@ -442,6 +445,32 @@ class LockManager(context: Context) {
         val sched = workSchedule.firstOrNull { it.day == isoDay } ?: return false
         val nowMin = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
         return nowMin >= sched.startMinute && nowMin < sched.endMinute + WORK_MODE_GRACE_MINUTES
+    }
+
+    /** Milisegundo absoluto en que termina el bloque de Escuela/Trabajo activo
+     * (hora de salida + colchón de 5 min). 0 si no hay bloque activo ahora. */
+    fun workModeEndMillis(now: Long = System.currentTimeMillis()): Long {
+        if (!workModeEnabled) return 0L
+        val cal = java.util.Calendar.getInstance()
+        cal.timeInMillis = now
+        val isoDay = when (cal.get(java.util.Calendar.DAY_OF_WEEK)) {
+            java.util.Calendar.MONDAY -> 1
+            java.util.Calendar.TUESDAY -> 2
+            java.util.Calendar.WEDNESDAY -> 3
+            java.util.Calendar.THURSDAY -> 4
+            java.util.Calendar.FRIDAY -> 5
+            java.util.Calendar.SATURDAY -> 6
+            else -> 7
+        }
+        val sched = workSchedule.firstOrNull { it.day == isoDay } ?: return 0L
+        val nowMin = cal.get(java.util.Calendar.HOUR_OF_DAY) * 60 + cal.get(java.util.Calendar.MINUTE)
+        val effectiveEnd = sched.endMinute + WORK_MODE_GRACE_MINUTES
+        if (nowMin < sched.startMinute || nowMin >= effectiveEnd) return 0L
+        cal.set(java.util.Calendar.HOUR_OF_DAY, 0)
+        cal.set(java.util.Calendar.MINUTE, 0)
+        cal.set(java.util.Calendar.SECOND, 0)
+        cal.set(java.util.Calendar.MILLISECOND, 0)
+        return cal.timeInMillis + effectiveEnd * 60_000L
     }
 
     // V28: en Modo Escuela/Trabajo, WhatsApp queda exento pero con límite de
@@ -611,6 +640,355 @@ class LockManager(context: Context) {
         get() = prefs.getBoolean(KEY_NOSOCIAL_GRAYSCALE, true)
         set(value) = prefs.edit().putBoolean(KEY_NOSOCIAL_GRAYSCALE, value).apply()
 
+    // ================================================================================
+    // V30: MODO SIN REDES — ESTADO ACTIVO Y LÍMITES
+    // Bloquea RRSS/juegos/navegadores/dopamina (excepto WhatsApp). Las apps permitidas
+    // tienen un límite de 30 min seguidos; al superarlo TODAS se bloquean durante un
+    // cooldown de 5 min (sin tregua). Tiene tregua propia de 5 min (cooldown 10 min).
+    // No se puede desactivar hasta que acabe el tiempo programado.
+    // ================================================================================
+
+    var noSocialModeEnabled: Boolean
+        get() = prefs.getBoolean(KEY_NOSOCIAL_MODE_ENABLED, false)
+        private set(value) = prefs.edit().putBoolean(KEY_NOSOCIAL_MODE_ENABLED, value).apply()
+
+    val noSocialStartTime: Long
+        get() = prefs.getLong(KEY_NOSOCIAL_START_TIME, 0L)
+
+    val noSocialEndTime: Long
+        get() = prefs.getLong(KEY_NOSOCIAL_END_TIME, 0L)
+
+    /** True si el Modo Sin Redes está activo (enabled + dentro del tiempo programado). */
+    fun isNoSocialModeActive(now: Long = System.currentTimeMillis()): Boolean =
+        noSocialModeEnabled && now < noSocialEndTime
+
+    /** Milisegundos restantes del Modo Sin Redes (0 si no está activo). */
+    fun noSocialRemainingMs(): Long {
+        if (!isNoSocialModeActive()) return 0L
+        return (noSocialEndTime - System.currentTimeMillis()).coerceAtLeast(0L)
+    }
+
+    /** Inicia el Modo Sin Redes por `minutes`. No se puede desactivar hasta que termine. */
+    fun startNoSocialMode(minutes: Int) {
+        val now = System.currentTimeMillis()
+        prefs.edit()
+            .putBoolean(KEY_NOSOCIAL_MODE_ENABLED, true)
+            .putLong(KEY_NOSOCIAL_START_TIME, now)
+            .putLong(KEY_NOSOCIAL_END_TIME, now + minutes.coerceAtLeast(1) * 60_000L)
+            .remove(KEY_NOSOCIAL_USAGE_JSON)
+            .remove(KEY_NOSOCIAL_ALL_BLOCKED_UNTIL)
+            .remove(KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL)
+            .remove(KEY_NOSOCIAL_TREGUA_COOLDOWN_UNTIL)
+            .apply()
+        android.util.Log.d("ZEN_NOSOCIAL", "Modo Sin Redes iniciado por $minutes min")
+    }
+
+    /** Detiene el Modo Sin Redes (se llama automáticamente al expirar el tiempo). */
+    fun stopNoSocialMode() {
+        prefs.edit()
+            .putBoolean(KEY_NOSOCIAL_MODE_ENABLED, false)
+            .remove(KEY_NOSOCIAL_START_TIME)
+            .remove(KEY_NOSOCIAL_END_TIME)
+            .remove(KEY_NOSOCIAL_USAGE_JSON)
+            .remove(KEY_NOSOCIAL_ALL_BLOCKED_UNTIL)
+            .remove(KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL)
+            .remove(KEY_NOSOCIAL_TREGUA_COOLDOWN_UNTIL)
+            .apply()
+        android.util.Log.d("ZEN_NOSOCIAL", "Modo Sin Redes detenido (tiempo agotado)")
+    }
+
+    /** True si estamos en el cooldown de bloqueo total (TODAS las apps bloqueadas, sin tregua). */
+    fun isNoSocialAllBlocked(): Boolean =
+        System.currentTimeMillis() < prefs.getLong(KEY_NOSOCIAL_ALL_BLOCKED_UNTIL, 0L)
+
+    /** Tiempo restante del cooldown de bloqueo total (0 si no está activo). */
+    fun noSocialAllBlockedRemainingMs(): Long {
+        if (!isNoSocialAllBlocked()) return 0L
+        return (prefs.getLong(KEY_NOSOCIAL_ALL_BLOCKED_UNTIL, 0L) - System.currentTimeMillis()).coerceAtLeast(0L)
+    }
+
+    /** Activa el cooldown de 5 min con TODAS las apps bloqueadas (sin tregua disponible). */
+    fun activateNoSocialAllBlocked() {
+        prefs.edit()
+            .putLong(KEY_NOSOCIAL_ALL_BLOCKED_UNTIL, System.currentTimeMillis() + NOSOCIAL_ALL_BLOCKED_MINUTES * 60_000L)
+            .remove(KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL)
+            .remove(KEY_NOSOCIAL_TREGUA_COOLDOWN_UNTIL)
+            .apply()
+        // Tras el cooldown, WhatsApp vuelve a tener 30 min completos de uso seguido.
+        resetNoSocialUsage()
+        android.util.Log.d("ZEN_NOSOCIAL", "Cooldown de bloqueo total activado (${NOSOCIAL_ALL_BLOCKED_MINUTES} min)")
+    }
+
+    // --- Tregua del Modo Sin Redes (independiente de la del Modo Enfoque) ---
+
+    /** True si la tregua del Modo Sin Redes está activa (permite abrir lo bloqueado). */
+    fun isNoSocialTempUnlocked(): Boolean =
+        System.currentTimeMillis() < prefs.getLong(KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL, 0L)
+
+    /** True si la tregua del Modo Sin Redes está en cooldown (no disponible aún). */
+    fun isNoSocialTreguaCooldown(): Boolean =
+        System.currentTimeMillis() < prefs.getLong(KEY_NOSOCIAL_TREGUA_COOLDOWN_UNTIL, 0L)
+
+    /** Tiempo restante de la tregua del Modo Sin Redes. */
+    fun noSocialTreguaRemainingMs(): Long {
+        val end = prefs.getLong(KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL, 0L)
+        if (end <= 0L) return 0L
+        return (end - System.currentTimeMillis()).coerceAtLeast(0L)
+    }
+
+    /** Concede 5 min de tregua (solo si el modo está activo, no en bloqueo total y sin cooldown de tregua). */
+    fun startNoSocialTregua() {
+        if (!isNoSocialModeActive()) return
+        if (isNoSocialAllBlocked()) return
+        if (isNoSocialTreguaCooldown()) return
+        val now = System.currentTimeMillis()
+        prefs.edit()
+            .putLong(KEY_NOSOCIAL_TEMP_UNLOCK_UNTIL, now + NOSOCIAL_TREGUA_MINUTES * 60_000L)
+            .putLong(KEY_NOSOCIAL_TREGUA_COOLDOWN_UNTIL, now + NOSOCIAL_TREGUA_COOLDOWN_MINUTES * 60_000L)
+            .apply()
+        // La tregua reinicia el límite seguido de WhatsApp.
+        resetNoSocialUsage()
+        android.util.Log.d("ZEN_NOSOCIAL", "Tregua de ${NOSOCIAL_TREGUA_MINUTES} min concedida")
+    }
+
+    // --- Uso continuo de las apps permitidas (límite de 30 min seguidos) ---
+
+    /** Tiempo acumulado de uso seguido de una app permitida durante el Modo Sin Redes. */
+    fun noSocialUsageMs(pkg: String): Long {
+        val json = prefs.getString(KEY_NOSOCIAL_USAGE_JSON, null) ?: return 0L
+        return try {
+            val type = object : TypeToken<Map<String, Long>>() {}.type
+            val map = pomodoroGson.fromJson<Map<String, Long>>(json, type) ?: emptyMap()
+            map[pkg] ?: 0L
+        } catch (e: Exception) {
+            0L
+        }
+    }
+
+    /** Acumula uso seguido de una app permitida durante el Modo Sin Redes. */
+    fun addNoSocialUsage(pkg: String, deltaMs: Long) {
+        if (deltaMs <= 0L) return
+        try {
+            val type = object : TypeToken<Map<String, Long>>() {}.type
+            val map = (prefs.getString(KEY_NOSOCIAL_USAGE_JSON, null)?.let {
+                pomodoroGson.fromJson<Map<String, Long>>(it, type) ?: emptyMap()
+            } ?: emptyMap()).toMutableMap()
+            map[pkg] = (map[pkg] ?: 0L) + deltaMs
+            prefs.edit().putString(KEY_NOSOCIAL_USAGE_JSON, pomodoroGson.toJson(map)).apply()
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    /** Reinicia el contador de uso seguido (al cambiar de app, en tregua o tras el cooldown). */
+    fun resetNoSocialUsage() {
+        prefs.edit().remove(KEY_NOSOCIAL_USAGE_JSON).apply()
+    }
+
+    /** Apps bloqueadas en el Modo Sin Redes: RRSS/juegos/navegadores/dopamina, EXCEPTO WhatsApp. */
+    fun isNoSocialAppBlocked(pkg: String): Boolean =
+        LauncherUtils.isDopamineWalkPackage(pkg) && !LauncherUtils.isWhatsApp(pkg)
+
+    /** Estado de bloqueo ACTUAL de un paquete en el Modo Sin Redes (para la UI del cajón). */
+    fun isNoSocialPackageBlockedNow(pkg: String): Boolean {
+        if (!isNoSocialModeActive()) return false
+        if (isNoSocialAllBlocked()) return true
+        if (isNoSocialTempUnlocked()) return false
+        return isNoSocialAppBlocked(pkg)
+    }
+
+    // ================================================================================
+    // V30: ESCALA DE GRISES DE APP (launcher) — Sin Redes / Paseo / Escuela-Trabajo
+    // Solo afecta al menú principal y al cajón de aplicaciones de AntiProcrastinación.
+    // ================================================================================
+
+    /** True si debe activarse la escala de grises PROPIA de la app (dentro del launcher
+     *  y la pantalla de bloqueo del Modo Enfoque). No afecta a otras apps. */
+    fun isAppGrayscaleActive(): Boolean {
+        if (isLocked) return true                 // Modo Enfoque (pantalla de bloqueo)
+        if (isWorkModeActive()) return true       // horario Escuela/Trabajo
+        if (paseoModeEnabled) return true         // Modo Paseo
+        if (appGrayscaleManualEnabled) return true // toggle manual del home
+        return noSocialGrayScale && isNoSocialModeActive()
+    }
+
+    // V30: toggle MANUAL de la escala de grises PROPIA de la app (botón del home).
+    // Desatura solo la interfaz de AntiProcrastinación; nunca afecta a otras apps.
+    var appGrayscaleManualEnabled: Boolean
+        get() = prefs.getBoolean(KEY_APP_GRAYSCALE_MANUAL, false)
+        set(value) = prefs.edit().putBoolean(KEY_APP_GRAYSCALE_MANUAL, value).apply()
+
+    // ================================================================================
+    // V31: AHORRO DE BATERÍA AUTOMÁTICO + BLOQUEO DE NOTIFICACIONES
+    // Visión: al activarse CUALQUIER modo -> ahorro de batería + silencio de
+    // notificaciones de apps que distraen (solo llamadas y mensajes de texto).
+    // ================================================================================
+
+    /** True si hay algún modo activo ahora (Enfoque, Sin Redes, Escuela/Trabajo o Paseo). */
+    fun isAnyModeActive(): Boolean =
+        isLocked || isNoSocialModeActive() || isWorkModeActive() || paseoModeEnabled
+
+    /** ¿Tiene la app permiso "Modificar ajustes del sistema" (WRITE_SETTINGS)? */
+    fun canWriteSystemSettings(): Boolean =
+        Settings.System.canWrite(appContext)
+
+    /** Intent para abrir la pantalla que concede WRITE_SETTINGS a la app. */
+    fun openWriteSettingsIntent(): Intent =
+        Intent(
+            Settings.ACTION_MANAGE_WRITE_SETTINGS,
+            Uri.parse("package:${appContext.packageName}")
+        ).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+
+    // V31: control del reintento (evita spam de logs si el dispositivo no permite
+    // escribir "low_power" sin WRITE_SECURE_SETTINGS, como HiOS/TECNO).
+    private var lastBatteryShouldBeOn: Boolean? = null
+    private var lastBatteryAttemptMs = 0L
+
+    /**
+     * Sincroniza el modo ahorro de batería del sistema con el estado de los modos.
+     * Se activa cuando entra cualquier modo; se apaga solo cuando NO hay ningún modo
+     * y el usuario no lo había activado manualmente antes.
+     *
+     * En dispositivos que exigen WRITE_SECURE_SETTINGS (signature) el cambio silencioso
+     * es imposible; entonces se muestra UN aviso que abre el ajuste de ahorro de batería
+     * (una vez por sesión de modo) y se reintenta como mucho cada 10 minutos.
+     */
+    fun syncBatterySaver() {
+        try {
+            val shouldBeOn = isAnyModeActive()
+            val enabledByApp = prefs.getBoolean(KEY_BATTERY_SAVER_BY_APP, false)
+            val stateChanged = lastBatteryShouldBeOn != shouldBeOn
+            lastBatteryShouldBeOn = shouldBeOn
+
+            if (!shouldBeOn) {
+                // Sin modos: permitir que el próximo modo vuelva a avisar de la batería.
+                prefs.edit().remove(KEY_BATTERY_SAVER_NUDGE_SHOWN).apply()
+            }
+            if (shouldBeOn == enabledByApp) return       // estado ya sincronizado
+
+            val now = System.currentTimeMillis()
+            if (!stateChanged && now - lastBatteryAttemptMs < 10 * 60_000L) return
+            lastBatteryAttemptMs = now
+
+            if (!canWriteSystemSettings()) {
+                // Sin WRITE_SETTINGS: no-op silencioso (se reintenta al concederlo).
+                return
+            }
+
+            val powerManager = appContext.getSystemService(Context.POWER_SERVICE) as android.os.PowerManager
+            if (shouldBeOn) {
+                // Recordar el estado previo para restaurarlo al salir del modo.
+                prefs.edit().putBoolean(KEY_BATTERY_SAVER_PREV_STATE, powerManager.isPowerSaveMode).apply()
+                Settings.Secure.putInt(appContext.contentResolver, "low_power", 1)
+                Settings.Secure.putInt(appContext.contentResolver, "low_power_sticky", 1)
+                prefs.edit().putBoolean(KEY_BATTERY_SAVER_BY_APP, true).apply()
+                android.util.Log.d("ZEN_BATTERY", "Ahorro de batería ACTIVADO por un modo activo")
+            } else {
+                // Solo apagar si nosotros lo encendimos y antes estaba apagado
+                // (no pisar la decisión manual del usuario).
+                if (!prefs.getBoolean(KEY_BATTERY_SAVER_PREV_STATE, false)) {
+                    Settings.Secure.putInt(appContext.contentResolver, "low_power", 0)
+                    Settings.Secure.putInt(appContext.contentResolver, "low_power_sticky", 0)
+                }
+                prefs.edit().putBoolean(KEY_BATTERY_SAVER_BY_APP, false).apply()
+                android.util.Log.d("ZEN_BATTERY", "Ahorro de batería DESACTIVADO: sin modos activos")
+            }
+        } catch (e: Exception) {
+            // El dispositivo exige WRITE_SECURE_SETTINGS (p.ej. TECNO/HiOS): avisamos
+            // una vez para que el usuario lo active manualmente y no repetimos hasta
+            // que cambie el estado o pasen 10 minutos.
+            android.util.Log.w("ZEN_BATTERY", "No se puede activar el ahorro automático (se reintentará): ${e.message}")
+            if (isAnyModeActive()) showBatterySaverNudge()
+        }
+    }
+
+    /**
+     * V31: notificación única (una vez por sesión de modo) que abre el ajuste de
+     * ahorro de batería del sistema, cuando el cambio automático no es posible.
+     */
+    private fun showBatterySaverNudge() {
+        if (prefs.getBoolean(KEY_BATTERY_SAVER_NUDGE_SHOWN, false)) return
+        prefs.edit().putBoolean(KEY_BATTERY_SAVER_NUDGE_SHOWN, true).apply()
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+                val channel = NotificationChannel(
+                    "zen_battery_nudge",
+                    "Ahorro de batería",
+                    NotificationManager.IMPORTANCE_DEFAULT
+                ).apply { description = "Aviso para activar el ahorro de batería al iniciar un modo" }
+                manager.createNotificationChannel(channel)
+            }
+            val intent = Intent(Settings.ACTION_BATTERY_SAVER_SETTINGS).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+            val pi = PendingIntent.getActivity(
+                appContext,
+                0,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+            val notification = NotificationCompat.Builder(appContext, "zen_battery_nudge")
+                .setSmallIcon(R.drawable.ic_launcher_foreground)
+                .setContentTitle("Activa el ahorro de batería")
+                .setContentText("Tienes un modo activo. Activa el ahorro de batería para gastar menos energía (toca para abrir).")
+                .setStyle(NotificationCompat.BigTextStyle().bigText("Tienes un modo activo. Este dispositivo no permite activar el ahorro de batería automáticamente; tócalo para abrirlo y actívalo tú."))
+                .setAutoCancel(true)
+                .setContentIntent(pi)
+                .build()
+            val manager = appContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(1002, notification)
+        } catch (e: Exception) {
+            // Aviso no crítico
+        }
+    }
+
+    /** V31: toggle global del bloqueo de notificaciones (por defecto ACTIVADO). */
+    var notifBlockingEnabled: Boolean
+        get() = prefs.getBoolean(KEY_NOTIF_BLOCKING_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_NOTIF_BLOCKING_ENABLED, value).apply()
+
+    /**
+     * V31: alcance del bloqueo de notificaciones.
+     * - false (por defecto) = "Solo con modos": bloquea únicamente cuando hay un modo activo.
+     * - true = "Siempre": bloquea también sin ningún modo activo.
+     */
+    var notifBlockingAlways: Boolean
+        get() = prefs.getBoolean(KEY_NOTIF_BLOCKING_ALWAYS, false)
+        set(value) = prefs.edit().putBoolean(KEY_NOTIF_BLOCKING_ALWAYS, value).apply()
+
+    /**
+     * V31: el modo caminata/salida/cita bloquea notificaciones por defecto; si el usuario
+     * activa este ajuste, la caminata deja pasar notificaciones.
+     */
+    var paseoNotificationsAllowed: Boolean
+        get() = prefs.getBoolean(KEY_PASEO_NOTIF_ALLOWED, false)
+        set(value) = prefs.edit().putBoolean(KEY_PASEO_NOTIF_ALLOWED, value).apply()
+
+    /**
+     * V31: decide si la notificación de un paquete debe ocultarse.
+     * Llamadas y mensajes de texto SIEMPRE se dejan visibles, igual que las
+     * notificaciones propias de AntiProcrastinación (temporizador y 2FA).
+     *
+     * - Enfoque, Sin Redes y Escuela/Trabajo: todo se bloquea apenas se activan.
+     * - Caminata/salida/cita: bloquea por defecto; se permite si el ajuste
+     *   "notificaciones en caminata" está activo.
+     * - Sin ningún modo: solo se bloquea con la opción "Siempre".
+     */
+    fun shouldBlockNotification(pkg: String): Boolean {
+        if (!notifBlockingEnabled) return false
+        if (pkg == appContext.packageName) return false          // temporizador y 2FA propios
+        if (LauncherUtils.getDefaultDialerPackage(appContext) == pkg) return false  // llamadas
+        if (LauncherUtils.getDefaultSmsPackage(appContext) == pkg) return false     // SMS
+
+        // Modos restrictivos: todo bloqueado.
+        if (isLocked || isNoSocialModeActive() || isWorkModeActive()) return true
+
+        // Modo caminata/salida/cita: bloquea salvo que el ajuste lo permita.
+        if (paseoModeEnabled) return !paseoNotificationsAllowed
+
+        // Sin ningún modo activo: solo con la opción "Siempre".
+        return notifBlockingAlways
+    }
+
     // Modo Enfoque: duración por defecto (5-480 min)
     var focusDefaultMinutes: Int
         get() = prefs.getInt(KEY_FOCUS_DEFAULT_MINUTES, 25).coerceIn(5, 480)
@@ -636,43 +1014,117 @@ class LockManager(context: Context) {
             prefs.edit().putString(KEY_POMODORO_PHASES, pomodoroGson.toJson(value)).apply()
         }
 
-    /** Límites (maxRestDuration, maxRestCount) según la duración total y la selección actual.
-     * Retorna (maxRestDuration, maxRestCount) para la UI. */
-    fun computePomodoroLimits(totalMinutes: Int, currentRestCount: Int, currentRestDuration: Int): Pair<Int, Int> {
-        val maxTotalRest = totalMinutes / 4
-        if (maxTotalRest < 1) return 0 to 0
-        val maxCount = (maxTotalRest / currentRestDuration.coerceAtLeast(1)).coerceAtLeast(1)
-        val maxRest = minOf(30, maxTotalRest / currentRestCount.coerceAtLeast(1)).coerceAtLeast(1)
-        return maxRest to maxCount
-    }
-
-    /** Genera las fases (work/rest) de un enfoque Pomodoro desde startTime. */
-    fun buildPomodoroSchedule(startTime: Long, totalMinutes: Int, restCount: Int, restMinutes: Int): List<PomodoroPhase> {
-        val maxTotalRest = totalMinutes / 4
-        if (maxTotalRest < 1) return emptyList()
-        val rm = restMinutes.coerceIn(1, 30)
-        val rc = restCount.coerceAtLeast(1)
-        val actualTotalRest = (rc * rm).coerceAtMost(maxTotalRest)
-        val adjustedRestMs = (actualTotalRest * 60_000L) / rc
-        val totalMs = totalMinutes * 60_000L
-        val restMs = adjustedRestMs
-        val workBlocks = rc + 1
-        val workMs = (totalMs - rc * restMs) / workBlocks
-        val phases = mutableListOf<PomodoroPhase>()
-        var t = startTime
-        for (i in 0 until rc) {
-            phases.add(PomodoroPhase("work", t, t + workMs))
-            t += workMs
-            phases.add(PomodoroPhase("rest", t, t + restMs))
-            t += restMs
-        }
-        phases.add(PomodoroPhase("work", t, t + workMs))
-        return phases
-    }
-
     /** Fase actual del Pomodoro en `now` (null si no hay Pomodoro activo). */
     fun currentPomodoroPhase(now: Long): PomodoroPhase? =
         pomodoroPhases.firstOrNull { now >= it.startTime && now < it.endTime }
+
+    // ================================================================================
+    // V32: PLAN DE ACTIVIDADES — el usuario divide el enfoque en actividades (con
+    // título y duración) y descansos colocados donde quiera. Cada cambio de segmento
+    // suena una alarma corta (~5 s).
+    // ================================================================================
+
+    var focusActivityPlan: List<FocusSegment>
+        get() {
+            val json = prefs.getString(KEY_FOCUS_ACTIVITY_PLAN, null) ?: return emptyList()
+            return try {
+                val type = object : TypeToken<List<FocusSegment>>() {}.type
+                pomodoroGson.fromJson<List<FocusSegment>>(json, type) ?: emptyList()
+            } catch (e: Exception) {
+                emptyList()
+            }
+        }
+        set(value) {
+            prefs.edit().putString(KEY_FOCUS_ACTIVITY_PLAN, pomodoroGson.toJson(value)).apply()
+        }
+
+    /** Minutos totales del plan (0 si no hay plan). */
+    val focusPlanTotalMinutes: Int
+        get() = focusActivityPlan.sumOf { it.durationMinutes.coerceAtLeast(1) }
+
+    /** Convierte el plan en fases cronológicas (work/rest) desde startTime. */
+    fun buildPlanSchedule(startTime: Long, plan: List<FocusSegment>): List<PomodoroPhase> {
+        if (plan.isEmpty()) return emptyList()
+        val phases = mutableListOf<PomodoroPhase>()
+        var t = startTime
+        for (seg in plan) {
+            val type = if (seg.type == "rest") "rest" else "work"
+            val title = if (type == "work") {
+                seg.title.trim().ifBlank { "Actividad" }
+            } else {
+                "Descanso"
+            }
+            val durMs = seg.durationMinutes.coerceIn(1, 480) * 60_000L
+            phases.add(PomodoroPhase(type, t, t + durMs, title))
+            t += durMs
+        }
+        return phases
+    }
+
+    /** Título de la actividad/descanso actual (para la pantalla de bloqueo). */
+    fun currentActivityTitle(now: Long): String {
+        val phase = currentPomodoroPhase(now) ?: return ""
+        return phase.title.ifBlank { if (phase.type == "rest") "Descanso" else "Enfoque" }
+    }
+
+    private val lastAnnouncedSegmentKey: String
+        get() = prefs.getString(KEY_FOCUS_LAST_ANNOUNCED, "") ?: ""
+
+    private fun setLastAnnouncedSegmentKey(key: String) {
+        prefs.edit().putString(KEY_FOCUS_LAST_ANNOUNCED, key).apply()
+    }
+
+    /** Comprueba si cambió el segmento actual y, si lo hizo, suena la alarma. Barato: 1 lectura. */
+    fun pollSegmentAlarm() {
+        if (!isLocked) return
+        val now = System.currentTimeMillis()
+        val phase = currentPomodoroPhase(now) ?: return
+        val key = "${phase.startTime}|${phase.endTime}|${phase.type}"
+        val last = lastAnnouncedSegmentKey
+        if (key != last) {
+            if (last.isNotEmpty()) {
+                playSegmentAlarm(now)
+            }
+            setLastAnnouncedSegmentKey(key)
+        }
+    }
+
+    @Volatile private var alarmPlayer: MediaPlayer? = null
+
+    /** Reproduce una alarma corta (~5 s) eligiendo un sonido distinto cada vez. */
+    private fun playSegmentAlarm(now: Long) {
+        val phase = currentPomodoroPhase(now)
+        try {
+            val pool = if (phase?.type == "rest") {
+                // descanso: tonos suaves
+                intArrayOf(R.raw.chime_soft, R.raw.chime_warm, R.raw.chime_bright, R.raw.pop_soft)
+            } else {
+                // cambio de actividad: timbres más claros
+                intArrayOf(
+                    R.raw.alarm_beep, R.raw.alarm_clock, R.raw.alarm_bugle,
+                    R.raw.alarm_digital_long, R.raw.chime_soft, R.raw.chime_bright
+                )
+            }
+            val resId = pool[pool.indices.random()]
+            alarmPlayer?.let {
+                try { if (it.isPlaying) it.stop() } catch (_: Exception) {}
+                try { it.release() } catch (_: Exception) {}
+            }
+            val player = MediaPlayer.create(appContext, resId) ?: return
+            player.isLooping = true
+            player.start()
+            alarmPlayer = player
+            val label = runCatching { appContext.resources.getResourceEntryName(resId) }.getOrNull() ?: "?"
+            android.util.Log.d("ZEN_PLAN", "Alarma de segmento -> $label")
+            Handler(Looper.getMainLooper()).postDelayed({
+                try { player.stop() } catch (_: Exception) {}
+                try { player.release() } catch (_: Exception) {}
+                if (alarmPlayer === player) alarmPlayer = null
+            }, 5000)
+        } catch (e: Exception) {
+            android.util.Log.e("ZEN_PLAN", "No se pudo reproducir la alarma", e)
+        }
+    }
 
     /** True si ahora mismo estamos en una fase de DESCANSO del Pomodoro. */
     val isPomodoroRestPhase: Boolean
@@ -703,18 +1155,26 @@ class LockManager(context: Context) {
         }
 
     fun startLock(durationMinutes: Int) {
-        val endTime = System.currentTimeMillis() + (durationMinutes * 60 * 1000)
+        val now = System.currentTimeMillis()
+        val plan = focusActivityPlan
+        // V32: si hay plan de actividades, el plan define la duración y las fases
+        // (los descansos ya no se generan solos: se configuran en el plan)
+        pomodoroPhases = if (plan.isNotEmpty()) {
+            buildPlanSchedule(now, plan)
+        } else {
+            emptyList()
+        }
+        val effectiveMinutes = if (plan.isNotEmpty()) focusPlanTotalMinutes else durationMinutes
+        val endTime = now + (effectiveMinutes * 60 * 1000)
         lockEndTime = endTime
+        // V32: no anunciar la primera fase al iniciar el enfoque
+        setLastAnnouncedSegmentKey(
+            pomodoroPhases.firstOrNull()?.let { "${it.startTime}|${it.endTime}|${it.type}" } ?: ""
+        )
         // Asignación aleatoria de frases (generador combinatorio, miles de variantes)
         longPhrase = PhraseGenerator.longFinish()
         mediumPhrase = PhraseGenerator.mediumTemp()
         shortPhrase = PhraseGenerator.shortFinished()
-        // V24: construir la programación Pomodoro (fases trabajo/descanso)
-        pomodoroPhases = if (pomodoroEnabled && durationMinutes >= 10) {
-            buildPomodoroSchedule(System.currentTimeMillis(), durationMinutes, pomodoroRestCount, pomodoroRestMinutes)
-        } else {
-            emptyList()
-        }
         isLocked = true
         tempUnlockEndTime = 0L
         cooldownEndTime = 0L
@@ -727,6 +1187,12 @@ class LockManager(context: Context) {
         tempUnlockEndTime = 0L
         cooldownEndTime = 0L
         pomodoroPhases = emptyList()
+        setLastAnnouncedSegmentKey("")
+        alarmPlayer?.let {
+            try { if (it.isPlaying) it.stop() } catch (_: Exception) {}
+            try { it.release() } catch (_: Exception) {}
+        }
+        alarmPlayer = null
         pushLockStateToFirebase(false, 0L)
     }
 
@@ -750,7 +1216,7 @@ class LockManager(context: Context) {
         phases.removeAt(idx)
         val updated = phases.map { p ->
             if (p.startTime >= phase.endTime) {
-                PomodoroPhase(p.type, p.startTime - remainingRest, p.endTime - remainingRest)
+                PomodoroPhase(p.type, p.startTime - remainingRest, p.endTime - remainingRest, p.title)
             } else {
                 p
             }
@@ -952,25 +1418,7 @@ class LockManager(context: Context) {
                     android.util.Log.d("ZEN_SYNC", "Bloqueo cruzado remoto aplicado desde la extensión: $remoteCross")
                 }
 
-                // V24 (Propuesta 1): aplicar ajustes Pomodoro llegados desde la extensión
-                val remotePomodoroEnabled = snapshot.child("pomodoro_enabled").getValue(Boolean::class.java)
-                val remotePomodoroWork = snapshot.child("pomodoro_work_minutes").getValue(Int::class.java)
-                val remotePomodoroRest = snapshot.child("pomodoro_rest_minutes").getValue(Int::class.java)
-                val remotePomodoroRestCount = snapshot.child("pomodoro_rest_count").getValue(Int::class.java)
-
-                if (remotePomodoroEnabled != null) {
-                    prefs.edit().putBoolean(KEY_POMODORO_ENABLED, remotePomodoroEnabled).apply()
-                }
-                if (remotePomodoroWork != null) {
-                    prefs.edit().putInt(KEY_POMODORO_WORK_MINUTES, remotePomodoroWork.coerceIn(1, POMODORO_MAX_WORK_MINUTES)).apply()
-                }
-                if (remotePomodoroRest != null) {
-                    prefs.edit().putInt(KEY_POMODORO_REST_MINUTES, remotePomodoroRest.coerceIn(1, POMODORO_MAX_REST_MINUTES)).apply()
-                }
-                if (remotePomodoroRestCount != null) {
-                    prefs.edit().putInt(KEY_POMODORO_REST_COUNT, remotePomodoroRestCount.coerceIn(1, 6)).apply()
-                }
-
+                // V32: los ajustes Pomodoro remotos se eliminaron (descansos via plan)
                 if (remoteCross != null) {
                     remoteConfigCallback?.invoke(
                         darkModeEnabled,

@@ -50,7 +50,8 @@ import kotlinx.coroutines.withContext
 fun AppDrawerScreen(
     onBack: () -> Unit,
     lockManager: LockManager? = null,
-    workModeActive: Boolean = false
+    workModeActive: Boolean = false,
+    noSocialActive: Boolean = false
 ) {
     val context = LocalContext.current
     var apps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
@@ -101,10 +102,14 @@ fun AppDrawerScreen(
                         color = ZenCharcoal
                     )
                     Text(
-                        text = if (workModeActive)
-                            "Modo Escuela activo: WhatsApp y videollamadas disponibles"
-                        else
-                            "Al tocar una app que distrae verás un aviso; tú decides si abrirla",
+                        text = when {
+                            noSocialActive ->
+                                "Modo Sin Redes activo: solo WhatsApp (30 min) y llamadas"
+                            workModeActive ->
+                                "Modo Escuela activo: WhatsApp y videollamadas disponibles"
+                            else ->
+                                "Al tocar una app que distrae verás un aviso; tú decides si abrirla"
+                        },
                         fontSize = 11.sp,
                         color = ZenSage
                     )
@@ -161,11 +166,14 @@ fun AppDrawerScreen(
                     horizontalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     items(filtered, key = { it.packageName }) { app ->
-                        // Solo en Modo Escuela las distractoras se atenúan/bloquean
-                        // (WhatsApp y videollamadas quedan libres con sus reglas).
-                        val blocked = app.isDistraction &&
+                        // Bloqueo según el modo activo:
+                        // - Escuela/Trabajo: distractoras atenuadas (WhatsApp/videollamadas libres).
+                        // - Sin Redes: RRSS/juegos/navegadores bloqueados, WhatsApp con límite.
+                        val workBlocked = app.isDistraction &&
                             workModeActive &&
                             !LauncherUtils.isWorkModeAppAllowed(app.packageName)
+                        val noSocialBlocked = lockManager?.isNoSocialPackageBlockedNow(app.packageName) == true
+                        val blocked = workBlocked || noSocialBlocked
                         AppLogo(
                             app = app,
                             isBlocked = blocked,
@@ -222,11 +230,16 @@ fun AppDrawerScreen(
             },
             text = {
                 val isWhatsAppTimeout = workModeActive && LauncherUtils.isWhatsApp(app.packageName)
+                val isNoSocialBlock = lockManager?.isNoSocialPackageBlockedNow(app.packageName) == true
                 Text(
-                    text = if (isWhatsAppTimeout)
-                        "Agotaste el tiempo de WhatsApp en el Modo Escuela/Trabajo.\n\nVuelve a tus clases o trabajo; podrás usarla de nuevo en el próximo bloque."
-                    else
-                        "${app.label} está atenuada porque distrae.\n\n¿De verdad la necesitas ahora o solo buscas perder el tiempo?",
+                    text = when {
+                        isWhatsAppTimeout ->
+                            "Agotaste el tiempo de WhatsApp en el Modo Escuela/Trabajo.\n\nVuelve a tus clases o trabajo; podrás usarla de nuevo en el próximo bloque."
+                        isNoSocialBlock ->
+                            "${app.label} no está disponible durante el Modo Sin Redes.\n\nVuelve cuando termine, o pide una tregua de 5 minutos desde Modos."
+                        else ->
+                            "${app.label} está atenuada porque distrae.\n\n¿De verdad la necesitas ahora o solo buscas perder el tiempo?"
+                    },
                     fontSize = 13.sp,
                     lineHeight = 19.sp,
                     color = ZenSage

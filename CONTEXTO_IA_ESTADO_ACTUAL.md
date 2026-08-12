@@ -1,4 +1,4 @@
-# CONTEXTO IA — Estado actual del proyecto AntiProcrastinacion-NuevoUI (V29)
+# CONTEXTO IA — Estado actual del proyecto AntiProcrastinacion-NuevoUI (V31)
 
 > Este archivo es el punto de reanudación. Si el chat se compacta o se abre uno
 > nuevo, leer este archivo ANTES de hacer cualquier cambio.
@@ -13,8 +13,143 @@ C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI
 
 - adb: `F:\codigo\A\android-sdk\platform-tools\adb.exe`
 - Paquete: `com.antiprocrastinacion.lock`
-- `app/build.gradle.kts`: `versionCode = 242`, `versionName = "26.0.0"` (NO se subió la versión en las últimas builds; los respaldos van como `AntiProcrastinacion-v26.x.x.apk`).
-- Último build instalado y respaldado: `AntiProcrastinacion-v26.1.1.apk` (== `app-debug.apk`).
+- `app/build.gradle.kts`: `versionCode = 243`, `versionName = "26.2.0"`.
+- Último build instalado y respaldado: `app-debug.apk` (== v26.2.0, instalado 11/08/2026).
+
+## V31 — AHORRO DE BATERÍA AUTOMÁTICO (sincronizado con los modos)
+
+Especificación: al activarse CUALQUIER modo (Enfoque, Sin Redes, Escuela/Trabajo o
+Paseo) → activar el ahorro de batería del sistema; al salir todos los modos →
+apagarlo si el usuario no lo tenía encendido antes.
+
+### Descubrimiento clave (verificado por adb, 11/08/2026)
+- El TECNO LI7 (HiOS/Android 15) exige `android.permission.WRITE_SECURE_SETTINGS`
+  (nivel signature/privilegiado) para escribir `low_power` en `Settings.Secure/Global`.
+  La app SOLO puede pedir `WRITE_SETTINGS` ("Modificar ajustes del sistema").
+- Verificado vía shell: `settings put global low_power 1` SÍ funciona (shell tiene
+  WRITE_SECURE_SETTINGS), así que la clave es correcta; solo falta el permiso.
+- CONCLUSIÓN: el cambio SILENCIOSO del ahorro de batería es IMPOSIBLE en este
+  dispositivo sin root. En dispositivos AOSP "limpios" sí puede funcionar con WRITE_SETTINGS.
+
+### Solución implementada en `LockManager.kt`
+- `syncBatterySaver()` (se llama desde el bucle del servicio):
+  - Rate-limit de reintento: solo intenta escribir si cambió el estado de los modos o
+    si pasaron 10 minutos (`lastBatteryShouldBeOn`, `lastBatteryAttemptMs`). Esto evita
+    el spam de logs/errores cada 500 ms que había antes.
+  - Guarda el estado previo (`KEY_BATTERY_SAVER_PREV_STATE`) para restaurarlo al salir.
+  - Al fallar (WRITE_SECURE_SETTINGS denegado) muestra `showBatterySaverNudge()`.
+- `showBatterySaverNudge()`: notificación ÚNICA por sesión de modo (canal
+  `zen_battery_nudge`, ID 1002) que abre `Settings.ACTION_BATTERY_SAVER_SETTINGS`
+  para que el usuario active el ahorro manualmente. Se resetea al salir de todos
+  los modos (`KEY_BATTERY_SAVER_NUDGE_SHOWN`).
+- Clave nueva: `KEY_BATTERY_SAVER_NUDGE_SHOWN`. Imports añadidos: NotificationChannel,
+  NotificationManager, PendingIntent, Build, NotificationCompat.
+
+### Estado de la prueba en TECNO LI7
+- App instalada (v26.2.0). El ahorro de batería AUTOMÁTICO no puede activarse en este
+  dispositivo; el flujo esperado es: entrar a un modo → aparece el aviso → el usuario
+  toca y activa el ahorro manualmente en Ajustes. Para probar el aviso: activar
+  cualquier modo y mirar la bandeja de notificaciones (ID 1002).
+- Pendiente de verificación en vivo: que el aviso se muestre una sola vez por modo y
+  no se repita al reintentar (rate-limit 10 min).
+
+## V31 — BLOQUEO DE NOTIFICACIONES (rediseñado según pedido del usuario, 11/08/2026)
+
+Modelo acordado (preguntado y confirmado por el usuario):
+- **Llamadas y SMS siempre pasan**, igual que las notificaciones propias de la app.
+- **Enfoque, Sin Redes y Escuela/Trabajo: bloquean TODO** apenas se activan
+  (antes cada modo tenía sus excepciones; ahora nada más entrar el modo, todo se oculta).
+- **Caminata/salida/cita (Paseo): bloquea por defecto**, pero hay un ajuste en Config
+  para permitir notificaciones ahí.
+- **Sin ningún modo**: se bloquea solo con la opción "Siempre" activa.
+- Ajustes nuevos en Config > Bloqueo de notificaciones:
+  - Alcance: **"Solo con modos"** (defecto) vs **"Siempre"** (bloquea sin modo también).
+  - **"Permitir notificaciones en caminata"** (switch, defecto OFF).
+
+### Cambios de código
+- `LockManager.kt`:
+  - Claves nuevas: `notif_blocking_always`, `paseo_notifications_allowed`
+    (propiedades `notifBlockingAlways`, `paseoNotificationsAllowed`).
+  - `shouldBlockNotification()` reescrito: ahora el orden es
+    master switch → propias/llamadas/SMS → modo restrictivo → caminata → "siempre".
+    Ya no usa `isNoSocialTempUnlocked`/`isNoSocialAllBlocked`/`isNoSocialAppBlocked`/
+    `isWorkModeAppAllowed`/`isDopamineWalkPackage`/`isMusicPackage` (esas funciones se
+    conservan para el bloqueo de USO, no de notificaciones).
+- `ZenNotificationListenerService.kt`: añadido log diagnóstico
+  `Log.d("ZEN_NOTIF_BLOCK", "Recibida notificación de <pkg>")` al inicio de
+  `onNotificationPosted` (facilita la verificación; sin él los logs solo salen al bloquear).
+- `ConfigScreen.kt`: selector de alcance (2 pills "Solo con modos"/"Siempre") y switch
+  de caminata dentro de la tarjeta SISTEMA > Bloqueo de notificaciones. Textos actualizados.
+
+### Verificación EN VIVO (TECNO LI7, 11/08/2026) — ÉXITO
+- Con Sin Redes + Trabajo activos, un amigo envió mensajes de WhatsApp y llegó una de
+  Instagram: logcat mostró para cada notificación
+  `Recibida notificación de com.whatsapp` + `Bloqueada notificación de com.whatsapp`
+  (y com.instagram.android), ocultándose en ~5-15 ms. Listener conectado
+  (`ServiceRecord` c:android, proxy en `dumpsys notification`).
+- NOTA de prueba: `cmd notification post` SIEMPRE atribuye a `com.android.shell`
+  (uid 2000), no al paquete indicado → NO sirve para probar el bloqueo. Usar
+  notificaciones reales y `adb logcat -s ZEN_NOTIF_BLOCK:*`.
+
+## V32 - PLAN DE ACTIVIDADES DEL MODO ENFOQUE + ALARMAS (11/08/2026)
+
+Especificación del usuario: en un enfoque, uno divide el tiempo en varias actividades
+(con aviso por alarma) y coloca el descanso en el momento que quiere; puede seguir con
+la misma actividad o dividir el resto del tiempo. Cada cambio de segmento suena una
+alarma corta (~5 s). Sonidos: MÁS descargados que generados (8 total: 5 descargados
+CC0 + 3 generados por código).
+
+### Modelo
+- `FocusSegment(type, title, durationMinutes)` en `LockManager.kt`; `type` = "work"/"rest".
+- `PomodoroPhase` ahora lleva `title` opcional (default "") → compatible con JSON viejo.
+- Claves: `focus_activity_plan_json` (lista de segmentos), `focus_last_announced_segment`.
+
+### Cambios de código
+- `LockManager.kt`:
+  - `focusActivityPlan` (getter/setter JSON con Gson), `focusPlanTotalMinutes`.
+  - `buildPlanSchedule(startTime, plan)` → List<PomodoroPhase> con títulos.
+  - `startLock()`: si hay plan → el plan define duración y fases; si NO hay plan → sin
+    descansos (emptyList). Resetea `focus_last_announced_segment` a la 1ª fase (la primera
+    actividad no suena).
+  - `pollSegmentAlarm()` (barato, 1 lectura de pref): detecta cambio de segmento y llama
+    `playSegmentAlarm()`; `lastAnnouncedSegmentKey` en prefs sobrevive reinicios del servicio.
+  - `playSegmentAlarm()`: MediaPlayer con un sonido ALEATORIO de `res/raw` (descanso →
+    tonos suaves; actividad → timbres claros), looping, se detiene y libera a los 5 s.
+    `stopLock()` corta cualquier alarma en curso.
+  - `endPomodoroRestNow()` conserva el `title` al reprogramar fases.
+  - ELIMINADO el Pomodoro automático (a petición del usuario): se quitaron
+    `pomodoroEnabled`, `pomodoroWorkMinutes`, `pomodoroRestMinutes`, `pomodoroRestCount`,
+    `computePomodoroLimits`, `buildPomodoroSchedule`, las claves KEY_POMODORO_ENABLED/
+    _WORK/_REST_*, `POMODORO_MAX_*` y su sync por Firebase/LanServer. Los descansos ahora
+    SOLO salen del plan de actividades.
+- `LockMonitoringService.kt`: `lockManager.pollSegmentAlarm()` en cada pasada del bucle
+  (junto a `syncBatterySaver`).
+- `ModosScreen.kt` (`ModeCard` + `FocusPlanEditor` + `FocusPlanRow`):
+  - Botón "Crear plan de actividades" (siembra Actividad 1 + Descanso con la duración de los steppers).
+  - Si hay plan: oculta los steppers y muestra el editor (título editable, duración +/-, borrar,
+    añadir Actividad/Descanso, "Quitar" plan). El botón pasa a "Iniciar plan (X min)".
+  - LÍMITE de descansos: máximo 15% del total del plan (antes 25%). El botón "+" y
+    "Agregar descanso" se deshabilitan al llegar al límite; aviso en rojo.
+  - Estado `focusPlan` persistido vía `lockManager.focusActivityPlan`.
+- `ConfigScreen.kt`: ELIMINADA la sección "Descansos" (Pomodoro) de AJUSTES GENERALES y su
+  tarjeta de configuración — los descansos se configuran únicamente en el plan de actividades.
+- `LanServer.kt`: ya no publica `pomodoro_enabled/work/rest/count`; solo comparte `phases`.
+- `ZenScreen.kt`: píldora "ACTIVIDAD ACTUAL: <título>" durante el bloqueo (solo si hay plan;
+  en descanso se muestra el banner verde de tregua libre existente).
+
+### Sonidos (app/src/main/res/raw)
+- Descargados (biblioteca de sonidos de Google Actions): `alarm_beep.ogg`, `alarm_clock.ogg`,
+  `alarm_bugle.ogg`, `alarm_digital_long.ogg`, `pop_soft.ogg`.
+- Generados por código (PowerShell, síntesis sinusoidal con armónicos y decaimiento):
+  `chime_soft.wav`, `chime_warm.wav`, `chime_bright.wav`. Script: `gen_chimes.ps1` en Temp.
+
+### Estado de la prueba
+- Compilación OK (`:app:compileDebugKotlin` y `:app:assembleDebug` BUILD SUCCESSFUL).
+- Instalado en TECNO LI7 (11/08/2026, 2º build del día): sección "Descansos" de Ajustes
+  eliminada + límite de descansos al 15% en el plan. PENDIENTE prueba en vivo:
+  crear un plan (con descansos), verificar que el límite del 15% corta los descansos,
+  iniciar enfoque y comprobar el título en la pantalla de bloqueo y la alarma al cambiar
+  de segmento. Logs: `adb logcat -s ZEN_PLAN:*`.
 
 ## MÉTODO DE TRABAJO (obligatorio)
 
@@ -119,3 +254,22 @@ OJO con estos glitches del entorno (no son errores de la app):
 Si el contexto se pierde otra vez: leer ESTE archivo, `Estructura de la App para
 proximos cambios.md` (especificación de modos) y `ORDEN_E_INSTRUCCIONES_DEL_USUARIO.txt`.
 La ruta del proyecto es `C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI`.
+
+## DÓNDE ESTÁN LAS INSTRUCCIONES (importante para un chat nuevo)
+
+Los archivos de instrucciones están en la MISMA carpeta del proyecto NUEVO:
+
+```
+C:\Users\USUARIO\Documents\AntiProcrastinacion-NuevoUI\
+    ORDEN_E_INSTRUCCIONES_DEL_USUARIO.txt
+    PLAN_DE_ACCION_Y_ESPECIFICACIONES.md
+    CONTEXTO_PROYECTO_IA.txt
+    Estructura de la App para proximos cambios.md
+    PLAN_DE_IMPLEMENTACION_V24_1.md
+    CONFIGURACION_ENTORNO_IA.txt
+    INSTRUCCION_MENU_PERFIL_Y_AJUSTES.txt
+```
+
+NOTA: la carpeta vieja `C:\Users\USUARIO\Documents\AntiProcrastinacion\` tiene COPIA
+IDÉNTICA de estos archivos (mismos MD5, verificados 11/08/2026), pero NO es la carpeta
+de trabajo. Trabajar SIEMPRE en `AntiProcrastinacion-NuevoUI`.

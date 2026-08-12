@@ -990,7 +990,15 @@ layout select_dialog_multichoice_material
 layout select_dialog_singlechoice_material
 layout support_simple_spinner_dropdown_item
 layout zen_widget
+raw alarm_beep
+raw alarm_bugle
+raw alarm_clock
+raw alarm_digital_long
+raw chime_bright
+raw chime_soft
+raw chime_warm
 raw firebase_common_keep
+raw pop_soft
 string abc_action_bar_home_description
 string abc_action_bar_up_description
 string abc_action_menu_overflow_description

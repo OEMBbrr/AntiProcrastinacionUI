@@ -83,10 +83,7 @@ class LanServer(
         put("is_lan", true)
         // V28: tregua activa (desbloqueo temporal / descanso Pomodoro); 0 si no hay
         put("tregua_until", if (lockManager.isTempUnlocked) lockManager.tempUnlockEndTime else 0L)
-        put("pomodoro_enabled", lockManager.pomodoroEnabled)
-        put("pomodoro_work_minutes", lockManager.pomodoroWorkMinutes)
-        put("pomodoro_rest_minutes", lockManager.pomodoroRestMinutes)
-        put("pomodoro_rest_count", lockManager.pomodoroRestCount)
+        // V32: los ajustes Pomodoro se eliminaron; solo se comparten las fases del plan
         put("phases", JSONArray().apply {
             lockManager.pomodoroPhases.forEach { p ->
                 put(JSONObject().apply {

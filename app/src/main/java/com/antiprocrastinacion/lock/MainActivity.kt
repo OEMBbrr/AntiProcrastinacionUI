@@ -31,6 +31,7 @@ import com.antiprocrastinacion.lock.ui.launcher.SleepCycleScreen
 import com.antiprocrastinacion.lock.ui.theme.AntiProcrastinacionTheme
 import com.antiprocrastinacion.lock.ui.theme.AccentPresets
 import com.antiprocrastinacion.lock.ui.theme.ZenTheme
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 // V24 (Propuesta 4): FragmentActivity para poder usar BiometricPrompt (biometría/PIN)
@@ -43,6 +44,10 @@ class MainActivity : FragmentActivity() {
     private var configVersion by mutableStateOf(0)
     // V29: estado del Modo Paseo (activa/desactiva a voluntad, sin temporizador)
     private var paseoActive by mutableStateOf(false)
+    // V30: estado del Modo Sin Redes (activo con tiempo programado, no se puede cancelar)
+    private var noSocialActive by mutableStateOf(false)
+    // V30: toggle manual de la escala de grises PROPIA de la app (botón del home)
+    private var appGrayscaleManual by mutableStateOf(false)
     // V25: pantalla actual del launcher ("launcher" | "drawer" | "notes" | "sleep" | "organizer" | "config" | "zen")
     private var currentScreen by mutableStateOf("launcher")
     // V24 (Propuesta 2): solicitud de tregua entrante desde el PC (null = ninguna)
@@ -64,6 +69,7 @@ class MainActivity : FragmentActivity() {
                 isLockedState = true
                 isTempUnlockedState = false
                 LockMonitoringService.startService(this)
+                ZenNotificationListenerService.requestRefresh(this)
                 currentScreen = "zen"
             }
             ZenWidgetProvider.ACTION_OPEN_NOTES -> {
@@ -87,7 +93,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        lockManager = LockManager(this)
+        lockManager = LockManager.getInstance(this)
         // V26: acciones lanzadas desde el widget de escritorio
         handleWidgetIntent(intent)
 
@@ -107,6 +113,8 @@ class MainActivity : FragmentActivity() {
         isTempUnlockedState = lockManager.isTempUnlocked
         darkTheme = lockManager.darkModeEnabled
         paseoActive = lockManager.paseoModeEnabled
+        noSocialActive = lockManager.isNoSocialModeActive()
+        appGrayscaleManual = lockManager.appGrayscaleManualEnabled
         // V26: cargar el acento del sistema elegido en Ajustes -> Colores
         ZenTheme.accent = AccentPresets.byKey(lockManager.accentPresetKey)
 
@@ -161,7 +169,38 @@ class MainActivity : FragmentActivity() {
                 val togglePaseo: () -> Unit = {
                     lockManager.paseoModeEnabled = !lockManager.paseoModeEnabled
                     paseoActive = lockManager.paseoModeEnabled
+                    ZenNotificationListenerService.requestRefresh(this@MainActivity)
                 }
+
+                // V30: iniciar el Modo Sin Redes (no se puede cancelar hasta que acabe)
+                val startNoSocial: (Int) -> Unit = { minutes ->
+                    lockManager.startNoSocialMode(minutes)
+                    noSocialActive = true
+                    LockMonitoringService.startService(this@MainActivity)
+                    ZenNotificationListenerService.requestRefresh(this@MainActivity)
+                }
+                val noSocialTregua: () -> Unit = {
+                    lockManager.startNoSocialTregua()
+                }
+
+                // V30: refrescar cada segundo el estado del Modo Sin Redes (expira solo)
+                LaunchedEffect(Unit) {
+                    while (true) {
+                        noSocialActive = lockManager.isNoSocialModeActive()
+                        delay(1000)
+                    }
+                }
+
+                // V30: toggle manual de la escala de grises PROPIA de la app (botón del home).
+                // Desatura solo la interfaz de AntiProcrastinación; no toca otras apps.
+                val toggleAppGrayscale: () -> Unit = {
+                    lockManager.appGrayscaleManualEnabled = !lockManager.appGrayscaleManualEnabled
+                    appGrayscaleManual = lockManager.appGrayscaleManualEnabled
+                }
+
+                // V30: la escala de grises PROPIA de la app se aplica al launcher, al cajón
+                // y a la pantalla del Modo Enfoque (Sin Redes, Paseo, Escuela/Trabajo y toggle).
+                val appGrayscale = lockManager.isAppGrayscaleActive()
 
                 LaunchedEffect(isLockedState) {
                     currentScreen = if (isLockedState) "zen" else "launcher"
@@ -169,23 +208,30 @@ class MainActivity : FragmentActivity() {
 
                 when (currentScreen) {
                     "launcher" -> {
-                        LauncherScreen(
-                            lockManager = lockManager,
-                            onOpenNotes = { currentScreen = "notes" },
-                            onOpenSleepCycle = { currentScreen = "sleep" },
-                            onOpenOrganizer = { currentScreen = "organizer" },
-                            onOpenAppDrawer = { currentScreen = "drawer" },
-                            onOpenSettings = { currentScreen = "config" },
-                            onOpenModes = { currentScreen = "modos" },
-                            onStartFocus = { minutes ->
-                                lockManager.startLock(minutes)
-                                isLockedState = true
-                                isTempUnlockedState = false
-                                LockMonitoringService.startService(this@MainActivity)
-                            },
-                            paseoActive = paseoActive,
-                            onTogglePaseo = togglePaseo
-                        )
+                        AppGrayscaleWrapper(enabled = appGrayscale) {
+                            LauncherScreen(
+                                lockManager = lockManager,
+                                onOpenNotes = { currentScreen = "notes" },
+                                onOpenSleepCycle = { currentScreen = "sleep" },
+                                onOpenOrganizer = { currentScreen = "organizer" },
+                                onOpenAppDrawer = { currentScreen = "drawer" },
+                                onOpenSettings = { currentScreen = "config" },
+                                onOpenModes = { currentScreen = "modos" },
+                                onStartFocus = { minutes ->
+                                    lockManager.startLock(minutes)
+                                    isLockedState = true
+                                    isTempUnlockedState = false
+                                    LockMonitoringService.startService(this@MainActivity)
+                                },
+                                paseoActive = paseoActive,
+                                onTogglePaseo = togglePaseo,
+                                noSocialActive = noSocialActive,
+                                onStartNoSocial = startNoSocial,
+                                onNoSocialTregua = noSocialTregua,
+                                appGrayscaleManualEnabled = appGrayscaleManual,
+                                onToggleAppGrayscale = toggleAppGrayscale
+                            )
+                        }
                     }
                     "modos" -> {
                         ModosScreen(
@@ -197,15 +243,23 @@ class MainActivity : FragmentActivity() {
                                 LockMonitoringService.startService(this@MainActivity)
                             },
                             paseoActive = paseoActive,
-                            onTogglePaseo = togglePaseo
+                            onTogglePaseo = togglePaseo,
+                            lockManager = lockManager,
+                            onOpenSettings = { currentScreen = "config" },
+                            noSocialActive = noSocialActive,
+                            onStartNoSocial = startNoSocial,
+                            onNoSocialTregua = noSocialTregua
                         )
                     }
                     "drawer" -> {
-                        AppDrawerScreen(
-                            onBack = { currentScreen = "launcher" },
-                            lockManager = lockManager,
-                            workModeActive = lockManager.isWorkModeActive()
-                        )
+                        AppGrayscaleWrapper(enabled = appGrayscale) {
+                            AppDrawerScreen(
+                                onBack = { currentScreen = "launcher" },
+                                lockManager = lockManager,
+                                workModeActive = lockManager.isWorkModeActive(),
+                                noSocialActive = noSocialActive
+                            )
+                        }
                     }
                     "notes" -> {
                         NotesAppScreen(
@@ -252,15 +306,17 @@ class MainActivity : FragmentActivity() {
                         )
                     }
                     "zen" -> {
-                        ZenScreen(
-                            lockManager = lockManager,
-                            onUnlocked = {
-                                isLockedState = false
-                                isTempUnlockedState = false
-                                // V20: el servicio sigue en modo escucha para bloqueos cruzados
-                                finish()
-                            }
-                        )
+                        AppGrayscaleWrapper(enabled = appGrayscale) {
+                            ZenScreen(
+                                lockManager = lockManager,
+                                onUnlocked = {
+                                    isLockedState = false
+                                    isTempUnlockedState = false
+                                    // V20: el servicio sigue en modo escucha para bloqueos cruzados
+                                    finish()
+                                }
+                            )
+                        }
                     }
                 }
 

@@ -18,6 +18,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Apps
 import androidx.compose.material.icons.filled.Bedtime
@@ -26,6 +27,7 @@ import androidx.compose.material.icons.filled.Checklist
 import androidx.compose.material.icons.filled.DirectionsWalk
 import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.Palette
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Settings
@@ -37,6 +39,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -74,7 +77,12 @@ fun LauncherScreen(
     onOpenModes: () -> Unit,
     onStartFocus: (Int) -> Unit,
     paseoActive: Boolean,
-    onTogglePaseo: () -> Unit
+    onTogglePaseo: () -> Unit,
+    noSocialActive: Boolean = false,
+    onStartNoSocial: (Int) -> Unit = {},
+    onNoSocialTregua: () -> Unit = {},
+    appGrayscaleManualEnabled: Boolean = false,
+    onToggleAppGrayscale: () -> Unit = {}
 ) {
     val context = androidx.compose.ui.platform.LocalContext.current
     val currentPhrase = remember { MotivationalPhrases.getRandomPhrase() }
@@ -133,6 +141,17 @@ fun LauncherScreen(
             // ---- RELOJ (widget principal del home) ----
             ClockWidget(now = now)
 
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // ---- V30: Toggle manual de la escala de grises PROPIA de la app ----
+            // No se puede apagar mientras haya un modo activo que la fuerce.
+            val grayscaleForcedByMode = paseoActive || noSocialActive || lockManager.isWorkModeActive()
+            AppGrayscalePill(
+                enabled = appGrayscaleManualEnabled || grayscaleForcedByMode,
+                lockedOn = grayscaleForcedByMode,
+                onToggle = onToggleAppGrayscale
+            )
+
             Spacer(modifier = Modifier.height(20.dp))
 
             // ---- Widget: Modo Enfoque (steppers horas/minutos) ----
@@ -142,6 +161,17 @@ fun LauncherScreen(
 
             // ---- Widget: Modo Paseo (activa/desactiva a voluntad) ----
             PaseoModeWidget(paseoActive = paseoActive, onTogglePaseo = onTogglePaseo)
+
+            Spacer(modifier = Modifier.height(14.dp))
+
+            // ---- Widget: Modo Sin Redes (bloqueo de RRSS con límites) ----
+            NoSocialModeWidget(
+                lockManager = lockManager,
+                active = noSocialActive,
+                onStartNoSocial = onStartNoSocial,
+                onNoSocialTregua = onNoSocialTregua,
+                onOpenModes = onOpenModes
+            )
 
             Spacer(modifier = Modifier.height(14.dp))
 
@@ -304,6 +334,65 @@ private fun ClockWidget(now: LocalTime) {
             fontSize = 15.sp,
             color = LchMuted,
             fontWeight = FontWeight.Medium
+        )
+    }
+}
+
+/** V30: píldora compacta para activar a voluntad la escala de grises PROPIA de la app
+ *  (desatura solo la interfaz del launcher). `lockedOn` bloquea el switch: no se puede
+ *  apagar mientras haya un modo activo que fuerce el gris. */
+@Composable
+private fun AppGrayscalePill(
+    enabled: Boolean,
+    lockedOn: Boolean,
+    onToggle: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(20.dp))
+            .background(if (enabled) LchAccent.copy(alpha = 0.14f) else LchWidgetBg)
+            .border(1.dp, if (enabled) LchAccent.copy(alpha = 0.5f) else LchWidgetBorder, RoundedCornerShape(20.dp))
+            .padding(horizontal = 14.dp, vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(30.dp)
+                .clip(RoundedCornerShape(9.dp))
+                .background(LchAccent.copy(alpha = 0.16f)),
+            contentAlignment = Alignment.Center
+        ) {
+            Icon(
+                imageVector = Icons.Default.Palette,
+                contentDescription = null,
+                tint = LchAccent,
+                modifier = Modifier.size(17.dp)
+            )
+        }
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = "Escala de grises",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.Bold,
+                color = LchText
+            )
+            Text(
+                text = when {
+                    lockedOn -> "Forzado por un modo activo"
+                    enabled -> "Solo la interfaz de la app"
+                    else -> "Solo la interfaz de la app"
+                },
+                fontSize = 10.sp,
+                color = if (enabled) LchAccent else LchMuted
+            )
+        }
+        Switch(
+            checked = enabled,
+            onCheckedChange = { if (!lockedOn) onToggle() },
+            enabled = !lockedOn,
+            modifier = Modifier.scale(0.8f)
         )
     }
 }
@@ -507,6 +596,142 @@ private fun PaseoModeWidget(
             color = if (paseoActive) LchAccent else LchMuted,
             textAlign = TextAlign.Center
         )
+    }
+}
+
+/**
+ * V30: Widget del Modo Sin Redes. Muestra el estado en vivo (activo, cooldown,
+ * tregua) con un botón de tregua. Cuando está inactivo, abre la pantalla de
+ * Modos para configurar la duración.
+ */
+@Composable
+private fun NoSocialModeWidget(
+    lockManager: LockManager,
+    active: Boolean,
+    onStartNoSocial: (Int) -> Unit,
+    onNoSocialTregua: () -> Unit,
+    onOpenModes: () -> Unit
+) {
+    var tick by remember { mutableIntStateOf(0) }
+    LaunchedEffect(active) {
+        while (active) {
+            delay(1_000)
+            tick++
+        }
+    }
+
+    val inCooldown = lockManager.isNoSocialAllBlocked()
+    val inTregua = lockManager.isNoSocialTempUnlocked()
+    val treguaCooldown = lockManager.isNoSocialTreguaCooldown()
+
+    val subtitle = when {
+        !active -> "Sin RRSS 30 min · tregua 5 min"
+        inCooldown -> "Cooldown ${LockManager.NOSOCIAL_ALL_BLOCKED_MINUTES} min: todo bloqueado"
+        inTregua -> "Tregua activa: quedan ${(lockManager.noSocialTreguaRemainingMs() / 60_000L).coerceAtLeast(1)} min"
+        else -> "Activo: quedan ${(lockManager.noSocialRemainingMs() / 60_000L).coerceAtLeast(1)} min"
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(28.dp))
+            .background(if (active) LchWarm.copy(alpha = 0.14f) else LchWidgetBg)
+            .border(1.dp, if (active) LchWarm.copy(alpha = 0.5f) else LchWidgetBorder, RoundedCornerShape(28.dp))
+            .padding(18.dp),
+        horizontalAlignment = Alignment.CenterHorizontally
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(LchWarm.copy(alpha = 0.16f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Icon(
+                    imageVector = Icons.Default.VisibilityOff,
+                    contentDescription = null,
+                    tint = LchWarm,
+                    modifier = Modifier.size(20.dp)
+                )
+            }
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "MODO SIN REDES",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = LchWarm,
+                    letterSpacing = 0.8.sp
+                )
+                Text(
+                    text = subtitle,
+                    fontSize = 11.sp,
+                    color = LchMuted,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+        Spacer(modifier = Modifier.height(10.dp))
+
+        if (active) {
+            Text(
+                text = when {
+                    inCooldown -> "Superaste el límite de 30 min de WhatsApp. Sin tregua disponible."
+                    else -> "WhatsApp permitido (30 min). RRSS, juegos y navegadores bloqueados."
+                },
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                color = LchWarm,
+                textAlign = TextAlign.Center
+            )
+            if (!inCooldown) {
+                Button(
+                    onClick = onNoSocialTregua,
+                    enabled = !treguaCooldown,
+                    modifier = Modifier.fillMaxWidth().height(40.dp),
+                    shape = RoundedCornerShape(14.dp),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = LchWarm,
+                        contentColor = Color.White,
+                        disabledContainerColor = LchWarm.copy(alpha = 0.3f),
+                        disabledContentColor = LchMuted
+                    )
+                ) {
+                    Text(
+                        text = when {
+                            inTregua -> "Tregua activa"
+                            treguaCooldown -> "Tregua en cooldown"
+                            else -> "Pedir tregua (5 min)"
+                        },
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        } else {
+            Text(
+                text = "No se puede desactivar una vez iniciado. Toca para configurar la duración.",
+                fontSize = 11.sp,
+                color = LchMuted,
+                textAlign = TextAlign.Center
+            )
+            Button(
+                onClick = onOpenModes,
+                modifier = Modifier.fillMaxWidth().height(40.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = LchWidgetBg,
+                    contentColor = LchText
+                )
+            ) {
+                Text("Configurar en Modos", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+            }
+        }
     }
 }
 

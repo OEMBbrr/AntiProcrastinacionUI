@@ -1,6 +1,8 @@
 package com.antiprocrastinacion.lock.ui.screens
 
 import android.content.pm.PackageManager
+import android.content.Intent
+import android.provider.Settings
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -19,6 +21,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
 import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.BatterySaver
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DarkMode
@@ -27,6 +30,7 @@ import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.KeyboardArrowDown
 import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.NotificationsOff
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material.icons.filled.School
@@ -52,6 +56,7 @@ import androidx.core.content.ContextCompat
 import com.antiprocrastinacion.lock.AppInfo
 import com.antiprocrastinacion.lock.LauncherUtils
 import com.antiprocrastinacion.lock.LockManager
+import com.antiprocrastinacion.lock.ZenNotificationListenerService
 import com.antiprocrastinacion.lock.ui.theme.*
 import kotlinx.coroutines.*
 import java.util.concurrent.Executor
@@ -93,11 +98,6 @@ fun ConfigScreen(
     var syncTestResult by remember { mutableStateOf<String?>(null) }
     var manualKeyInput by remember { mutableStateOf(lockManager.userSyncKey) }
 
-    // V24: Ajustes Pomodoro sincronizados
-    var pomodoroEnabled by remember { mutableStateOf(false) }
-    var pomodoroRestMinutes by remember { mutableIntStateOf(5) }
-    var pomodoroRestCount by remember { mutableIntStateOf(1) }
-
     // Estados de permisos
     var hasUsageStats by remember { mutableStateOf(LauncherUtils.hasUsageStatsPermission(context)) }
 
@@ -125,12 +125,15 @@ fun ConfigScreen(
     var paseoDopamineMinutes by remember { mutableIntStateOf(lockManager.paseoDopamineMinutes) }
     var paseoWhatsAppMinutes by remember { mutableIntStateOf(lockManager.paseoWhatsAppMinutes) }
     var paseoMusicBlocked by remember { mutableStateOf(lockManager.paseoMusicBlocked) }
+    // V31: estado de permisos de sistema (ahorro de batería y bloqueo de notificaciones)
+    var canWriteSettings by remember { mutableStateOf(lockManager.canWriteSystemSettings()) }
+    var notifListenerEnabled by remember { mutableStateOf(ZenNotificationListenerService.isEnabled(context)) }
+    var notifBlockingEnabled by remember { mutableStateOf(lockManager.notifBlockingEnabled) }
+    var notifBlockingAlways by remember { mutableStateOf(lockManager.notifBlockingAlways) }
+    var paseoNotificationsAllowed by remember { mutableStateOf(lockManager.paseoNotificationsAllowed) }
 
     // Carga inicial
     LaunchedEffect(Unit) {
-        pomodoroEnabled = lockManager.pomodoroEnabled
-        pomodoroRestMinutes = lockManager.pomodoroRestMinutes
-        pomodoroRestCount = lockManager.pomodoroRestCount
         withContext(Dispatchers.IO) {
             installedApps = LauncherUtils.getInstalledApps(context)
         }
@@ -145,9 +148,6 @@ fun ConfigScreen(
     // V20.2: refrescar ajustes si cambiaron desde la extensión / otro dispositivo
     LaunchedEffect(configVersion) {
         crossDeviceLockEnabled = lockManager.crossDeviceLockEnabled
-        pomodoroEnabled = lockManager.pomodoroEnabled
-        pomodoroRestMinutes = lockManager.pomodoroRestMinutes
-        pomodoroRestCount = lockManager.pomodoroRestCount
         workModeEnabled = lockManager.workModeEnabled
         focusDefaultMinutes = lockManager.focusDefaultMinutes
         noSocialDefaultMinutes = lockManager.noSocialDefaultMinutes
@@ -155,6 +155,18 @@ fun ConfigScreen(
         paseoDopamineMinutes = lockManager.paseoDopamineMinutes
         paseoWhatsAppMinutes = lockManager.paseoWhatsAppMinutes
         paseoMusicBlocked = lockManager.paseoMusicBlocked
+    }
+
+    // V31: mantener al día los permisos de sistema al volver de Ajustes
+    LaunchedEffect(Unit) {
+        while (true) {
+            canWriteSettings = lockManager.canWriteSystemSettings()
+            notifListenerEnabled = ZenNotificationListenerService.isEnabled(context)
+            notifBlockingEnabled = lockManager.notifBlockingEnabled
+            notifBlockingAlways = lockManager.notifBlockingAlways
+            paseoNotificationsAllowed = lockManager.paseoNotificationsAllowed
+            delay(1000)
+        }
     }
 
     // V24 (Propuesta 5): proteger TODOS los ajustes durante sesión activa (local o remota)
@@ -1155,7 +1167,242 @@ fun ConfigScreen(
                     }
                 }
 
-                // AJUSTES GENERALES (Modo Oscuro / Bloqueo Cruzado / Descansos)
+                // V31: AHORRO DE BATERÍA AUTOMÁTICO
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                    border = BorderStroke(1.dp, ZenSage.copy(alpha = 0.2f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.BatterySaver, contentDescription = null, tint = ZenOlive)
+                            Column {
+                                Text(
+                                    text = "SISTEMA",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = ZenOlive,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Ahorro de batería automático",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                                    color = ZenCharcoal
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Al activar cualquier modo (Enfoque, Sin Redes, Escuela/Trabajo o Paseo) se enciende el ahorro de batería del sistema para reducir el consumo. Se apaga solo cuando terminan todos los modos.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = ZenSage
+                        )
+                        if (canWriteSettings) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = ZenGreen)
+                                Text(
+                                    text = "Permiso concedido: el ahorro se activa solo con cada modo.",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                    color = ZenGreen
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    try {
+                                        context.startActivity(lockManager.openWriteSettingsIntent())
+                                    } catch (e: Exception) {
+                                        // Ajustes de sistema no disponibles
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Conceder permiso: Modificar ajustes del sistema", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = "Necesario para poder activar el ahorro de batería automáticamente. Sin él, los modos funcionan igual pero sin ahorro de energía.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = ZenCoral
+                            )
+                        }
+                    }
+                }
+
+                // V31: BLOQUEO DE NOTIFICACIONES
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = RoundedCornerShape(16.dp),
+                    colors = CardDefaults.cardColors(containerColor = ZenWhite),
+                    border = BorderStroke(1.dp, ZenSage.copy(alpha = 0.2f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        verticalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Icon(Icons.Default.NotificationsOff, contentDescription = null, tint = ZenOlive)
+                            Column {
+                                Text(
+                                    text = "SISTEMA",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    color = ZenOlive,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = "Bloqueo de notificaciones",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 14.sp, fontWeight = FontWeight.Bold),
+                                    color = ZenCharcoal
+                                )
+                            }
+                        }
+                        Text(
+                            text = "Se ocultan las notificaciones al activarse Enfoque, Sin Redes o Escuela/Trabajo. Llamadas y SMS siempre llegan. Puedes activarlo siempre o solo con los modos, y elegir si la caminata deja pasar notificaciones.",
+                            style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp),
+                            color = ZenSage
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Bloquear notificaciones",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                                    color = ZenCharcoal
+                                )
+                            }
+                            Switch(
+                                checked = notifBlockingEnabled,
+                                onCheckedChange = { newValue ->
+                                    notifBlockingEnabled = newValue
+                                    lockManager.notifBlockingEnabled = newValue
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = ZenOlive,
+                                    uncheckedTrackColor = ZenSage.copy(alpha = 0.3f),
+                                    checkedThumbColor = ZenWhite
+                                )
+                            )
+                        }
+                        Text(
+                            text = "Alcance del bloqueo",
+                            style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                            color = ZenCharcoal,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            listOf(
+                                false to "Solo con modos",
+                                true to "Siempre"
+                            ).forEach { (always, label) ->
+                                val sel = notifBlockingAlways == always
+                                Box(
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .clip(RoundedCornerShape(10.dp))
+                                        .background(if (sel) ZenOlive else ZenSage.copy(alpha = 0.12f))
+                                        .clickable {
+                                            notifBlockingAlways = always
+                                            lockManager.notifBlockingAlways = always
+                                        }
+                                        .padding(vertical = 10.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = label,
+                                        fontSize = 12.sp,
+                                        fontWeight = if (sel) FontWeight.Bold else FontWeight.Medium,
+                                        color = if (sel) ZenWhite else ZenCharcoal
+                                    )
+                                }
+                            }
+                        }
+                        Row(
+                            modifier = Modifier.fillMaxWidth().padding(top = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = "Permitir notificaciones en caminata",
+                                    style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium),
+                                    color = ZenCharcoal
+                                )
+                                Text(
+                                    text = "El modo caminata/salida/cita bloquea por defecto; actívalo para dejar pasar notificaciones ahí.",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                    color = ZenSage
+                                )
+                            }
+                            Switch(
+                                checked = paseoNotificationsAllowed,
+                                onCheckedChange = { newValue ->
+                                    paseoNotificationsAllowed = newValue
+                                    lockManager.paseoNotificationsAllowed = newValue
+                                },
+                                colors = SwitchDefaults.colors(
+                                    checkedTrackColor = ZenOlive,
+                                    uncheckedTrackColor = ZenSage.copy(alpha = 0.3f),
+                                    checkedThumbColor = ZenWhite
+                                )
+                            )
+                        }
+                        if (notifListenerEnabled) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Icon(Icons.Default.Check, contentDescription = null, tint = ZenGreen)
+                                Text(
+                                    text = "Activo: el bloqueo de notificaciones está funcionando.",
+                                    style = MaterialTheme.typography.bodySmall.copy(fontSize = 11.sp, fontWeight = FontWeight.Bold),
+                                    color = ZenGreen
+                                )
+                            }
+                        } else {
+                            Button(
+                                onClick = {
+                                    try {
+                                        context.startActivity(
+                                            Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS)
+                                        )
+                                    } catch (e: Exception) {
+                                        // Ajustes no disponibles
+                                    }
+                                },
+                                colors = ButtonDefaults.buttonColors(containerColor = ZenOlive),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Text("Activar Acceso a notificaciones", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                            }
+                            Text(
+                                text = "AntiProcrastinación necesita este permiso de sistema para ocultar las notificaciones mientras hay un modo activo.",
+                                style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
+                                color = ZenCoral
+                            )
+                        }
+                    }
+                }
+
+                // AJUSTES GENERALES (Modo Oscuro / Bloqueo Cruzado)
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(16.dp),
@@ -1269,120 +1516,11 @@ fun ConfigScreen(
                                 )
                             )
                         }
-
-                        HorizontalDivider(color = ZenSage.copy(alpha = 0.15f))
-
-                        // Toggle Descansos (Pomodoro)
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            verticalAlignment = Alignment.CenterVertically,
-                            horizontalArrangement = Arrangement.SpaceBetween
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(10.dp),
-                                modifier = Modifier.weight(1f)
-                            ) {
-                                Icon(Icons.Default.Timer, contentDescription = null, tint = ZenOlive)
-                                Column {
-                                    Text(
-                                        text = "Descansos",
-                                        style = MaterialTheme.typography.bodyMedium.copy(fontSize = 13.sp, fontWeight = FontWeight.Medium, color = ZenCharcoal)
-                                    )
-                                    Text(
-                                        text = "Configura ciclos de trabajo y descansos.",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                        color = ZenSage
-                                    )
-                                }
-                            }
-                            Switch(
-                                checked = pomodoroEnabled,
-                                onCheckedChange = { newValue ->
-                                    executeWithAuthIfNeeded {
-                                        pomodoroEnabled = newValue
-                                        lockManager.pomodoroEnabled = newValue
-                                    }
-                                },
-                                colors = SwitchDefaults.colors(
-                                    checkedTrackColor = ZenOlive,
-                                    uncheckedTrackColor = ZenSage.copy(alpha = 0.3f),
-                                    checkedThumbColor = ZenWhite
-                                )
-                            )
-                        }
                     }
                 }
 
-                // V24: Configuración de Descansos (Pomodoro) — aparece con el toggle activo
-                if (pomodoroEnabled) {
-                    Card(
-                        modifier = Modifier.fillMaxWidth(),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = ZenSoftGreen),
-                        border = BorderStroke(1.dp, ZenGreen.copy(alpha = 0.35f)),
-                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
-                    ) {
-                        Column(
-                            modifier = Modifier.padding(14.dp),
-                            verticalArrangement = Arrangement.spacedBy(10.dp)
-                        ) {
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Icon(Icons.Default.Timer, contentDescription = null, tint = ZenGreen)
-                                Column {
-                                    Text(
-                                        text = "DESCANSOS",
-                                        style = MaterialTheme.typography.labelLarge,
-                                        color = ZenGreen,
-                                        fontWeight = FontWeight.Bold
-                                    )
-                                    Text(
-                                        text = "Comparte ciclos de trabajo y descanso con la extensión.",
-                                        style = MaterialTheme.typography.bodySmall.copy(fontSize = 10.sp),
-                                        color = ZenSage
-                                    )
-                                }
-                            }
-
-                            SettingStepper(
-                                label = "Descansos",
-                                value = pomodoroRestCount,
-                                unit = "",
-                                step = 1,
-                                onChanged = { newVal ->
-                                    executeWithAuthIfNeeded {
-                                        pomodoroRestCount = newVal.coerceIn(1, 6)
-                                        lockManager.pomodoroRestCount = pomodoroRestCount
-                                    }
-                                }
-                            )
-
-                            SettingStepper(
-                                label = "Cada descanso",
-                                value = pomodoroRestMinutes,
-                                unit = "min",
-                                step = 1,
-                                onChanged = { newVal ->
-                                    executeWithAuthIfNeeded {
-                                        pomodoroRestMinutes = newVal.coerceIn(1, LockManager.POMODORO_MAX_REST_MINUTES)
-                                        lockManager.pomodoroRestMinutes = pomodoroRestMinutes
-                                    }
-                                }
-                            )
-
-                            Text(
-                                text = "Los descansos se aplican automáticamente al iniciar un enfoque de 10 minutos o más.",
-                                fontSize = 11.sp,
-                                color = ZenSage,
-                                textAlign = TextAlign.Center,
-                                modifier = Modifier.fillMaxWidth()
-                            )
-                        }
-                    }
-                }
+                // V32: los descansos ya se configuran en el plan de actividades
+                // (Modo Enfoque) — la sección Pomodoro de ajustes se eliminó.
 
                 // Selección de Apps Permitidas (Máximo 4)
                 Column {

@@ -30,6 +30,14 @@ id widget_open_notes
 id widget_subtitle
 id widget_title
 layout zen_widget
+raw alarm_beep
+raw alarm_bugle
+raw alarm_clock
+raw alarm_digital_long
+raw chime_bright
+raw chime_soft
+raw chime_warm
+raw pop_soft
 string app_name
 string default_web_client_id
 string gcm_defaultSenderId
