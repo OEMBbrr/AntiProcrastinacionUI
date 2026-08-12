@@ -26,7 +26,38 @@ import kotlinx.coroutines.*
 data class PomodoroPhase(val type: String, val startTime: Long, val endTime: Long, val title: String = "")
 
 // V32: segmento del plan de actividades (trabajo con título o descanso) del Modo Enfoque
-data class FocusSegment(val type: String, val title: String, val durationMinutes: Int)
+// V33: una actividad puede llevar descansos INTERNOS (se restan de su tiempo, la actividad
+// se divide en bloques iguales) y los descansos pueden ser EXTERNOS (entre actividades,
+// se suman al total). Un descanso exterior exige una actividad después.
+data class FocusSegment(
+    val type: String,
+    val title: String,
+    val durationMinutes: Int,
+    val internalBreakCount: Int = 0,
+    val internalBreakMinutes: Int = 5
+)
+
+/** V33: valida el plan. Devuelve null si es válido o un mensaje de error si no. */
+fun validateFocusPlan(plan: List<FocusSegment>): String? {
+    if (plan.isEmpty()) return null
+    if (plan.none { it.type != "rest" }) return "El plan necesita al menos una actividad."
+    if (plan.first().type == "rest") return "El plan no puede empezar con un descanso."
+    if (plan.last().type == "rest") return "Un descanso exterior necesita una actividad después: quítalo o añade otra actividad."
+    for (i in 0 until plan.size - 1) {
+        if (plan[i].type == "rest" && plan[i + 1].type == "rest") {
+            return "No pueden ir dos descansos exteriores seguidos."
+        }
+    }
+    for (seg in plan) {
+        if (seg.type == "rest") continue
+        val n = seg.internalBreakCount.coerceAtLeast(0)
+        val bm = seg.internalBreakMinutes.coerceAtLeast(1)
+        if (n > 0 && n * bm >= seg.durationMinutes) {
+            return "'${seg.title.ifBlank { "Actividad" }}': los descansos internos (${n * bm} min) superan su tiempo (${seg.durationMinutes} min)."
+        }
+    }
+    return null
+}
 
 class LockManager private constructor(context: Context) {
     // V31: contexto de aplicación (para WRITE_SETTINGS, dialer/SMS y clasificación de apps)
@@ -1042,24 +1073,48 @@ class LockManager private constructor(context: Context) {
     val focusPlanTotalMinutes: Int
         get() = focusActivityPlan.sumOf { it.durationMinutes.coerceAtLeast(1) }
 
-    /** Convierte el plan en fases cronológicas (work/rest) desde startTime. */
+    /** Convierte el plan en fases cronológicas (work/rest) desde startTime.
+     * V33: los descansos internos dividen su actividad en bloques iguales (se restan
+     * de su tiempo); los descansos exteriores se suman al total y van entre actividades. */
     fun buildPlanSchedule(startTime: Long, plan: List<FocusSegment>): List<PomodoroPhase> {
-        if (plan.isEmpty()) return emptyList()
+        if (validateFocusPlan(plan) != null) return emptyList()
         val phases = mutableListOf<PomodoroPhase>()
         var t = startTime
         for (seg in plan) {
-            val type = if (seg.type == "rest") "rest" else "work"
-            val title = if (type == "work") {
-                seg.title.trim().ifBlank { "Actividad" }
+            if (seg.type == "rest") {
+                val durMs = seg.durationMinutes.coerceIn(1, 480) * 60_000L
+                phases.add(PomodoroPhase("rest", t, t + durMs, "Descanso"))
+                t += durMs
             } else {
-                "Descanso"
+                val title = seg.title.trim().ifBlank { "Actividad" }
+                val n = seg.internalBreakCount.coerceIn(0, 6)
+                val bm = seg.internalBreakMinutes.coerceIn(1, 60)
+                val slotMs = seg.durationMinutes.coerceIn(1, 480) * 60_000L
+                val workMs = (slotMs - n * bm * 60_000L).coerceAtLeast(0L)
+                val perBlock = workMs / (n + 1)
+                for (i in 0 until n) {
+                    phases.add(PomodoroPhase("work", t, t + perBlock, title))
+                    t += perBlock
+                    phases.add(PomodoroPhase("rest", t, t + bm * 60_000L, "Descanso"))
+                    t += bm * 60_000L
+                }
+                phases.add(PomodoroPhase("work", t, t + perBlock, title))
+                t += perBlock
             }
-            val durMs = seg.durationMinutes.coerceIn(1, 480) * 60_000L
-            phases.add(PomodoroPhase(type, t, t + durMs, title))
-            t += durMs
         }
         return phases
     }
+
+    /** Minutos efectivos de TRABAJO del plan (actividades menos sus descansos internos). */
+    val focusPlanWorkMinutes: Int
+        get() = focusActivityPlan.sumOf { seg ->
+            if (seg.type == "rest") 0
+            else {
+                val n = seg.internalBreakCount.coerceAtLeast(0)
+                val bm = seg.internalBreakMinutes.coerceAtLeast(1)
+                (seg.durationMinutes - n * bm).coerceAtLeast(0)
+            }
+        }
 
     /** Título de la actividad/descanso actual (para la pantalla de bloqueo). */
     fun currentActivityTitle(now: Long): String {
@@ -1157,14 +1212,14 @@ class LockManager private constructor(context: Context) {
     fun startLock(durationMinutes: Int) {
         val now = System.currentTimeMillis()
         val plan = focusActivityPlan
-        // V32: si hay plan de actividades, el plan define la duración y las fases
-        // (los descansos ya no se generan solos: se configuran en el plan)
-        pomodoroPhases = if (plan.isNotEmpty()) {
+        val planValid = plan.isNotEmpty() && validateFocusPlan(plan) == null
+        // V32/V33: si hay plan válido, el plan define la duración y las fases
+        pomodoroPhases = if (planValid) {
             buildPlanSchedule(now, plan)
         } else {
             emptyList()
         }
-        val effectiveMinutes = if (plan.isNotEmpty()) focusPlanTotalMinutes else durationMinutes
+        val effectiveMinutes = if (planValid) focusPlanTotalMinutes else durationMinutes
         val endTime = now + (effectiveMinutes * 60 * 1000)
         lockEndTime = endTime
         // V32: no anunciar la primera fase al iniciar el enfoque

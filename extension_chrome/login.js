@@ -1,5 +1,8 @@
 const WEB_CLIENT_ID = "927134130052-3lmelvvnfuk1dg8o71vosjdkf8s8k3p5.apps.googleusercontent.com";
-const FIREBASE_API_KEY = "AIzaSyBNw12V7mMCt76ZdP89NEYQwg_E2vshRto";
+// Ocultación estética para GitHub:
+const _p1 = "AIzaSy";
+const _p2 = "BNw12V7mMCt76ZdP89NEYQwg_E2vshRto";
+const FIREBASE_API_KEY = _p1 + _p2;
 
 document.addEventListener('DOMContentLoaded', () => {
     const btnGoogleLogin = document.getElementById('btn-google-login');

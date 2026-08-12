@@ -91,51 +91,56 @@ Modelo acordado (preguntado y confirmado por el usuario):
   (uid 2000), no al paquete indicado → NO sirve para probar el bloqueo. Usar
   notificaciones reales y `adb logcat -s ZEN_NOTIF_BLOCK:*`.
 
-## V32 - PLAN DE ACTIVIDADES DEL MODO ENFOQUE + ALARMAS (11/08/2026)
+## V32/V33 - PLAN DE ACTIVIDADES DEL MODO ENFOQUE + ALARMAS (11/08/2026)
 
-Especificación del usuario: en un enfoque, uno divide el tiempo en varias actividades
-(con aviso por alarma) y coloca el descanso en el momento que quiere; puede seguir con
-la misma actividad o dividir el resto del tiempo. Cada cambio de segmento suena una
-alarma corta (~5 s). Sonidos: MÁS descargados que generados (8 total: 5 descargados
-CC0 + 3 generados por código).
+Especificación del usuario (V33, confirmado con 2 preguntas):
+- **Descanso DENTRO de una actividad**: se RESTA del tiempo de la actividad y esta se
+  divide en bloques iguales. Ej: 2 h con 2 descansos de 20 min → 3 bloques de ~26 min.
+- **Descanso ENTRE actividades (exterior)**: se SUMA al total. Ej: 50 + descanso 10 +
+  20 = 80 min de enfoque.
+- Total del enfoque = suma de actividades (slot completo) + descansos exteriores.
+- **Validación**: un descanso exterior necesita una actividad DESPUÉS; si queda al final
+  (o el plan empieza con descanso, o hay 2 descansos exteriores seguidos, o los descansos
+  internos superan el tiempo de su actividad) → el plan NO se puede iniciar y se muestra
+  el motivo en rojo. Botón "!" abre la ayuda explicando las reglas.
+- Alarmas: AUTOMÁTICAS en cada cambio (actividad→descanso→actividad). Ya no hay opción manual.
+- NOTA: el límite del 15% del V32 quedó OBSOLETO con este modelo (se elimina).
 
 ### Modelo
-- `FocusSegment(type, title, durationMinutes)` en `LockManager.kt`; `type` = "work"/"rest".
-- `PomodoroPhase` ahora lleva `title` opcional (default "") → compatible con JSON viejo.
-- Claves: `focus_activity_plan_json` (lista de segmentos), `focus_last_announced_segment`.
+- `FocusSegment(type, title, durationMinutes, internalBreakCount=0, internalBreakMinutes=5)`
+  en `LockManager.kt`; `type` = "work"/"rest" (rest = descanso exterior).
+- `validateFocusPlan(plan): String?` (top-level): devuelve el error o null.
+- `PomodoroPhase` lleva `title` opcional. Claves: `focus_activity_plan_json`,
+  `focus_last_announced_segment`.
 
 ### Cambios de código
 - `LockManager.kt`:
-  - `focusActivityPlan` (getter/setter JSON con Gson), `focusPlanTotalMinutes`.
-  - `buildPlanSchedule(startTime, plan)` → List<PomodoroPhase> con títulos.
-  - `startLock()`: si hay plan → el plan define duración y fases; si NO hay plan → sin
-    descansos (emptyList). Resetea `focus_last_announced_segment` a la 1ª fase (la primera
-    actividad no suena).
-  - `pollSegmentAlarm()` (barato, 1 lectura de pref): detecta cambio de segmento y llama
-    `playSegmentAlarm()`; `lastAnnouncedSegmentKey` en prefs sobrevive reinicios del servicio.
-  - `playSegmentAlarm()`: MediaPlayer con un sonido ALEATORIO de `res/raw` (descanso →
-    tonos suaves; actividad → timbres claros), looping, se detiene y libera a los 5 s.
-    `stopLock()` corta cualquier alarma en curso.
-  - `endPomodoroRestNow()` conserva el `title` al reprogramar fases.
-  - ELIMINADO el Pomodoro automático (a petición del usuario): se quitaron
-    `pomodoroEnabled`, `pomodoroWorkMinutes`, `pomodoroRestMinutes`, `pomodoroRestCount`,
-    `computePomodoroLimits`, `buildPomodoroSchedule`, las claves KEY_POMODORO_ENABLED/
-    _WORK/_REST_*, `POMODORO_MAX_*` y su sync por Firebase/LanServer. Los descansos ahora
-    SOLO salen del plan de actividades.
-- `LockMonitoringService.kt`: `lockManager.pollSegmentAlarm()` en cada pasada del bucle
-  (junto a `syncBatterySaver`).
-- `ModosScreen.kt` (`ModeCard` + `FocusPlanEditor` + `FocusPlanRow`):
-  - Botón "Crear plan de actividades" (siembra Actividad 1 + Descanso con la duración de los steppers).
-  - Si hay plan: oculta los steppers y muestra el editor (título editable, duración +/-, borrar,
-    añadir Actividad/Descanso, "Quitar" plan). El botón pasa a "Iniciar plan (X min)".
-  - LÍMITE de descansos: máximo 15% del total del plan (antes 25%). El botón "+" y
-    "Agregar descanso" se deshabilitan al llegar al límite; aviso en rojo.
-  - Estado `focusPlan` persistido vía `lockManager.focusActivityPlan`.
+  - `buildPlanSchedule()` V33: expande cada actividad en (n+1) bloques de trabajo con n
+    descansos internos entre medias (el trabajo = duración − n·bm, repartido en bloques
+    iguales); los descansos exteriores pasan como fases "rest" entre actividades.
+  - `focusPlanWorkMinutes`: minutos efectivos de trabajo (actividades − descansos internos).
+  - `startLock()`: usa el plan SOLO si `validateFocusPlan() == null`; el total = suma de
+    segmentos. Resetea `focus_last_announced_segment` a la 1ª fase.
+  - `pollSegmentAlarm()` + `playSegmentAlarm()` (igual que V32): sonido aleatorio ~5 s en
+    cada cambio de segmento; `stopLock()` corta la alarma.
+  - ELIMINADO el Pomodoro automático (petición del usuario, V32): `pomodoroEnabled`,
+    `pomodoroWorkMinutes`, `pomodoroRestMinutes`, `pomodoroRestCount`,
+    `computePomodoroLimits`, `buildPomodoroSchedule`, claves KEY_POMODORO_ENABLED/_WORK/
+    _REST_*, `POMODORO_MAX_*` y su sync por Firebase/LanServer. Los descansos SOLO salen del plan.
+- `LockMonitoringService.kt`: `lockManager.pollSegmentAlarm()` en cada pasada del bucle.
+- `ModosScreen.kt` (`ModeCard` + `FocusPlanEditor` + `FocusActivityRow` + `FocusBreakRow`):
+  - "Crear plan de actividades" siembra UNA actividad (sin descanso colgante).
+  - Actividad: título editable + duración (+/-) + "Descansos dentro: [n] × [bm min]" con
+    vista previa "→ N bloques de ~X min".
+  - Descanso exterior: fila verde "Descanso (entre actividades)", solo se puede añadir si
+    la última fila es una actividad; se suma al total.
+  - Botón "!" (círculo) abre AlertDialog con las reglas. Botón "Quitar" elimina el plan.
+  - Errores de validación en rojo + botón "Iniciar plan (X min)" deshabilitado si es inválido.
 - `ConfigScreen.kt`: ELIMINADA la sección "Descansos" (Pomodoro) de AJUSTES GENERALES y su
-  tarjeta de configuración — los descansos se configuran únicamente en el plan de actividades.
+  tarjeta — los descansos se configuran únicamente en el plan de actividades.
 - `LanServer.kt`: ya no publica `pomodoro_enabled/work/rest/count`; solo comparte `phases`.
-- `ZenScreen.kt`: píldora "ACTIVIDAD ACTUAL: <título>" durante el bloqueo (solo si hay plan;
-  en descanso se muestra el banner verde de tregua libre existente).
+- `ZenScreen.kt`: píldora "ACTIVIDAD ACTUAL: <título>" (solo con plan; en descanso sale el
+  banner verde de tregua libre).
 
 ### Sonidos (app/src/main/res/raw)
 - Descargados (biblioteca de sonidos de Google Actions): `alarm_beep.ogg`, `alarm_clock.ogg`,
@@ -143,13 +148,17 @@ CC0 + 3 generados por código).
 - Generados por código (PowerShell, síntesis sinusoidal con armónicos y decaimiento):
   `chime_soft.wav`, `chime_warm.wav`, `chime_bright.wav`. Script: `gen_chimes.ps1` en Temp.
 
-### Estado de la prueba
-- Compilación OK (`:app:compileDebugKotlin` y `:app:assembleDebug` BUILD SUCCESSFUL).
-- Instalado en TECNO LI7 (11/08/2026, 2º build del día): sección "Descansos" de Ajustes
-  eliminada + límite de descansos al 15% en el plan. PENDIENTE prueba en vivo:
-  crear un plan (con descansos), verificar que el límite del 15% corta los descansos,
-  iniciar enfoque y comprobar el título en la pantalla de bloqueo y la alarma al cambiar
-  de segmento. Logs: `adb logcat -s ZEN_PLAN:*`.
+### Estado de la prueba (V33)
+- Compilación OK (`:app:compileDebugKotlin` + `:app:assembleDebug` BUILD SUCCESSFUL).
+- Instalado en TECNO LI7 (11/08/2026, 3º build del día) con el nuevo editor de plan.
+- PENDIENTE prueba en vivo (2 escenarios):
+  1. Actividad + descanso interno → verificar el desglose "N bloques de ~X min" y que la
+     actividad totaliza su duración (con las treguas dentro).
+  2. Actividad 50 + descanso exterior 10 + actividad 20 → verificar que el total suma 80,
+     que al quitar la última actividad el plan queda inválido (mensaje + botón deshabilitado),
+     y que suena la alarma en cada cambio de segmento.
+  - Logs: `adb logcat -s ZEN_PLAN:*`. Si el plan guardado de pruebas anteriores era
+    inválido (descanso final colgante), el botón Iniciar saldrá deshabilitado a propósito.
 
 ## MÉTODO DE TRABAJO (obligatorio)
 

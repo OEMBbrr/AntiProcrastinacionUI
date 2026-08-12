@@ -2,6 +2,7 @@ package com.antiprocrastinacion.lock.ui.launcher
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
@@ -33,6 +34,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.antiprocrastinacion.lock.FocusSegment
 import com.antiprocrastinacion.lock.LockManager
+import com.antiprocrastinacion.lock.validateFocusPlan
 import com.antiprocrastinacion.lock.ui.theme.*
 import kotlinx.coroutines.delay
 import java.util.Locale
@@ -201,13 +203,31 @@ private fun ModeCard(
             }
 
             if (hasPlan) {
-                // V32: plan de actividades definido — el plan manda sobre los steppers
+                // V32/V33: plan de actividades definido — el plan manda sobre los steppers
+                val planWork = plan.filter { it.type != "rest" }.sumOf {
+                    val n = it.internalBreakCount.coerceAtLeast(0)
+                    val bm = it.internalBreakMinutes.coerceAtLeast(1)
+                    (it.durationMinutes - n * bm).coerceAtLeast(0)
+                }
+                val planError = validateFocusPlan(plan)
                 FocusPlanEditor(
                     plan = plan,
                     planTotal = planTotal,
+                    planWork = planWork,
+                    error = planError,
                     accent = accent,
                     onPlanChange = onPlanChange
                 )
+                if (planError != null) {
+                    Text(
+                        text = planError,
+                        fontSize = 12.sp,
+                        fontWeight = FontWeight.Medium,
+                        color = ZenCoral,
+                        textAlign = TextAlign.Center,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
                 Button(
                     onClick = { if (planTotal > 0) onStart(planTotal) },
                     modifier = Modifier
@@ -218,10 +238,10 @@ private fun ModeCard(
                         containerColor = accent,
                         contentColor = if (accent.luminance() > 0.5f) Color(0xFF1B252E) else Color.White
                     ),
-                    enabled = planTotal > 0
+                    enabled = planTotal > 0 && planError == null
                 ) {
                     Text(
-                        text = "Iniciar plan ($planTotal min)",
+                        text = if (planTotal > 0) "Iniciar plan ($planTotal min)" else "Iniciar plan",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold
                     )
@@ -277,10 +297,7 @@ private fun ModeCard(
                 OutlinedButton(
                     onClick = {
                         onPlanChange(
-                            listOf(
-                                FocusSegment("work", "Actividad 1", totalMinutes.coerceAtLeast(1)),
-                                FocusSegment("rest", "", 5)
-                            )
+                            listOf(FocusSegment("work", "Actividad 1", totalMinutes.coerceAtLeast(1)))
                         )
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -302,21 +319,22 @@ private fun ModeCard(
 }
 
 /**
- * V32: Editor del plan de actividades. Cada fila es una actividad (con título) o un
- * descanso; el usuario decide cuántos y dónde. Total = suma de todas las filas.
+ * V33: Editor del plan de actividades.
+ * - Actividades: título + duración + descansos INTERNOS (se restan, la actividad se
+ *   divide en bloques iguales).
+ * - Descansos EXTERNOS: van entre actividades y se SUMAN al total. Solo se pueden
+ *   añadir si la última fila es una actividad.
  */
 @Composable
 private fun FocusPlanEditor(
     plan: List<FocusSegment>,
     planTotal: Int,
+    planWork: Int,
+    error: String?,
     accent: Color,
     onPlanChange: (List<FocusSegment>) -> Unit
 ) {
-    // V32: los descansos no pueden superar el 15% del total del plan
-    val total = planTotal
-    val breakMinutes = plan.filter { it.type == "rest" }.sumOf { it.durationMinutes.coerceAtLeast(1) }
-    val maxBreakMinutes = (total * 15 / 100).coerceAtLeast(1)
-    val breaksFull = breakMinutes >= maxBreakMinutes
+    var showHelp by remember { mutableStateOf(false) }
 
     Column(
         modifier = Modifier
@@ -326,7 +344,7 @@ private fun FocusPlanEditor(
             .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = "PLAN DE ACTIVIDADES",
@@ -336,11 +354,22 @@ private fun FocusPlanEditor(
                     letterSpacing = 0.5.sp
                 )
                 Text(
-                    text = "Cada actividad y descanso suena una alarma de 5 s al comenzar. Total: $total min. Descansos: $breakMinutes de máx $maxBreakMinutes min (15%).",
+                    text = "Total: $planTotal min · Trabajo: $planWork min. Alarma automática en cada cambio.",
                     fontSize = 11.sp,
                     lineHeight = 14.sp,
                     color = ZenSage
                 )
+            }
+            // Botón de ayuda "!"
+            Box(
+                modifier = Modifier
+                    .size(30.dp)
+                    .clip(CircleShape)
+                    .border(1.dp, accent.copy(alpha = 0.6f), CircleShape)
+                    .clickable { showHelp = true },
+                contentAlignment = Alignment.Center
+            ) {
+                Text(text = "!", color = accent, fontWeight = FontWeight.Bold, fontSize = 15.sp)
             }
             TextButton(onClick = { onPlanChange(emptyList()) }) {
                 Text(text = "Quitar", fontSize = 12.sp, color = ZenSage)
@@ -348,17 +377,28 @@ private fun FocusPlanEditor(
         }
 
         plan.forEachIndexed { index, seg ->
-            FocusPlanRow(
-                seg = seg,
-                accent = accent,
-                canIncreaseBreak = !breaksFull,
-                onUpdate = { updated ->
-                    onPlanChange(plan.toMutableList().also { it[index] = updated })
-                },
-                onDelete = {
-                    onPlanChange(plan.toMutableList().also { it.removeAt(index) })
-                }
-            )
+            if (seg.type == "rest") {
+                FocusBreakRow(
+                    seg = seg,
+                    onUpdate = { updated ->
+                        onPlanChange(plan.toMutableList().also { it[index] = updated })
+                    },
+                    onDelete = {
+                        onPlanChange(plan.toMutableList().also { it.removeAt(index) })
+                    }
+                )
+            } else {
+                FocusActivityRow(
+                    seg = seg,
+                    accent = accent,
+                    onUpdate = { updated ->
+                        onPlanChange(plan.toMutableList().also { it[index] = updated })
+                    },
+                    onDelete = {
+                        onPlanChange(plan.toMutableList().also { it.removeAt(index) })
+                    }
+                )
+            }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -375,44 +415,71 @@ private fun FocusPlanEditor(
                 Text(text = "Actividad", fontSize = 12.sp, color = accent)
             }
             OutlinedButton(
-                onClick = {
-                    val newBreakMin = (maxBreakMinutes - breakMinutes).coerceAtLeast(1)
-                    onPlanChange(plan + FocusSegment("rest", "", newBreakMin))
-                },
-                enabled = !breaksFull,
+                onClick = { onPlanChange(plan + FocusSegment("rest", "", 5)) },
+                enabled = plan.isNotEmpty() && plan.last().type != "rest",
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
-                border = BorderStroke(1.dp, accent.copy(alpha = 0.4f))
+                border = BorderStroke(1.dp, ZenGreen.copy(alpha = 0.5f))
             ) {
-                Icon(Icons.Default.Add, contentDescription = null, tint = accent, modifier = Modifier.size(16.dp))
-                Text(text = "Descanso", fontSize = 12.sp, color = accent)
+                Icon(Icons.Default.Add, contentDescription = null, tint = if (plan.isNotEmpty() && plan.last().type != "rest") ZenGreen else ZenSage.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
+                Text(text = "Descanso", fontSize = 12.sp, color = if (plan.isNotEmpty() && plan.last().type != "rest") ZenGreen else ZenSage.copy(alpha = 0.6f))
             }
         }
-        if (breaksFull) {
+
+        if (error != null) {
             Text(
-                text = "Límite alcanzado: los descansos no pueden pasar del 15% del tiempo del plan.",
-                fontSize = 10.sp,
+                text = error,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Medium,
                 color = ZenCoral,
                 textAlign = TextAlign.Center,
                 modifier = Modifier.fillMaxWidth()
             )
         }
     }
+
+    if (showHelp) {
+        AlertDialog(
+            onDismissRequest = { showHelp = false },
+            title = {
+                Text("Cómo funciona el plan", fontWeight = FontWeight.Bold, color = ZenCharcoal)
+            },
+            text = {
+                Text(
+                    text = "• DESCANSO DENTRO de una actividad: se resta de su tiempo y la actividad se divide en bloques iguales.\nEj: actividad de 2 h con 2 descansos de 20 min → 3 bloques de ~26 min + 2 descansos.\n\n• DESCANSO ENTRE actividades: se suma al total.\nEj: actividad 50 min + descanso 10 + actividad 20 min = 80 min de enfoque.\n\nUn descanso exterior necesita una actividad después. Si queda al final, el plan no se puede iniciar.\n\nCada cambio de actividad o descanso suena una alarma automática de 5 s.",
+                    fontSize = 13.sp,
+                    lineHeight = 18.sp,
+                    color = ZenCharcoal
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = { showHelp = false }) {
+                    Text("Entendido", color = ZenOlive, fontWeight = FontWeight.Bold)
+                }
+            },
+            containerColor = ZenWhite
+        )
+    }
 }
 
-/** Fila del plan: actividad editable (título + duración) o descanso fijo (duración). */
+/** Fila de actividad: título, duración total, descansos internos y vista previa de bloques. */
 @Composable
-private fun FocusPlanRow(
+private fun FocusActivityRow(
     seg: FocusSegment,
     accent: Color,
-    canIncreaseBreak: Boolean,
     onUpdate: (FocusSegment) -> Unit,
     onDelete: () -> Unit
 ) {
-    val isWork = seg.type != "rest"
-    val rowColor = if (isWork) accent else ZenGreen
+    val n = seg.internalBreakCount.coerceIn(0, 6)
+    val bm = seg.internalBreakMinutes.coerceIn(1, 60)
+    val workPerBlock = if (n == 0) seg.durationMinutes else (seg.durationMinutes - n * bm) / (n + 1)
+
     Row(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(accent.copy(alpha = 0.06f))
+            .padding(8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(8.dp)
     ) {
@@ -420,49 +487,109 @@ private fun FocusPlanRow(
             modifier = Modifier
                 .size(9.dp)
                 .clip(CircleShape)
-                .background(rowColor)
+                .background(accent)
         )
-        Column(modifier = Modifier.weight(1f)) {
-            if (isWork) {
-                OutlinedTextField(
-                    value = seg.title,
-                    onValueChange = { onUpdate(seg.copy(title = it)) },
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(46.dp),
-                    textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
-                    singleLine = true,
-                    placeholder = { Text("Nombre de la actividad", fontSize = 12.sp) },
-                    shape = RoundedCornerShape(10.dp)
-                )
-            } else {
-                Text(
-                    text = "Descanso",
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    color = ZenCharcoal,
-                    modifier = Modifier.padding(vertical = 13.dp)
-                )
-            }
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            OutlinedTextField(
+                value = seg.title,
+                onValueChange = { onUpdate(seg.copy(title = it)) },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(42.dp),
+                textStyle = androidx.compose.ui.text.TextStyle(fontSize = 13.sp, fontWeight = FontWeight.SemiBold),
+                singleLine = true,
+                placeholder = { Text("Nombre de la actividad", fontSize = 12.sp) },
+                shape = RoundedCornerShape(10.dp)
+            )
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(4.dp)
             ) {
                 IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes - 1).coerceAtLeast(1))) }) {
-                    Icon(Icons.Default.Remove, contentDescription = "Menos", tint = rowColor, modifier = Modifier.size(18.dp))
+                    Icon(Icons.Default.Remove, contentDescription = "Menos tiempo", tint = accent, modifier = Modifier.size(16.dp))
                 }
                 Text(text = "${seg.durationMinutes} min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenCharcoal)
-                IconButton(
-                    onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(240))) },
-                    enabled = isWork || canIncreaseBreak
-                ) {
-                    Icon(Icons.Default.Add, contentDescription = "Más", tint = if (isWork || canIncreaseBreak) rowColor else ZenSage.copy(alpha = 0.4f), modifier = Modifier.size(18.dp))
+                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(480))) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Más tiempo", tint = accent, modifier = Modifier.size(16.dp))
+                }
+                Text(text = "Descansos dentro:", fontSize = 11.sp, color = ZenSage, modifier = Modifier.padding(start = 6.dp))
+                IconButton(onClick = { onUpdate(seg.copy(internalBreakCount = (n - 1).coerceAtLeast(0))) }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Menos descansos", tint = ZenGreen, modifier = Modifier.size(16.dp))
+                }
+                Text(text = "$n", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenGreen)
+                IconButton(onClick = { onUpdate(seg.copy(internalBreakCount = (n + 1).coerceAtMost(6))) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Más descansos", tint = ZenGreen, modifier = Modifier.size(16.dp))
+                }
+                if (n > 0) {
+                    IconButton(onClick = { onUpdate(seg.copy(internalBreakMinutes = (bm - 1).coerceAtLeast(1))) }) {
+                        Icon(Icons.Default.Remove, contentDescription = "Menos duración", tint = ZenGreen, modifier = Modifier.size(16.dp))
+                    }
+                    Text(text = "$bm min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenGreen)
+                    IconButton(onClick = { onUpdate(seg.copy(internalBreakMinutes = (bm + 1).coerceAtMost(30))) }) {
+                        Icon(Icons.Default.Add, contentDescription = "Más duración", tint = ZenGreen, modifier = Modifier.size(16.dp))
+                    }
+                }
+            }
+            if (n > 0) {
+                Text(
+                    text = "→ ${n + 1} bloques de ~${workPerBlock} min, separados por $n descanso(s) de $bm min",
+                    fontSize = 10.sp,
+                    color = ZenSage
+                )
+            }
+        }
+        IconButton(onClick = onDelete) {
+            Icon(Icons.Default.Close, contentDescription = "Eliminar actividad", tint = ZenSage, modifier = Modifier.size(18.dp))
+        }
+    }
+}
+
+/** Fila de descanso exterior: va entre dos actividades y suma al total. */
+@Composable
+private fun FocusBreakRow(
+    seg: FocusSegment,
+    onUpdate: (FocusSegment) -> Unit,
+    onDelete: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(ZenSoftGreen)
+            .border(1.dp, ZenGreen.copy(alpha = 0.4f), RoundedCornerShape(12.dp))
+            .padding(8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        Box(
+            modifier = Modifier
+                .size(9.dp)
+                .clip(CircleShape)
+                .background(ZenGreen)
+        )
+        Column(modifier = Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Text(
+                text = "Descanso (entre actividades)",
+                fontSize = 12.sp,
+                fontWeight = FontWeight.SemiBold,
+                color = ZenCharcoal
+            )
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes - 1).coerceAtLeast(1))) }) {
+                    Icon(Icons.Default.Remove, contentDescription = "Menos", tint = ZenGreen, modifier = Modifier.size(16.dp))
+                }
+                Text(text = "${seg.durationMinutes} min", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = ZenCharcoal)
+                IconButton(onClick = { onUpdate(seg.copy(durationMinutes = (seg.durationMinutes + 1).coerceAtMost(120))) }) {
+                    Icon(Icons.Default.Add, contentDescription = "Más", tint = ZenGreen, modifier = Modifier.size(16.dp))
                 }
             }
         }
         IconButton(onClick = onDelete) {
-            Icon(Icons.Default.Close, contentDescription = "Eliminar", tint = ZenSage, modifier = Modifier.size(18.dp))
+            Icon(Icons.Default.Close, contentDescription = "Eliminar descanso", tint = ZenSage, modifier = Modifier.size(18.dp))
         }
     }
 }
