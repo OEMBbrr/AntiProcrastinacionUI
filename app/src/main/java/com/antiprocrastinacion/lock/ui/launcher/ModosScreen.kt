@@ -214,7 +214,6 @@ private fun ModeCard(
                     plan = plan,
                     planTotal = planTotal,
                     planWork = planWork,
-                    error = planError,
                     accent = accent,
                     onPlanChange = onPlanChange
                 )
@@ -330,7 +329,6 @@ private fun FocusPlanEditor(
     plan: List<FocusSegment>,
     planTotal: Int,
     planWork: Int,
-    error: String?,
     accent: Color,
     onPlanChange: (List<FocusSegment>) -> Unit
 ) {
@@ -401,12 +399,13 @@ private fun FocusPlanEditor(
             }
         }
 
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             val workCount = plan.count { it.type != "rest" }
             OutlinedButton(
                 onClick = {
                     onPlanChange(plan + FocusSegment("work", "Actividad ${workCount + 1}", 25))
                 },
+                modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 border = BorderStroke(1.dp, accent.copy(alpha = 0.4f))
@@ -417,6 +416,7 @@ private fun FocusPlanEditor(
             OutlinedButton(
                 onClick = { onPlanChange(plan + FocusSegment("rest", "", 5)) },
                 enabled = plan.isNotEmpty() && plan.last().type != "rest",
+                modifier = Modifier.weight(1f),
                 shape = RoundedCornerShape(10.dp),
                 contentPadding = PaddingValues(horizontal = 12.dp, vertical = 8.dp),
                 border = BorderStroke(1.dp, ZenGreen.copy(alpha = 0.5f))
@@ -424,17 +424,6 @@ private fun FocusPlanEditor(
                 Icon(Icons.Default.Add, contentDescription = null, tint = if (plan.isNotEmpty() && plan.last().type != "rest") ZenGreen else ZenSage.copy(alpha = 0.4f), modifier = Modifier.size(16.dp))
                 Text(text = "Descanso", fontSize = 12.sp, color = if (plan.isNotEmpty() && plan.last().type != "rest") ZenGreen else ZenSage.copy(alpha = 0.6f))
             }
-        }
-
-        if (error != null) {
-            Text(
-                text = error,
-                fontSize = 11.sp,
-                fontWeight = FontWeight.Medium,
-                color = ZenCoral,
-                textAlign = TextAlign.Center,
-                modifier = Modifier.fillMaxWidth()
-            )
         }
     }
 

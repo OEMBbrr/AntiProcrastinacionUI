@@ -394,7 +394,7 @@ body {
     font-weight: 500;
 }
 
-.btn-del-note {
+.btn-del-note, .btn-focus-note {
     background: transparent;
     border: none;
     cursor: pointer;
@@ -405,13 +405,19 @@ body {
     color: var(--text-muted);
 }
 
-.note-card:hover .btn-del-note {
+.note-card:hover .btn-del-note,
+.note-card:hover .btn-focus-note {
     opacity: 1;
 }
 
 .btn-del-note:hover {
     background: var(--hover-bg);
     color: var(--zen-coral);
+}
+
+.btn-focus-note:hover {
+    background: var(--hover-bg);
+    color: var(--zen-olive);
 }
 
 /* Reflection Banner */
