@@ -287,7 +287,7 @@ document.addEventListener('DOMContentLoaded', () => {
             else catText = 'General';
 
             const titleHtml = note.title ? `<div class="note-card-title">${escapeHtml(note.title)}</div>` : '';
-            const imgHtml = note.image ? `<img class="note-card-img" src="${note.image}" alt="Imagen adjunta">` : '';
+            const imgHtml = note.image ? `<img class="note-card-img" src="${note.image}" alt="Imagen adjunta" onload="window.dispatchEvent(new Event('resize'))">` : '';
 
             return `
                 <div class="note-card" data-id="${note.id}">
@@ -313,7 +313,32 @@ document.addEventListener('DOMContentLoaded', () => {
                 });
             });
         });
+
+        // Aplicar Masonry calculation (True Masonry via CSS Grid rows)
+        setTimeout(applyMasonrySpans, 50);
     }
+
+    function applyMasonrySpans() {
+        if (!notesGrid) return;
+        const cards = notesGrid.querySelectorAll('.note-card');
+        cards.forEach(card => {
+            // Remove span to get natural unconstrained height
+            card.style.gridRowEnd = '';
+            // Get bounding rect instead of offsetHeight for floating point accuracy
+            const rect = card.getBoundingClientRect();
+            // 16px is the margin-bottom value from CSS
+            const height = rect.height + 16; 
+            // 10px is the grid-auto-rows value
+            const span = Math.ceil(height / 10); 
+            card.style.gridRowEnd = `span ${span}`;
+        });
+    }
+
+    let resizeTimeout;
+    window.addEventListener('resize', () => {
+        clearTimeout(resizeTimeout);
+        resizeTimeout = setTimeout(applyMasonrySpans, 150);
+    });
 
     function getCatLabel(cat) {
         switch(cat) {
